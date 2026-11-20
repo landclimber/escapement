@@ -16,6 +16,6 @@ path = "src/bin/escapement.rs"
 [dependencies]
 escapement-program = { path = "../../escapement-program" }
 lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
-risc0-zkvm = { version = "=3.0.5", default-features = false }
+risc0-zkvm = { version = "3.0.5", default-features = false }
 # Pin ruint below 1.18 (MSRV 1.90) for guest toolchain compatibility.
 ruint = { version = "=1.17.0", default-features = false }

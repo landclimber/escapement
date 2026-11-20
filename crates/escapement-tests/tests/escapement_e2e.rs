@@ -66,6 +66,21 @@ fn assert_refused<T: std::fmt::Debug>(res: &Result<T, LeeError>, needle: &str) {
     );
 }
 
+/// Verifies a cycle-metered non-zero guest exit (`env::exit(code)`), proving the caller
+/// pays only actual cycles executed rather than the full `gas_limit`.
+fn assert_exit_code<T: std::fmt::Debug>(res: &Result<T, LeeError>, expected_code: u32) -> u64 {
+    match res {
+        Err(LeeError::ProgramExitedWithCode { code, cycles }) if *code == expected_code => {
+            assert!(
+                *cycles > 0 && *cycles < MAX_GAS_EXEC,
+                "expected metered cycles in (0, {MAX_GAS_EXEC}), got {cycles}"
+            );
+            *cycles
+        }
+        other => panic!("expected ProgramExitedWithCode {{ code: {expected_code} }}, got {other:?}"),
+    }
+}
+
 fn events_of<E: VestingEvent + borsh::BorshDeserialize>(events: &[TransactionEvent]) -> Vec<E> {
     let want = escapement_core::event::selector(E::NAME);
     events
@@ -847,10 +862,10 @@ fn s2_time_asymmetry_validity_window_and_live_clock_cancel() {
     assert_eq!(chain.token_balance(creator), 920_000);
     assert_eq!(chain.token_balance(escrow_id), 60_000);
 
-    // Advance far past end_ts -> beneficiary can claim remaining 60_000 privately, but 60_001 is REFUSED.
+    // Advance far past end_ts -> beneficiary can claim remaining 60_000 privately, but 60_001 is REFUSED (exit code 27).
     chain.tick(9_000_000);
     let over = chain.claim_private_blinded(&benef_k, sched_id, &mut dest_priv, [3; 32], 60_001, 9_000_000, true);
-    assert_refused(&over, "E027");
+    assert_exit_code(&over, 27);
     chain
         .claim_private_blinded(&benef_k, sched_id, &mut dest_priv, [4; 32], 60_000, 9_000_000, true)
         .expect("post-cancel vested tokens remain privately claimable");
@@ -900,7 +915,7 @@ fn s3_lez_admin_authority_fee_switch_and_immutability() {
     );
     assert_refused(&res, "E103");
 
-    // Changing token_program_id refused (write-once immutable).
+    // Changing token_program_id refused (write-once immutable, exit code 9).
     let res = chain.submit_public(
         Actor::new(chain.vesting, chain.vesting),
         &[Actor::new(chain.vesting, chain.vesting), Actor::new(cfg, chain.vesting)],
@@ -911,9 +926,9 @@ fn s3_lez_admin_authority_fee_switch_and_immutability() {
             fee_treasury: None,
         }),
     );
-    assert_refused(&res, "E009");
+    assert_exit_code(&res, 9);
 
-    // Fee cap > 100 bps refused (E007).
+    // Fee cap > 100 bps refused (exit code 7).
     let res = chain.submit_public(
         Actor::new(chain.vesting, chain.vesting),
         &[Actor::new(chain.vesting, chain.vesting), Actor::new(cfg, chain.vesting)],
@@ -924,7 +939,7 @@ fn s3_lez_admin_authority_fee_switch_and_immutability() {
             fee_treasury: Some(treasury),
         }),
     );
-    assert_refused(&res, "E007");
+    assert_exit_code(&res, 7);
 
     // Set 50 bps (0.50%) protocol fee -> succeeds and emits FeeConfigUpdated.
     let evs = chain
@@ -1115,7 +1130,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
     chain.transfer_public(&donor_k, ms_escrow, 5_000);
     assert_eq!(chain.token_balance(ms_escrow), 65_000);
 
-    // Creator is REFUSED from signalling milestone when milestone_authority is delegated (Soft-2)!
+    // Creator is REFUSED from signalling milestone when milestone_authority is delegated (Soft-2, exit code 13)!
     let res = chain.submit_public(
         Actor::new(creator, chain.vesting),
         &[
@@ -1129,7 +1144,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             milestone_index: 0,
         }),
     );
-    assert_refused(&res, "E013");
+    assert_exit_code(&res, 13);
 
     // Delegated milestone_authority signals tranche 0 -> succeeds and emits MilestoneSignaled.
     chain.tick(1_100_000);
@@ -1150,7 +1165,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
         .expect("delegated milestone signal succeeds");
     assert_eq!(events_of::<MilestoneSignaled>(&evs)[0].amount_unlocked, 20_000);
 
-    // Double-signalling same tranche is deterministically rejected (R4, E025).
+    // Double-signalling same tranche is deterministically rejected (R4, exit code 25).
     let dup = chain.submit_public(
         Actor::new(ms_auth, chain.vesting),
         &[
@@ -1164,7 +1179,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             milestone_index: 0,
         }),
     );
-    assert_refused(&dup, "E025");
+    assert_exit_code(&dup, 25);
 
     // Transfer beneficiary rights (F4): benef -> benef2.
     let evs = chain
@@ -1183,7 +1198,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
         .expect("beneficiary transfer succeeds");
     assert_eq!(events_of::<BeneficiaryTransferred>(&evs)[0].new_beneficiary, benef2);
 
-    // Old beneficiary is now refused on claim.
+    // Old beneficiary is now refused on claim (exit code 13).
     let old_claim = chain.submit_public(
         Actor::new(benef, chain.vesting),
         &[
@@ -1200,9 +1215,9 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             amount: None,
         }),
     );
-    assert_refused(&old_claim, "E013");
+    assert_exit_code(&old_claim, 13);
 
-    // Creator is REFUSED from cancelling when cancel_authority is delegated (Soft-1).
+    // Creator is REFUSED from cancelling when cancel_authority is delegated (Soft-1, exit code 13).
     let creator_cancel = chain.submit_public(
         Actor::new(creator, chain.vesting),
         &[
@@ -1217,7 +1232,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             schedule_id: ms_sched,
         }),
     );
-    assert_refused(&creator_cancel, "E013");
+    assert_exit_code(&creator_cancel, 13);
 
     // Delegated cancel_authority cancels -> 40,000 unvested returns strictly to creator's pinned refund_holding.
     let creator_before = chain.token_balance(creator);
@@ -1294,7 +1309,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
         )
         .expect("cliff schedule created");
 
-    // Pre-cliff claim fails with E026 naming exact cliff_ts (3000000).
+    // Pre-cliff claim exits with code 26 (cycle-metered, NOT full-budget panic) and core reports exact next_unlock_ts = 3_000_000!
     chain.tick(2_500_000);
     let pre = chain.submit_public(
         Actor::new(benef, chain.vesting),
@@ -1312,9 +1327,14 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             amount: None,
         }),
     );
-    assert_refused(&pre, "next unlock at 3000000 ms");
+    let pre_cycles = assert_exit_code(&pre, 26);
+    assert_eq!(
+        escapement_core::math::next_unlock_after(&chain.schedule(cl_sched), 2_500_000),
+        Some(3_000_000)
+    );
+    eprintln!("[METERED_REFUSAL] Pre-cliff ClaimPublic exit code 26 metered {pre_cycles} cycles (vs 10,000,000 panic cap)");
 
-    // Non-transferable rejects transfer.
+    // Non-transferable rejects transfer (exit code 21).
     let nt = chain.submit_public(
         Actor::new(benef, chain.vesting),
         &[Actor::new(benef, chain.vesting), Actor::new(cl_sched, chain.vesting)],
@@ -1324,7 +1344,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             new_beneficiary: benef2,
         }),
     );
-    assert_refused(&nt, "E021");
+    assert_exit_code(&nt, 21);
 
     // MakeNonCancelable is one-way irreversible.
     let evs = chain
@@ -1352,7 +1372,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
             schedule_id: cl_sched,
         }),
     );
-    assert_refused(&cancel_after, "E017");
+    assert_exit_code(&cancel_after, 17);
 }
 
 // ============================================================================

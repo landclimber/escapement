@@ -26,8 +26,8 @@ token_core = { git = "https://github.com/logos-blockchain/lez-programs.git", rev
 token-methods = { git = "https://github.com/logos-blockchain/lez-programs.git", rev = "cad71fc67d75ec9f6a07fc908f687678de7f7ed6" }
 lez-admin-authority = { git = "https://github.com/mmlado/lez-admin-authority.git", tag = "v0.2.0" }
 lez-authority = { git = "https://github.com/mmlado/lez-authority.git", tag = "v0.2.0" }
-risc0-zkvm = { version = "=3.0.5", default-features = false }
-risc0-build = "=3.0.5"
+risc0-zkvm = { version = "3.0.5", default-features = false }
+risc0-build = "3.0.5"
 proptest = "1.6"
 escapement-core = { path = "crates/escapement-core" }
 escapement-program = { path = "crates/escapement-program" }

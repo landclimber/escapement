@@ -386,6 +386,85 @@ pub enum VestingError {
 }
 
 impl VestingError {
+    /// Deterministic non-zero guest exit code (`1..=30`).
+    ///
+    /// On LEZ v0.4, exiting with a non-zero code (`env::exit(code)`) produces
+    /// `LeeError::ProgramExitedWithCode { code, cycles }` and bills only metered cycles
+    /// executed rather than burning the caller's entire declared `gas_limit`.
+    #[must_use]
+    pub const fn code(&self) -> u8 {
+        match self {
+            Self::ZeroAmount => 1,
+            Self::InvalidTimeRange => 2,
+            Self::InvalidCliffAmount => 3,
+            Self::InvalidMilestoneCount => 4,
+            Self::InvalidMilestoneTranche => 5,
+            Self::MilestoneSumMismatch => 6,
+            Self::FeeRateExceedsCap { .. } => 7,
+            Self::FeeTreasuryRequired => 8,
+            Self::TokenProgramImmutable => 9,
+            Self::TokenProgramNotConfigured => 10,
+            Self::ZeroAddress => 11,
+            Self::EmptyBatch => 12,
+            Self::Unauthorized => 13,
+            Self::ScheduleAlreadyExists => 14,
+            Self::BatchAlreadyExists => 15,
+            Self::NotASchedule => 16,
+            Self::NotCancelable => 17,
+            Self::AlreadyCancelled => 18,
+            Self::AlreadyNonCancelable => 19,
+            Self::AlreadyFullyVested => 20,
+            Self::NotTransferable => 21,
+            Self::SameBeneficiary => 22,
+            Self::NotMilestoneSchedule => 23,
+            Self::MilestoneIndexOutOfBounds => 24,
+            Self::MilestoneAlreadyUnlocked(_) => 25,
+            Self::NothingClaimable { .. } => 26,
+            Self::ExceedsClaimable { .. } => 27,
+            Self::InvalidRefundHolding => 28,
+            Self::EscrowFundingMismatch { .. } => 29,
+            Self::ArithmeticOverflow => 30,
+        }
+    }
+
+    /// Maps a non-zero guest exit code back to a static human-readable label.
+    #[must_use]
+    pub const fn describe_code(code: u32) -> &'static str {
+        match code {
+            1 => "E001: amount must be positive",
+            2 => "E002: invalid schedule time range",
+            3 => "E003: invalid cliff amount",
+            4 => "E004: milestone count must be in 1..=64",
+            5 => "E005: milestone tranche must be positive and locked",
+            6 => "E006: milestone tranche sum must equal total_amount",
+            7 => "E007: fee rate exceeds immutable cap",
+            8 => "E008: fee_treasury is required when fee_bps > 0",
+            9 => "E009: token_program_id is write-once and immutable",
+            10 => "E010: token_program_id is not configured",
+            11 => "E011: zero address is not permitted",
+            12 => "E012: batch must contain at least one recipient",
+            13 => "E013: caller is not authorized",
+            14 => "E014: schedule already exists",
+            15 => "E015: batch_id already exists",
+            16 => "E016: account does not hold an active schedule",
+            17 => "E017: schedule is not cancelable",
+            18 => "E018: schedule is already cancelled",
+            19 => "E019: schedule is already non-cancelable",
+            20 => "E020: schedule is already fully vested; nothing to cancel",
+            21 => "E021: schedule is non-transferable",
+            22 => "E022: new_beneficiary equals current beneficiary",
+            23 => "E023: schedule is not milestone-based",
+            24 => "E024: milestone index out of bounds",
+            25 => "E025: milestone index is already unlocked",
+            26 => "E026: nothing claimable yet",
+            27 => "E027: requested amount exceeds claimable",
+            28 => "E028: refund_holding must be an initialized token holding for token_definition",
+            29 => "E029: escrow delta does not match expected deposit",
+            30 => "E030: arithmetic overflow",
+            _ => "E999: unknown vesting exit code",
+        }
+    }
+
     #[must_use]
     pub fn message(&self) -> String {
         match self {
@@ -437,7 +516,14 @@ impl VestingError {
     }
 
     pub fn panic_with(&self) -> ! {
-        panic!("{}", self.message())
+        #[cfg(target_os = "zkvm")]
+        {
+            risc0_zkvm::guest::env::exit(self.code())
+        }
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            panic!("{}", self.message())
+        }
     }
 }
 

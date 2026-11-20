@@ -8,7 +8,7 @@ license.workspace = true
 risc0-build.workspace = true
 
 [dependencies]
-risc0-zkvm = { version = "=3.0.5", features = ["std"] }
+risc0-zkvm = { version = "3.0.5", features = ["std"] }
 
 [package.metadata.risc0]
 methods = ["guest"]
