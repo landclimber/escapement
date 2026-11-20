@@ -7,7 +7,8 @@
 
 use clock_core::{clock_actor, Message as ClockMessage, Reply as ClockReply};
 use escapement_core::{
-    batch_coord_pda, batch_escrow_pda, batch_escrow_seed, batch_schedule_pda, config_pda,
+    batch_coord_pda, batch_coord_seed, batch_escrow_pda, batch_escrow_seed, batch_schedule_pda,
+    batch_schedule_seed, config_pda,
     event::{
         BeneficiaryTransferred, Cancelled, Claimed, FeeConfigUpdated, MadeNonCancelable,
         MilestoneSignaled, ScheduleCreated, VestingEvent as _,
@@ -16,10 +17,10 @@ use escapement_core::{
         claimable_at, compute_fee_ceil, next_unlock_after, split_on_cancel,
         validate_schedule_params,
     },
-    schedule_pda, single_escrow_pda, single_escrow_seed, BatchCreateParams, CancellationRecord,
-    Config, CreateScheduleParams, Internal, Message, PendingOp, ScheduleAccount, ScheduleKind,
-    VestingActorState, VestingError, CONFIG_SEED, MAX_BROKER_FEE_BPS, MAX_PROTOCOL_FEE_BPS,
-    ZERO_ACCOUNT_ID,
+    schedule_pda, schedule_seed, single_escrow_pda, single_escrow_seed, BatchCreateParams,
+    CancellationRecord, Config, CreateScheduleParams, Internal, Message, PendingOp,
+    ScheduleAccount, ScheduleKind, VestingActorState, VestingError, CONFIG_SEED,
+    MAX_BROKER_FEE_BPS, MAX_PROTOCOL_FEE_BPS, ZERO_ACCOUNT_ID,
 };
 use lee_core::{
     account::{AccountId, Actor},
@@ -71,13 +72,21 @@ pub fn handle_message(input: &ReceiveInput) -> Response {
     // 4. Public / library message guarded by `lez-admin-authority` v0.2.0.
     let wire: Wire<Message> =
         borsh::from_slice(&input.message).expect("vesting wire message must decode");
-    lez_admin_authority::guard::<(Admin,), Config, Message>(
+    let mut resp = lez_admin_authority::guard::<(Admin,), Config, Message>(
         input,
         &CONFIG_SEED,
         InitGate::Deployer,
         wire,
         handle_public_message,
-    )
+    );
+    // Admit `config_pda` on first delivery (e.g., `AdminOp::Init`) under LEZ v0.4's
+    // `UnadmittedPublicActor` rule by attaching `CONFIG_SEED` to seat->config forwards.
+    for msg in &mut resp.sync_messages {
+        if msg.to == Actor::new(cfg_id, own_program) {
+            msg.pda_seeds.insert(CONFIG_SEED);
+        }
+    }
+    resp
 }
 
 fn own_actor(input: &ReceiveInput, account_id: AccountId) -> Actor {
@@ -167,10 +176,14 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
                 VestingError::Unauthorized.panic_with();
             }
             let creator = input.receiver.account_id;
+            let seed = schedule_seed(&creator, &params.salt);
             let sched_id = schedule_pda(own_program, &creator, &params.salt);
-            Response::keep_state().send_sync(
-                own_actor(input, sched_id),
-                &Internal::CreateSingle { creator, params },
+            Response::keep_state().send(
+                SyncMessage::new(
+                    own_actor(input, sched_id),
+                    &Internal::CreateSingle { creator, params },
+                )
+                .with_pda_seeds(Some(seed)),
             )
         }
         Message::BatchCreate(params) => {
@@ -178,10 +191,14 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
                 VestingError::Unauthorized.panic_with();
             }
             let creator = input.receiver.account_id;
+            let seed = batch_coord_seed(&creator, &params.batch_id);
             let coord_id = batch_coord_pda(own_program, &creator, &params.batch_id);
-            Response::keep_state().send_sync(
-                own_actor(input, coord_id),
-                &Internal::CreateBatchCoord { creator, params },
+            Response::keep_state().send(
+                SyncMessage::new(
+                    own_actor(input, coord_id),
+                    &Internal::CreateBatchCoord { creator, params },
+                )
+                .with_pda_seeds(Some(seed)),
             )
         }
         Message::ClaimPublic {
@@ -942,6 +959,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let mut resp = Response::set_state(committed.encode());
             for (idx, item) in params.items.into_iter().enumerate() {
                 let index_u32 = u32::try_from(idx).expect("checked count fits u32");
+                let seed = batch_schedule_seed(&creator, &params.batch_id, index_u32);
                 let sched_id = batch_schedule_pda(own_program, &creator, &params.batch_id, index_u32);
                 let schedule = ScheduleAccount {
                     version: 1,
@@ -961,12 +979,15 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     milestone_authority: item.milestone_authority,
                     cancelled: None,
                 };
-                resp = resp.send_sync(
-                    own_actor(input, sched_id),
-                    &Internal::InitBatchSchedule {
-                        batch_id: params.batch_id,
-                        schedule: Box::new(schedule),
-                    },
+                resp = resp.send(
+                    SyncMessage::new(
+                        own_actor(input, sched_id),
+                        &Internal::InitBatchSchedule {
+                            batch_id: params.batch_id,
+                            schedule: Box::new(schedule),
+                        },
+                    )
+                    .with_pda_seeds(Some(seed)),
                 );
             }
             resp
