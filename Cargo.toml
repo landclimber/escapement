@@ -1,0 +1,34 @@
+[workspace]
+members = [
+    "crates/escapement-core",
+    "crates/escapement-program",
+    "crates/escapement-methods",
+    "crates/escapement-tests",
+]
+exclude = [
+    "crates/escapement-methods/guest",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+borsh = { version = "1.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+lee = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["test-utils"] }
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["host"] }
+clock_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+programs = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["artifacts"] }
+token_core = { git = "https://github.com/logos-blockchain/lez-programs.git", rev = "cad71fc67d75ec9f6a07fc908f687678de7f7ed6" }
+token-methods = { git = "https://github.com/logos-blockchain/lez-programs.git", rev = "cad71fc67d75ec9f6a07fc908f687678de7f7ed6" }
+lez-admin-authority = { git = "https://github.com/mmlado/lez-admin-authority.git", tag = "v0.2.0" }
+lez-authority = { git = "https://github.com/mmlado/lez-authority.git", tag = "v0.2.0" }
+risc0-zkvm = { version = "=3.0.5", default-features = false }
+risc0-build = "=3.0.5"
+proptest = "1.6"
+escapement-core = { path = "crates/escapement-core" }
+escapement-program = { path = "crates/escapement-program" }
+escapement-methods = { path = "crates/escapement-methods" }

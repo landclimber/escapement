@@ -1,0 +1,18 @@
+[package]
+name = "escapement-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+borsh.workspace = true
+clock_core.workspace = true
+escapement-core.workspace = true
+escapement-methods.workspace = true
+lee.workspace = true
+lee_core.workspace = true
+lez-admin-authority.workspace = true
+lez-authority.workspace = true
+programs.workspace = true
+token_core.workspace = true
+token-methods.workspace = true
