@@ -447,7 +447,7 @@ impl TestChain {
             no_seal,
         )
         .expect("private holding init proves");
-        let tx_msg = PrivateTxMessage::from_circuit_output(Vec::new(), output.clone());
+        let tx_msg = PrivateTxMessage::from_circuit_output(BTreeMap::new(), output.clone());
         let tx_ws = PrivateWitnessSet::for_message(&tx_msg, proof, &[]);
         let diff = ValidatedStateDiff::from_privacy_preserving_transaction(
             &PrivacyPreservingTransaction::new(tx_msg, tx_ws),
@@ -544,7 +544,7 @@ impl TestChain {
             no_seal,
         )?;
 
-        let nonces = vec![(beneficiary_id, self.state.get_account_by_id(beneficiary_id).nonce)];
+        let nonces = BTreeMap::from([(beneficiary_id, self.state.get_account_by_id(beneficiary_id).nonce)]);
         let tx_msg = PrivateTxMessage::from_circuit_output(nonces, output.clone());
         let tx_ws = PrivateWitnessSet::for_message(&tx_msg, proof, &[beneficiary_key]);
         let diff = ValidatedStateDiff::from_privacy_preserving_transaction(
@@ -640,7 +640,7 @@ fn s1_private_claim_blinded_alias_single_tx_and_unlinkability() {
     let before = chain.state.clone();
     let err = chain.claim_private_blinded(&benef_k, sched_id, &mut uninit_priv, [0xA1; 32], 10_000, 2_000_000, true);
     assert_refused(&err, "recipient has no token holding; initialize it first");
-    assert_eq!(chain.state, before);
+    assert!(chain.state == before, "failed tx must leave chain state unchanged");
     assert_eq!(chain.token_balance(escrow_id), 100_000);
     assert_eq!(chain.schedule(sched_id).claimed_amount, 0);
 
@@ -653,7 +653,7 @@ fn s1_private_claim_blinded_alias_single_tx_and_unlinkability() {
         matches!(err, Err(LeeError::UnboundAsyncDestination { .. })),
         "unpromoted blinded alias must fail atomically with UnboundAsyncDestination, got {err:?}"
     );
-    assert_eq!(chain.state, before);
+    assert!(chain.state == before, "failed tx must leave chain state unchanged");
     assert_eq!(chain.schedule(sched_id).claimed_amount, 0);
     assert_eq!(dest_priv.balance(chain.token), 0);
 

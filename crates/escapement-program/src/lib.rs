@@ -14,7 +14,7 @@ use escapement_core::{
     },
     math::{
         claimable_at, compute_fee_ceil, next_unlock_after, split_on_cancel,
-        validate_schedule_params, vested_at,
+        validate_schedule_params,
     },
     schedule_pda, single_escrow_pda, single_escrow_seed, BatchCreateParams, CancellationRecord,
     Config, CreateScheduleParams, Internal, Message, PendingOp, ScheduleAccount, ScheduleKind,
