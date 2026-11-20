@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core-and-guest:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions pinned by commit SHA (aligned with logos-co/rfp PR 255).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: 1.98.1
+          components: clippy, rustfmt
+
+      - name: Install RISC Zero 3.0.5 (pinned rzup 0.5.2 + guest Rust 1.91.1)
+        run: |
+          cargo install --locked rzup --version 0.5.2
+          rzup install cargo-risczero 3.0.5
+          rzup install r0vm 3.0.5
+          rzup install rust 1.91.1
+          rzup install cpp 2024.1.5
+
+      - name: Run core math, proptest fuzzing, and real-ELF v0.4 integration/privacy/invariant tests
+        env:
+          RISC0_DEV_MODE: "1"
+        run: cargo test --workspace --locked -- --nocapture
