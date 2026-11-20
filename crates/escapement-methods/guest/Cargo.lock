@@ -458,6 +458,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clock_core"
+version = "0.1.0"
+source = "git+https://github.com/logos-blockchain/logos-execution-zone.git?tag=v0.4.0-rc3#bafd07be0701398f9bc435f73ab05e9a7936c301"
+dependencies = [
+ "borsh",
+ "lee_core",
+]
+
+[[package]]
 name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -752,6 +761,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "escapement-core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "lee_core",
+ "lez-admin-authority",
+ "lez-authority",
+ "risc0-zkvm",
+ "serde",
+]
+
+[[package]]
+name = "escapement-guest"
+version = "0.1.0"
+dependencies = [
+ "escapement-program",
+ "lee_core",
+ "risc0-zkvm",
+ "ruint",
+]
+
+[[package]]
+name = "escapement-program"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "clock_core",
+ "escapement-core",
+ "lee_core",
+ "lez-admin-authority",
+ "lez-authority",
+ "token_core",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1037,6 +1081,47 @@ dependencies = [
  "serde",
  "serde_with",
  "thiserror",
+]
+
+[[package]]
+name = "lez-admin-authority"
+version = "0.2.0"
+source = "git+https://github.com/mmlado/lez-admin-authority.git?tag=v0.2.0#e98471067f414a2f763f44450f5ae47fb285444b"
+dependencies = [
+ "lez-admin-authority-macros",
+ "lez-authority",
+]
+
+[[package]]
+name = "lez-admin-authority-macros"
+version = "0.2.0"
+source = "git+https://github.com/mmlado/lez-admin-authority.git?tag=v0.2.0#e98471067f414a2f763f44450f5ae47fb285444b"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "lez-authority"
+version = "0.2.0"
+source = "git+https://github.com/mmlado/lez-authority.git?tag=v0.2.0#145e09ca2f9739aaa09be5b08a9288175e2e813c"
+dependencies = [
+ "borsh",
+ "lee_core",
+ "lez-authority-macros",
+]
+
+[[package]]
+name = "lez-authority-macros"
+version = "0.2.0"
+source = "git+https://github.com/mmlado/lez-authority.git?tag=v0.2.0#145e09ca2f9739aaa09be5b08a9288175e2e813c"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -1881,32 +1966,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
-name = "token-guest"
-version = "0.1.0"
-dependencies = [
- "lee_core",
- "risc0-zkvm",
- "ruint",
- "token_program",
-]
-
-[[package]]
 name = "token_core"
 version = "0.1.0"
+source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=cad71fc67d75ec9f6a07fc908f687678de7f7ed6#cad71fc67d75ec9f6a07fc908f687678de7f7ed6"
 dependencies = [
  "borsh",
  "lee_core",
  "risc0-zkvm",
  "serde",
-]
-
-[[package]]
-name = "token_program"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "lee_core",
- "token_core",
 ]
 
 [[package]]

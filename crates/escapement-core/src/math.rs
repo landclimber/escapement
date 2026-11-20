@@ -150,7 +150,7 @@ fn validate_milestones(
     }
     let mut sum = 0u128;
     for t in tranches {
-        if t.amount == 0 || t.unlocked || t.unlocked_at.is_some() {
+        if t.amount == 0 || t.unlocked || t.unlocked_at_ms.is_some() {
             return Err(VestingError::InvalidMilestoneTranche);
         }
         sum = sum
