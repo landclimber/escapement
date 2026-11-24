@@ -9,18 +9,18 @@ Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), P
 - **Single immutable LEZ v0.4 actor program**, deployed with `program_loader` `immutable: true` (loader-enforced, no upgrade key); deployment and header read-back shown on a standalone sequencer, testnet 0.4 deployment pending.
 - **Zero protocol fee at launch (`0 bps`)** with a bounded, creation-only fee switch (`<= 100 bps`) gated by `lez-admin-authority` v0.2.0 (`Nominate` -> `Accept`, permanently renounceable), and **zero admin access, pause, or rescue power** over any schedule or escrow.
 - **Pull-only per-schedule claims** settling in 1 transaction either publicly (`ClaimPublic`) or into a shielded private account via fresh per-claim blinded aliases (`ClaimExact`).
-- **Local-first client stack** (Rust SDK, CLI, Logos Core module, Basecamp QML+C++ mini-app) **(M3–M4)** with user-configurable sequencer/indexer endpoints and zero hosted backend or telemetry.
+- **Local-first client stack**: Rust SDK and CLI (built); Logos Core module **(M2)** and Basecamp QML+C++ mini-app **(M3)**, with user-configurable sequencer/indexer endpoints and zero hosted backend or telemetry.
 
 ## Pillar-by-Pillar Assessment
 
 ### 1. Censorship Resistance
 - **Risk:** A hosted frontend, single RPC/indexer, or privileged admin pause/blacklist could block beneficiaries from claiming earned tokens.
-- **Mitigation:** Zero pause, freeze, blacklist, upgrade, or sweep instructions exist on schedules or escrows (true of the program today). Sequencer and indexer URLs will be user-configurable in both CLI and Basecamp UI **(M3–M4)**. No proprietary backend or relayer is required.
-- **User escape:** Any beneficiary can invoke `ClaimPublic` or `ClaimExact` directly via `escapement-cli` **(M3)**, `lez_core`, or any self-hosted Basecamp build against any LEZ sequencer.
+- **Mitigation:** Zero pause, freeze, blacklist, upgrade, or sweep instructions exist on schedules or escrows (true of the program today). Sequencer and indexer URLs are user-configurable in the CLI (`LEZ_RPC`) and will be in the Basecamp UI **(M3)**. No proprietary backend or relayer is required.
+- **User escape:** Any beneficiary can invoke `ClaimPublic` or `ClaimExact` directly via `escapement-cli` (built), `lez_core`, or any self-hosted Basecamp build against any LEZ sequencer.
 
 ### 2. Open (Visibility)
 - **Risk:** Unreproducible guest binaries, opaque build flags, or private offchain indexers prevent independent inspection or self-hosting.
-- **Mitigation:** Fully open repository: today `escapement-core`, `escapement-program`, `escapement-methods`, tests, and CI; later the SDK, CLI, Logos Core module, Basecamp QML UI, Nix flakes, and SPEL IDL **(M2–M4)**. Path-remapped reproducible guest builds checked for an exact ImageID match in CI **(M1)**. Immutable GitHub releases in an organisation-hosted catalog, signed with `lgx sign`, each with a Release Integrity Manifest including `rootHash` **(M4, `logos-co/rfp` PR 255)**.
+- **Mitigation:** Fully open repository: the program, guest, SDK, CLI, SPEL-generated IDL, tests, end-to-end suite and CI today; the Logos Core module **(M2)** and Basecamp QML UI with Nix flakes **(M3)** later. The guest build is reproducible and CI checks its image id against `image-ids.tsv` (built). Immutable GitHub releases in an organisation-hosted catalog, signed with `lgx sign`, each with a Release Integrity Manifest including `rootHash` **(M3, `logos-co/rfp` PR 255)**.
 - **User escape:** Anyone can rebuild the guest binary and every `.lgx-portable` module from a pinned commit and verify the onchain ImageID directly from the program header.
 
 ### 3. Free, as in Freedom (License)
@@ -33,8 +33,8 @@ Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), P
 - **Mitigation:**
   - Every private claim routes to a fresh single-use blinded alias `dest_priv.blinded(fresh_factor)` promoted atomically inside 1 PPTX (`20/20` pairwise-distinct aliases, nullifiers, commitments, and ephemeral keys in `adversarial_20_claim_privacy_linkability_suite`; no real private ID, nullifier key, or viewing key in any public transaction byte, event, or post-state).
   - `Claimed` events omit destination addresses and aliases; private `token::increase_balance` emits zero `Transferred` events (`M::EMITS_EVENTS == false`).
-  - SDK will validate that private targets belong to the shielded key tree and reject public addresses before tx construction (`Pr3`, **M3**).
-  - Basecamp UI will enforce a blocking pre-claim privacy disclosure before every private claim (`U5`/`Pr2`), run with network denied in the QML sandbox, and ship zero third-party analytics/telemetry **(M4)**.
+  - The SDK validates that a private target is a private account of the wallet (built from its key material) and rejects anything else before a transaction is built (`Pr3`, built and tested).
+  - Basecamp UI will enforce a blocking pre-claim privacy disclosure before every private claim (`U5`/`Pr2`), run with network denied in the QML sandbox, and ship zero third-party analytics/telemetry **(M3)**.
 - **User escape:** Recipients choose public vs private independently on every claim and can route through self-hosted sequencer/indexer nodes.
 
 ### 5. Security & Walkaway Test

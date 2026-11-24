@@ -11,14 +11,15 @@ standalone`, mock Bedrock, commit `bafd07be` asserted), on loopback, driven over
 skips STARK sealing; "real proof" means a full RISC Zero proof, verified by the sequencer. LEZ testnet
 0.4 has not launched (latest LEZ tag `v0.4.0-rc3`), so nothing here ran on it.
 
-**Machine.** A Linux x86-64 cloud container (gVisor), 32 vCPUs visible with a 2-core CPU request
-(bursting), 64 GiB RAM, CPU only.
+**Machine.** A Linux x86-64 cloud container (gVisor), CPU only, 32 vCPUs visible, 64 GiB RAM; the
+container requests 2 cores and bursts (the token real-proof run below used 8,754 s of CPU time in
+357 s of wall time, about 24 cores busy). Proving times on a desktop are part of the testnet milestone.
 
 ## Build identity
 
 | Item | Value |
 |---|---|
-| Program guest (`image-ids.tsv`) | image id `edb9fbe81a4c4046f60b33111dcc0c60e9ae6d9445ad329a259690d76707a865`, SHA-256 `f6758d82e60e7bef5506cefc23055a6d1af52ab3dd7c38afa5cb36f80afe6300`, 495,452 bytes |
+| Program guest (`image-ids.tsv`) | image id `adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c`, SHA-256 `03d8e8d9737790902390024555f27609d1e153582b3108cc86769387b69386e3`, 495,452 bytes |
 | Toolchains | host Rust 1.98.1; RISC Zero 3.0.5 (`r0vm`), guest Rust 1.91.1, C++ 2024.1.5 |
 | LEZ | `logos-execution-zone` tag `v0.4.0-rc3` (`bafd07be`) |
 | Token program | `lez-programs` `3f04cc37ec5f` (branch `refactor/lez-v0.4.x`) |
@@ -62,10 +63,14 @@ applied by the sequencer:
 | Private account's new commitment on the sequencer (`getProofsAndRoot`) | found |
 | Earlier pass (same build) | 237.8 s, same sizes |
 
-Not re-run on this build: the in-process real-proof test `s1_real_proof_dev_mode_0` (token claim,
-no fee witness). It passed on 20 Nov on an earlier build; it is `#[ignore]`d by default and reachable
-with `RISC0_DEV_MODE=0 cargo test -p escapement-tests --test escapement_e2e s1_real_proof_dev_mode_0
--- --ignored --nocapture` or CI's manual job.
+Also on this build, in-process (`s1_real_proof_dev_mode_0`, `RISC0_DEV_MODE=0`): a one-transaction
+private **token** claim with real proofs, both receipts checked to be `Succinct` and verified by LEZ's
+transaction validation before the state diff applies: private holding initialization proven in
+180.2 s, the claim in 159.8 s, 61,464 public cycles; the test asserts the private balance, the
+`Claimed` event, and that no private id, nullifier key or viewing key appears in the transaction
+bytes, events or state. (This test runs without a fee witness; the sequencer row above carries the
+in-proof fee.) Re-run: `RISC0_DEV_MODE=0 cargo test -p escapement-tests --test escapement_e2e
+s1_real_proof_dev_mode_0 -- --ignored --nocapture`, or CI's manual job.
 
 ## Review history
 

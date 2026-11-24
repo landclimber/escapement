@@ -8,7 +8,7 @@ through `lee::simulate_public_transaction` / `simulate_privacy_preserving_transa
 `v0.4.0-rc3`'s own state machine, with:
 
 - the reproducible guest of `image-ids.tsv`: `escapement` image id
-  `edb9fbe81a4c4046f60b33111dcc0c60e9ae6d9445ad329a259690d76707a865`, 495,452 bytes, built with
+  `adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c`, 495,452 bytes, built with
   RISC Zero's guest Rust 1.91.1 (`scripts/build-guest.sh --check`);
 - `lez-programs` token program at `3f04cc37ec5f`, LEZ clock at `v0.4.0-rc3`;
 - `fee_bps = 0`, no broker.

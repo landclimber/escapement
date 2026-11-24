@@ -1,6 +1,6 @@
 # Escapement — Public Architecture Decision Log
 
-All decisions recorded with UTC date, rationale, and rejected alternatives. Every LEZ v0.4 fact was verified against `logos-blockchain/logos-execution-zone` tag `v0.4.0-rc3`, `logos-blockchain/lez-programs` branch `refactor/lez-v0.4.x` (`cad71fc6`), and `mmlado/lez-admin-authority` tag `v0.2.0`.
+All decisions recorded with UTC date, rationale, and rejected alternatives. Every LEZ v0.4 fact was verified against `logos-blockchain/logos-execution-zone` tag `v0.4.0-rc3`, `logos-blockchain/lez-programs` branch `refactor/lez-v0.4.x` (`cad71fc6` until 23 Nov, `3f04cc37ec5f` since: same token source apart from SPEL annotations), and `mmlado/lez-admin-authority` tag `v0.2.0`.
 
 ---
 
@@ -52,7 +52,7 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 
 ## D-09 (2026-11-20): IDL from SPEL's v0.4 actor IDL v2 generator
 
-- **Decision:** Generate and CI-drift-check the program's actor IDL v2 with `spel-framework-core` (feature `idl-gen`) from SPEL's `refactor/lez-v0.4.x` branch (`c90ca0bc`, pins LEZ `v0.4.0-rc3`), the same generator `lez-programs@cad71fc6`'s `tools/idl-gen` uses for `token`, `nft`, and `twap_oracle` (its `ata` and `amm` IDLs are still version `0.1.0` on that commit). Move to the tagged SPEL v0.4 release when it is cut.
+- **Decision:** Generate and CI-drift-check the program's actor IDL v2 with `spel-framework-core` (feature `idl-gen`) from SPEL's `refactor/lez-v0.4.x` branch (`c90ca0bc`, pins LEZ `v0.4.0-rc3`), the same generator family `lez-programs`' `tools/idl-gen` uses for `token`, `nft` and `twap_oracle` (at `3f04cc37ec5f` it runs SPEL `d7444f8`). Move to the tagged SPEL v0.4 release when it is cut.
 - **Reason:** As of 2026-11-20 the latest SPEL release (`v0.7.0`) pins LEZ `v0.2.4` (SPEL `main` pins `v0.2.5-rc2`), so a released SPEL cannot describe a v0.4 actor program yet, while the v0.4 branch already can.
 
 ## D-10 (2026-11-20): Cancel never refunds claimed tokens (clock-lag clamp)
@@ -64,7 +64,7 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 
 - **Ruled out: a third party pre-initializing an escrow or fee-vault PDA.** On `v0.4.0-rc3` a PDA seed admits and authorizes only `for_public_pda(issuer, seed)`, where `issuer` is the *sending actor's program* (`lee/state_machine/core/src/execution_state.rs:353-357` `issuer()`, `:1196-1201` `admit`, `:1446-1451` `authorize`). Every Escapement escrow and fee vault is `for_public_pda(VESTING, seed)`, so only a message sent by an Escapement actor can admit or authorize it, and Escapement only ever sends `InitializeHolding` there with the schedule's own `token_definition`. Another program attaching the same seed derives a different account. A root (user) transaction has no issuer and cannot authorize a PDA at all. So no outsider can stamp a foreign token state on a future escrow or fee vault.
 - **Accepted (low): a broker holding of the wrong token.** If a creator names a `broker.holding` that holds a different token, the broker credit fails late in creation and the whole transaction reverts at full gas. No funds move; the creator chose the broker. The SDK will check the broker holding before submitting (M3).
-- **Accepted (info): `WithdrawFees` above the vault balance** reverts at full gas. Only `fee_treasury` can reach it; the SDK will read the vault balance first (M3).
+- **Accepted (info): `WithdrawFees` above the vault balance** reverts at full gas. Only `fee_treasury` can reach it; the SDK reads the vault balance first (`escapement-cli withdraw-fees`; a dedicated check in the Logos Core module, M2).
 - **Accepted (info): `lez-authority` refusals are panics by design** (`lez-authority` `guard`), so a non-admin `Configure` costs the sender the full budget. Escapement's own refusals all exit with metered codes.
 
 ## D-12 (2026-11-24): Root-or-direct-PDA authorization for every user transition
@@ -94,5 +94,5 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 
 ## D-16 (2026-11-24): Events on a standalone sequencer
 
-- **Observation:** On LEZ `v0.4.0-rc3`, `getEvents` belongs to the indexer service (`lez/indexer/service/rpc`); the standalone sequencer answers `Method not found` (observed by `e2e/run_e2e.sh`), and the sequencer persists events with finalized blocks (`lez/sequencer/core/src/lib.rs`, `apply_finalized`).
+- **Observation:** On LEZ `v0.4.0-rc3`, `getEvents` belongs to the indexer service (`lez/indexer/service/rpc/src/lib.rs:113`); the standalone sequencer answers `-32601 Method not found` (observed by `e2e/run_e2e.sh`), and the sequencer persists events with finalized blocks (`lez/sequencer/core/src/lib.rs`, `apply_finalized`).
 - **Decision:** Event fields are asserted in-process for every transition, private claims included; the sequencer suite records the `getEvents` answer instead of asserting events; reading them back through an indexer on LEZ testnet 0.4 is part of the testnet milestone. See `docs/events.md`.

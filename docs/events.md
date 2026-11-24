@@ -63,8 +63,8 @@ sequencer, by `e2e/run_e2e.sh`'s `claim-private-applied` step). `FeeWithdrawn` o
 
 ## Reading events
 
-On LEZ `v0.4.0-rc3`, `getEvents` is an RPC of the **indexer** service (`lez/indexer/service/rpc`),
-not of the sequencer: a standalone sequencer answers it with `Method not found` (recorded by
+On LEZ `v0.4.0-rc3`, `getEvents` is an RPC of the **indexer** service (`lez/indexer/service/rpc/src/lib.rs:113`),
+not of the sequencer: a standalone sequencer answers it with JSON-RPC error `-32601 Method not found` (recorded by
 `e2e/run_e2e.sh`, step `getEvents-observation`), and the sequencer stores a block's events with the
 blocks it finalizes through Bedrock (`lez/sequencer/core/src/lib.rs`, `apply_finalized`). So events
 cannot be read back from the standalone sequencer the suite runs on. Every event's fields are
