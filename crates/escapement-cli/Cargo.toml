@@ -1,0 +1,37 @@
+[package]
+name = "escapement-cli"
+description = "Escapement CLI: drives the vesting program on a LEZ v0.4 sequencer over JSON-RPC (create, claim public or private, cancel, signal, transfer, fees)"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Its own workspace: it links LEZ's client crates (RPC, wallet-side proving), which the program's
+# crates never need.
+[workspace]
+
+[[bin]]
+name = "escapement"
+path = "src/main.rs"
+
+[dependencies]
+escapement-core = { path = "../escapement-core" }
+escapement-sdk = { path = "../escapement-sdk" }
+lez-admin-authority = { git = "https://github.com/mmlado/lez-admin-authority.git", tag = "v0.2.0" }
+lez-authority = { git = "https://github.com/mmlado/lez-authority.git", tag = "v0.2.0" }
+# LEZ v0.4.0-rc3 (tag v0.4.0-rc3, commit bafd07be).
+lee = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["host"] }
+common = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+sequencer_service_rpc = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["client"] }
+program_loader_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+system_accounts = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+clock_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+fee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+programs = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["artifacts"] }
+risc0-zkvm = { version = "=3.0.5", default-features = false, features = ["client"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+anyhow = "1"
+borsh = { version = "1.5.7", features = ["derive"] }
+hex = "0.4"
+serde_json = "1"

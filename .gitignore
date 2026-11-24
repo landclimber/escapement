@@ -2,3 +2,5 @@
 **/target
 *.from-box
 .DS_Store
+/e2e/.run
+/crates/escapement-cli/target

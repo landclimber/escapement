@@ -1,6 +1,15 @@
 # Escapement — Security Tier 2 & Release Integrity Plan
 
-RFP-017 moves escrowed user funds and builds claim transactions inside Logos Basecamp, so it falls under **security tier 2** of the Logos RFP "Security and Release Integrity" requirements (`logos-co/rfp` PR 255, open as of 2026-11-20). This file is the plan; items marked with a milestone are not built yet.
+RFP-017 moves escrowed user funds and builds claim transactions inside Logos Basecamp, so it falls under **security tier 2** of the Logos RFP "Security and Release Integrity" requirements (`logos-co/rfp` PR 255, still open on 2026-11-24, so these are commitments we make, not RFP requirements). Program-level controls below are built and tested; items marked with a milestone are not built yet.
+
+## Program-level controls (built, tested)
+
+- **Who may act for an account:** user transitions are accepted only as the signer's root call or, for a program-owned PDA (multisig, DAO, launchpad), as `AsPda` from the program that derives it; anything else exits with code 35. LEZ v0.4 authorizes a signer's account across the whole call tree, so without this any program a user signs for could claim, transfer or cancel in their name (D-12; `sec_relay_eoa_refused`, `sec_pda_cpi_succeeds_and_inherited_seed_relay_refused`).
+- **Immutable deployment:** `program_loader` `CreateHeader { immutable: true }`, header read back and compared with the reproducible image id (`e2e/run_e2e.sh`). No upgrade key, pause, freeze, blacklist or sweep exists.
+- **Reproducible guest:** `scripts/build-guest.sh --check` rebuilds the guest anywhere and compares image id, SHA-256 and size with `image-ids.tsv`; CI runs it.
+- **Metered refusals:** every program refusal is an exit code (1..=35) charged by cycles used; a panic would be charged the transaction's whole gas limit.
+- **Funds invariants:** exact funding delta at creation; the cancel clamp `vested_at_cancel >= claimed`; per-asset fee vaults; write-once token program id; conservation checked after every step of a randomized multi-actor suite.
+- **Platform risk declared:** RISC Zero advisory GHSA-g6qg-9j8p-7j87 (critical) affects `risc0-zkvm < 3.1.0`, which LEZ `v0.4.0-rc3` uses; Escapement follows the LEZ release that bumps it (D-15).
 
 ## Catalog, signing, and releases (Baseline)
 

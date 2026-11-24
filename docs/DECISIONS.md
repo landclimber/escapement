@@ -66,3 +66,33 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 - **Accepted (low): a broker holding of the wrong token.** If a creator names a `broker.holding` that holds a different token, the broker credit fails late in creation and the whole transaction reverts at full gas. No funds move; the creator chose the broker. The SDK will check the broker holding before submitting (M3).
 - **Accepted (info): `WithdrawFees` above the vault balance** reverts at full gas. Only `fee_treasury` can reach it; the SDK will read the vault balance first (M3).
 - **Accepted (info): `lez-authority` refusals are panics by design** (`lez-authority` `guard`), so a non-admin `Configure` costs the sender the full budget. Escapement's own refusals all exit with metered codes.
+
+## D-12 (2026-11-24): Root-or-direct-PDA authorization for every user transition
+
+- **Decision:** A user transition (`CreateSchedule`, `BatchCreate`, `ClaimPublic`, `ClaimExact`, `Cancel`, `MakeNonCancelable`, `SignalMilestone`, `TransferBeneficiary`, `WithdrawFees`) is accepted only (a) as the transaction's root call (`input.from == None`) to the authorizing account's own actor, signed by it, or (b) as `Message::AsPda { seed, call }` from a program `P` with `for_public_pda(P, seed) == receiver`, with the delivery authorized. Anything else exits with code `35` (`NotRootOrDirectPda`), metered.
+- **Reason:** On LEZ `v0.4.0-rc3` a signer's account is authorized on every message of the transaction's call tree (`lee/state_machine/core/src/execution_state.rs`: `is_authorized` is set from `public_context.authorized_accounts`, and PDA grants are inherited by every downstream delivery). Without (a), any program a beneficiary or creator signs a transaction for could claim to an address of its choosing, transfer the position, or cancel, in their name. (b) keeps composability for multisigs, DAOs and launchpads: only the program that owns the PDA, calling directly, may act for it; an inherited grant passed to a third program is refused.
+- **Tests:** `sec_relay_eoa_refused` (all eight user operations relayed by another program: `35`, state unchanged), `sec_pda_cpi_succeeds_and_inherited_seed_relay_refused` (`AsPda` create/signal/claim/cancel/make-non-cancelable succeed; an inherited grant, a plain relay and a wrong seed: `35`).
+- **Alternative rejected:** checking only `is_authorized` (the 20 Nov prototype), and a root-only rule with no PDA path (blocks every multisig/DAO authority).
+
+## D-13 (2026-11-24): Native LEZ and token schedules (`Asset`)
+
+- **Decision:** `Asset::{Native, Token { definition }}` replaces `token_definition`. A native escrow is the balance actor `(escrow_pda, NATIVE_TOKEN_PROGRAM_ID)`, debited with the escrow seed through `native_token::Message::Transfer`; the first delivery to it is a seeded `ReadState`, which admits the new PDA account under LEZ v0.4's admission rule. Native schedules need only an initialized config (no token program); the creator funds them from its own native balance (`creator_holding == creator`, else code `13`). Native protocol fees go to the native fee vault PDA, admitted by `Internal::AdmitFeeVault` before its first credit. Refunds go to any account that is not one of the schedule's own accounts (code `28`).
+- **Reason:** LEZ's own unit of value is the native balance; a launch may vest either. The funding-delta check, the cancel clamp, the fee vaults and the privacy path are the same code for both.
+- **Tests:** `native_asset_lifecycle_fees_batch_private_claim_and_ceilings` (create, partial and full claims, overclaim `27`, cancel with refund, vested share after cancel, 50 bps fee into the native vault and its withdrawal, `13` for a non-treasury withdrawal, batch of 8 with per-recipient amounts, one-transaction private claim, batch ceilings per shape).
+
+## D-14 (2026-11-24): Private claim fees are paid by the beneficiary's private account
+
+- **Decision:** A private claim's fee is paid inside the proof by a private account of the beneficiary (for a native claim, the destination itself out of the claimed credit, as the CLI does). The SDK reserves the fee at a five-block headroom from public fee data only and refuses before proving if the payer cannot cover it (`InsufficientPrivateGas`).
+- **Reason:** A creator-funded fee float is a pool any beneficiary can drain by declaring a public target "private", and it links the claim to the creator's account. The reserve is computed from public inputs, so it reveals nothing about the payer's balance.
+- **Alternative rejected:** a creator-funded fee float, and LEZ rc3 wallet's `min(headroom, balance)` reserve, which publishes the payer's whole balance whenever it is below the headroom.
+
+## D-15 (2026-11-24): Platform risks declared, not hidden
+
+- RISC Zero advisory GHSA-g6qg-9j8p-7j87 (critical, 11 Nov 2026): the Groth16 verifier can accept a chosen invalid `ReceiptClaim`; affected `risc0-zkvm < 3.1.0`, `risc0-groth16 < 3.0.6`. LEZ `v0.4.0-rc3`, and so this program's proofs, use `risc0-zkvm 3.0.5`. The fix is a platform bump; Escapement moves with the LEZ tag that carries it and re-runs its suites.
+- LEZ `main` after rc3 changed private fees (explicit proven `tip`, larger `SHIELD_BYTES`); the SDK's fee estimate and the private-claim test are re-measured at the testnet 0.4 tag.
+- `lez-programs`' v0.4 token program lives on an unmerged branch; it is pinned by commit (`3f04cc37ec5f`, whose token source equals the earlier `cad71fc` apart from SPEL annotations) and replaced by the official deployment's program id at testnet 0.4 (write-once `token_program_id`).
+
+## D-16 (2026-11-24): Events on a standalone sequencer
+
+- **Observation:** On LEZ `v0.4.0-rc3`, `getEvents` belongs to the indexer service (`lez/indexer/service/rpc`); the standalone sequencer answers `Method not found` (observed by `e2e/run_e2e.sh`), and the sequencer persists events with finalized blocks (`lez/sequencer/core/src/lib.rs`, `apply_finalized`).
+- **Decision:** Event fields are asserted in-process for every transition, private claims included; the sequencer suite records the `getEvents` answer instead of asserting events; reading them back through an indexer on LEZ testnet 0.4 is part of the testnet milestone. See `docs/events.md`.

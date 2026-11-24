@@ -2,11 +2,11 @@
 
 Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), Privacy, and Security (following `ethskills.com/crops`).
 
-> **Status (2026-11-20).** Built and tested in this repository: `escapement-core`, `escapement-program`, `escapement-methods` (guest), `escapement-tests`, and SHA-pinned CI. Everything tagged **(M1)**–**(M5)** below is the design for the grant milestones and does not exist yet. See `README.md` and `docs/traceability.md`.
+> **Status (2026-11-24).** Built and tested in this repository: the program (native and token schedules), its guest with a reproducible build, `escapement-sdk`, `escapement-cli`, the SPEL IDL, an end-to-end suite on a standalone LEZ v0.4.0-rc3 sequencer (immutable deployment, public and private claims, refusals on chain), and SHA-pinned CI. The Logos Core module, the Basecamp mini-app and the testnet 0.4 deployment are not built yet.
 
 ## Chosen Default
 
-- **Single immutable LEZ v0.4 actor program**, to be deployed with `program-loader --immutable` (loader-enforced, no upgrade key, mirrored into the commitment tree) **(M5)**.
+- **Single immutable LEZ v0.4 actor program**, deployed with `program_loader` `immutable: true` (loader-enforced, no upgrade key); deployment and header read-back shown on a standalone sequencer, testnet 0.4 deployment pending.
 - **Zero protocol fee at launch (`0 bps`)** with a bounded, creation-only fee switch (`<= 100 bps`) gated by `lez-admin-authority` v0.2.0 (`Nominate` -> `Accept`, permanently renounceable), and **zero admin access, pause, or rescue power** over any schedule or escrow.
 - **Pull-only per-schedule claims** settling in 1 transaction either publicly (`ClaimPublic`) or into a shielded private account via fresh per-claim blinded aliases (`ClaimExact`).
 - **Local-first client stack** (Rust SDK, CLI, Logos Core module, Basecamp QML+C++ mini-app) **(M3–M4)** with user-configurable sequencer/indexer endpoints and zero hosted backend or telemetry.
@@ -53,5 +53,5 @@ Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), P
 
 1. **Public schedule & beneficiary linkability at creation:** Schedule parameters and beneficiary public address are public onchain state by RFP-017 design; privacy protects the destination private account and all post-claim movements (full beneficiary anonymity requires commitment-based registration under LP-0003, out of scope for RFP-017).
 2. **Residual post-claim timing/amount correlation:** Immediately deshielding or trading the exact claimed amount after a claim can correlate the movement offchain; disclosed explicitly in the pre-claim UI privacy notice (`U5`/`Pr2`).
-3. **Private-claim native LEZ gas requirement:** a production PPTX pays its fee from a witnessed private account (`ProvingInput.fee`; the prototype's proofs ran with `fee: None`, as recorded in E-02); the UI will verify native balance sufficiency pre-claim and surface an actionable error (`U4`, M4), and the SDK will use fixed fee-reserve tiers to avoid leaking small balances (M3).
+3. **Private-claim native LEZ gas requirement:** a private claim pays its fee inside the proof from a private account of the beneficiary (for native claims the destination itself, out of the claimed credit, as `escapement-cli` does on the sequencer suite); the UI will verify native balance sufficiency pre-claim and surface an actionable error (`U4`, M4), and the SDK will use fixed fee-reserve tiers to avoid leaking small balances (M3).
 4. **Producer-chosen block timestamps:** LEZ v0.4 block timestamps are chosen by the block producer and the clock program does not enforce monotonic time; acceptable for vesting horizons of days to years, and the cancel clamp above keeps a backwards step from moving claimed tokens.
