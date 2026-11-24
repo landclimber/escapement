@@ -2,6 +2,8 @@
 //! for the Escapement LEZ v0.4 token vesting program.
 
 pub mod event;
+#[cfg(kani)]
+mod kani_proofs;
 pub mod math;
 
 use borsh::{BorshDeserialize, BorshSerialize};

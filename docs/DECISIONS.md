@@ -22,10 +22,10 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 - **Reason:** Verified in `s1_private_claim_blinded_alias_single_tx_and_unlinkability` and `s1_real_proof_dev_mode_0`: completes in **1 LEZ transaction** (`P1`), leaves **zero** mailbox publications, emits **zero** `Transferred` events (`M::EMITS_EVENTS == false` on private execution), never exposes `dest_priv` in any public byte or event (`F2`), makes repeated claims to the same private wallet pairwise unlinkable (`20/20` distinct aliases), and fails atomically (`UnboundAsyncDestination`) if promotion is omitted (`R1`).
 - **Alternative rejected:** Public-to-private mailbox credit (`Publication::Clear`, which exposes `dest_priv` in plaintext, requires a pre-registered `recovery_binding`, and takes 2 transactions) or intermediate public burn/shield hop (2 transactions, violates `P1`).
 
-## D-04 (2026-11-20): Cycle-metered guest exit codes (`env::exit(1..=34)`) instead of panics
+## D-04 (2026-11-20): Cycle-metered guest exit codes (`env::exit(1..=35)`) instead of panics
 
-- **Decision:** Every deterministic vesting refusal (`VestingError`, codes `1..=34`) exits with `risc0_zkvm::guest::env::exit(code)` on `target_os = "zkvm"` rather than `panic!`.
-- **Reason:** Verified in LEZ `v0.4.0-rc3` (`validated_state_diff/mod.rs:503-513`): panics lose the cycle count and bill the caller's entire declared `gas_limit` (up to `10,000,000` cycles). Non-zero exit codes return `LeeError::ProgramExitedWithCode { code, cycles }` and bill only metered cycles executed (`15,836` cycles measured on a pre-cliff refusal, `0.16%` of the 10M cap, 631× less than a panic).
+- **Decision:** Every deterministic vesting refusal (`VestingError`, codes `1..=35`; code 35 added on 24 Nov, D-12) exits with `risc0_zkvm::guest::env::exit(code)` on `target_os = "zkvm"` rather than `panic!`.
+- **Reason:** Verified in LEZ `v0.4.0-rc3` (`validated_state_diff/mod.rs:503-513`): panics lose the cycle count and bill the caller's entire declared `gas_limit` (up to `10,000,000` cycles). Non-zero exit codes return `LeeError::ProgramExitedWithCode { code, cycles }` and bill only metered cycles executed (`16,150` cycles measured on a pre-cliff refusal on 24 Nov, `0.16%` of the 10M cap, about 620× less than a panic).
 - **Alternative rejected:** `panic!` on user errors (penalizes accidental early claims or stale retries with full gas-limit burn).
 
 ## D-05 (2026-11-20): Creator-paid, creation-only fee switch (`0 bps` default, `<= 100 bps` immutable cap) via `lez-admin-authority` v0.2.0
@@ -43,12 +43,12 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 ## D-07 (2026-11-20): Dedicated single-schedule escrow PDA + shared batch escrow PDA + donation-proof balance-delta checks
 
 - **Decision:** Single schedules use a dedicated `escrow_pda`; `BatchCreate` uses a write-once `batch_coord_pda` and a shared `batch_escrow_pda` funded in one `token::Transfer`, creating independent per-recipient `schedule_pda_i` actors. Creation verifies exact balance delta `post - pre == total_amount` via `token::ReadState` before and after transfer; vesting and cancellation math never read `escrow_account.balance`.
-- **Reason:** Achieves up to `N_max = 208` schedules in a single LEZ v0.4 transaction (`Linear`; `9,992,839` cycles, `99.93%` of the 10M cap; 179 for `CliffLinear` with a cancel authority, 149 for 4-tranche `Milestone` with both authorities) while keeping claims completely isolated per schedule and immune to unsolicited direct donations to escrow addresses.
+- **Reason:** Fits up to `N_max = 206` token schedules (226 native) in one LEZ v0.4 transaction for `Linear`, 178 (194) for `CliffLinear` with a cancel authority, 148 (166) for a 4-tranche `Milestone` with both authorities (`docs/gas-and-batch.md`, 24 Nov), while keeping claims completely isolated per schedule and immune to unsolicited direct donations to escrow addresses.
 
 ## D-08 (2026-11-20): Zero-dependency 256-bit `mul_div` in `escapement-core`
 
 - **Decision:** Implement exact 256-bit `wide_mul_u128` + restoring long division directly in `escapement-core/src/math.rs`, fuzz-verified over 12,288 `proptest` cases (28,672 across all seven property suites) across full `u128`/`u64` domains.
-- **Reason:** Zero external math crate bloat inside the RISC Zero guest ELF (`482,284` bytes), zero `unsafe`, exact overflow-free precision up to `u128::MAX`, floor rounding on intermediate claims, and exact terminal release with zero stranded dust.
+- **Reason:** Zero external math crate bloat inside the RISC Zero guest ELF (495,452 bytes on 24 Nov, `image-ids.tsv`), zero `unsafe`, exact overflow-free precision up to `u128::MAX`, floor rounding on intermediate claims, and exact terminal release with zero stranded dust.
 
 ## D-09 (2026-11-20): IDL from SPEL's v0.4 actor IDL v2 generator
 

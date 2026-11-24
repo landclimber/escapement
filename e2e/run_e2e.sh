@@ -60,10 +60,12 @@ as_c() { ESCAPEMENT_KEY="$CK" cli "$@"; }
 #    cancel (unvested back), vested remainder claimable after cancel.
 NOW="$(clock)"
 # Long enough that a real proof (minutes on CPU) lands before everything has vested.
+# The total scales with it so that 150,000,000 has vested about 20 s after the start.
 LINEAR_MS="${E2E_LINEAR_MS:-$([ "$E2E_DEV_MODE" = 1 ] && echo 90000 || echo 3600000)}"
-L="$(step create-linear cli create --beneficiary "$BA" --total 1000000000 --linear "$NOW,$((NOW + LINEAR_MS))")"
+TOTAL=$((1000000000 * LINEAR_MS / 90000))
+L="$(step create-linear cli create --beneficiary "$BA" --total "$TOTAL" --linear "$NOW,$((NOW + LINEAR_MS))")"
 LS="$(echo "$L" | jq -r .result.schedule)"
-expect escrow-holds-total '.result.escrow_balance == "1000000000"' "$L"
+expect escrow-holds-total ".result.escrow_balance == \"$TOTAL\"" "$L"
 wait_clock_past $((NOW + 20000))
 R="$(step claim-public-partial as_b claim --schedule "$LS" --amount 100000000 --to "$BA")"
 expect claim-public-applied '.result.tx.reverted == false and .result.escrow_debited == "100000000" and .result.claimed_total == "100000000"' "$R"
