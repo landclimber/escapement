@@ -14,5 +14,6 @@ lee_core.workspace = true
 lez-admin-authority.workspace = true
 lez-authority.workspace = true
 programs.workspace = true
+risc0-zkvm = { workspace = true, features = ["std"] }
 token_core.workspace = true
 token-methods.workspace = true

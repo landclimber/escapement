@@ -1255,6 +1255,7 @@ dependencies = [
  "lez-admin-authority",
  "lez-authority",
  "programs",
+ "risc0-zkvm",
  "token-methods",
  "token_core",
 ]

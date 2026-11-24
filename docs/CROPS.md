@@ -2,24 +2,26 @@
 
 Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), Privacy, and Security (following `ethskills.com/crops`).
 
+> **Status (2026-11-20).** Built and tested in this repository: `escapement-core`, `escapement-program`, `escapement-methods` (guest), `escapement-tests`, and SHA-pinned CI. Everything tagged **(M1)**–**(M5)** below is the design for the grant milestones and does not exist yet. See `README.md` and `docs/traceability.md`.
+
 ## Chosen Default
 
-- **Single immutable LEZ v0.4 actor program** deployed with `program-loader --immutable` (loader-enforced, no upgrade key, mirrored into the commitment tree).
+- **Single immutable LEZ v0.4 actor program**, to be deployed with `program-loader --immutable` (loader-enforced, no upgrade key, mirrored into the commitment tree) **(M5)**.
 - **Zero protocol fee at launch (`0 bps`)** with a bounded, creation-only fee switch (`<= 100 bps`) gated by `lez-admin-authority` v0.2.0 (`Nominate` -> `Accept`, permanently renounceable), and **zero admin access, pause, or rescue power** over any schedule or escrow.
 - **Pull-only per-schedule claims** settling in 1 transaction either publicly (`ClaimPublic`) or into a shielded private account via fresh per-claim blinded aliases (`ClaimExact`).
-- **Local-first client stack** (Rust SDK, CLI, Logos Core module, Basecamp QML+C++ mini-app) with user-configurable sequencer/indexer endpoints and zero hosted backend or telemetry.
+- **Local-first client stack** (Rust SDK, CLI, Logos Core module, Basecamp QML+C++ mini-app) **(M3–M4)** with user-configurable sequencer/indexer endpoints and zero hosted backend or telemetry.
 
 ## Pillar-by-Pillar Assessment
 
 ### 1. Censorship Resistance
 - **Risk:** A hosted frontend, single RPC/indexer, or privileged admin pause/blacklist could block beneficiaries from claiming earned tokens.
-- **Mitigation:** Zero pause, freeze, blacklist, upgrade, or sweep instructions exist on schedules or escrows. Sequencer and indexer URLs are user-configurable in both CLI and Basecamp UI. No proprietary backend or relayer is required.
-- **User escape:** Any beneficiary can invoke `ClaimPublic` or `ClaimExact` directly via `escapement-cli`, `lez_core`, or any self-hosted Basecamp build against any LEZ sequencer.
+- **Mitigation:** Zero pause, freeze, blacklist, upgrade, or sweep instructions exist on schedules or escrows (true of the program today). Sequencer and indexer URLs will be user-configurable in both CLI and Basecamp UI **(M3–M4)**. No proprietary backend or relayer is required.
+- **User escape:** Any beneficiary can invoke `ClaimPublic` or `ClaimExact` directly via `escapement-cli` **(M3)**, `lez_core`, or any self-hosted Basecamp build against any LEZ sequencer.
 
 ### 2. Open (Visibility)
 - **Risk:** Unreproducible guest binaries, opaque build flags, or private offchain indexers prevent independent inspection or self-hosting.
-- **Mitigation:** 100% open repository covering `escapement-core`, `escapement-program`, `escapement-methods`, SDK, CLI, Logos Core module, Basecamp QML UI, Nix flakes, actor IDL v2, and CI. Deterministic Docker guest builds verify byte-for-byte ImageID match in CI. Persistent (immutable) GitHub releases with `lgx sign` signatures and per-milestone release-integrity manifests (aligned with `logos-co/rfp` PR 255).
-- **User escape:** Anyone can rebuild every guest binary and `.lgx-portable` module from a pinned commit and verify the onchain ImageID directly from the program header.
+- **Mitigation:** Fully open repository: today `escapement-core`, `escapement-program`, `escapement-methods`, tests, and CI; later the SDK, CLI, Logos Core module, Basecamp QML UI, Nix flakes, and SPEL IDL **(M2–M4)**. Path-remapped reproducible guest builds checked for an exact ImageID match in CI **(M1)**. Immutable GitHub releases in an organisation-hosted catalog, signed with `lgx sign`, each with a Release Integrity Manifest including `rootHash` **(M4, `logos-co/rfp` PR 255)**.
+- **User escape:** Anyone can rebuild the guest binary and every `.lgx-portable` module from a pinned commit and verify the onchain ImageID directly from the program header.
 
 ### 3. Free, as in Freedom (License)
 - **Risk:** Source-available licenses (BUSL/SSPL), proprietary plugins, or future relicensing trap users and integrators.
@@ -29,25 +31,27 @@ Evaluated against Censorship Resistance, Open Source and Free (as in Freedom), P
 ### 4. Privacy
 - **Risk:** Schedule terms, claim amounts, beneficiary public addresses, PPTX fee reserves, and network/RPC IP metadata are observable; reusing a plaintext destination address across claims would link a user's private treasury.
 - **Mitigation:**
-  - Every private claim routes to a fresh single-use blinded alias `dest_priv.blinded(fresh_factor)` promoted atomically inside 1 PPTX (`20/20` pairwise-distinct aliases verified in `adversarial_20_claim_privacy_linkability_suite`; `0` real private IDs in public bytes/events).
-  - `Claimed` events omit destination addresses; private `token::increase_balance` emits zero `Transferred` events (`M::EMITS_EVENTS == false`).
-  - SDK validates that private targets belong to the shielded key tree and rejects public addresses before tx construction (`Pr3`).
-  - Basecamp UI enforces a blocking pre-claim privacy disclosure before every private claim (`U5`/`Pr2`), runs with network denied in the QML sandbox, and ships zero third-party analytics/telemetry.
+  - Every private claim routes to a fresh single-use blinded alias `dest_priv.blinded(fresh_factor)` promoted atomically inside 1 PPTX (`20/20` pairwise-distinct aliases, nullifiers, commitments, and ephemeral keys in `adversarial_20_claim_privacy_linkability_suite`; no real private ID, nullifier key, or viewing key in any public transaction byte, event, or post-state).
+  - `Claimed` events omit destination addresses and aliases; private `token::increase_balance` emits zero `Transferred` events (`M::EMITS_EVENTS == false`).
+  - SDK will validate that private targets belong to the shielded key tree and reject public addresses before tx construction (`Pr3`, **M3**).
+  - Basecamp UI will enforce a blocking pre-claim privacy disclosure before every private claim (`U5`/`Pr2`), run with network denied in the QML sandbox, and ship zero third-party analytics/telemetry **(M4)**.
 - **User escape:** Recipients choose public vs private independently on every claim and can route through self-hosted sequencer/indexer nodes.
 
 ### 5. Security & Walkaway Test
 - **Risk:** Precision overflow, reentrancy across multi-actor hops, unsolicited escrow donations, delegated authority abuse, admin key compromise, or team disappearance.
 - **Mitigation:**
-  - Full 256-bit `mul_div` math (`proptest`-verified across 12,288 cases) with floor rounding on intermediate claims and exact dust-free terminal completion.
+  - Full 256-bit `mul_div` math (`proptest`-verified across 28,672 cases) with floor rounding on intermediate claims and exact dust-free terminal completion.
   - Transient `PendingOp` state locks reject reentrant messages during synchronous `ReadState` / `clock` hops.
   - Creation verifies exact escrow balance delta (`post - pre == total_amount`); schedule math never depends on `escrow_account.balance` (donation-proof).
   - `refund_holding` is validated and frozen immutably at creation; delegated `cancel_authority` and `milestone_authority` are strictly exclusive.
-  - `token_program_id` is write-once; protocol fee cap (`100 bps`) is compile-time immutable; `Admin` uses two-step `Nominate` -> `Accept` and can be permanently renounced.
+  - `split_on_cancel` clamps `vested_at_cancel >= claimed_amount`, so a cancel read against a lagging or regressed clock can never refund tokens already claimed (and cannot draw on other recipients' share of a batch escrow).
+  - Protocol fees go to a per-token fee vault PDA, so enabling fees cannot block schedule creation for any token, including after `Renounce`.
+  - `token_program_id` is write-once and cannot be set to the program itself, its config PDA, or the clock; protocol fee cap (`100 bps`) is compile-time immutable; `Admin` uses two-step `Nominate` -> `Accept` and can be permanently renounced.
 - **User escape (Walkaway Test):** If our team, catalog, and every hosted indexer disappear permanently, the immutable onchain program continues operating unchanged: every beneficiary can still claim 100% of vested tokens (publicly or privately), every cancel authority can still cancel cancelable schedules to pinned refund holdings, and every milestone authority can still unlock tranches.
 
 ## Accepted Compromises (Explicit & Bounded)
 
 1. **Public schedule & beneficiary linkability at creation:** Schedule parameters and beneficiary public address are public onchain state by RFP-017 design; privacy protects the destination private account and all post-claim movements (full beneficiary anonymity requires commitment-based registration under LP-0003, out of scope for RFP-017).
 2. **Residual post-claim timing/amount correlation:** Immediately deshielding or trading the exact claimed amount after a claim can correlate the movement offchain; disclosed explicitly in the pre-claim UI privacy notice (`U5`/`Pr2`).
-3. **Private-claim native LEZ gas requirement:** LEZ v0.4 requires a PPTX fee to be paid from a witnessed private account; the UI verifies native balance sufficiency pre-claim and surfaces an actionable error (`U4`), and the SDK uses fixed fee-reserve tiers to avoid leaking small balances.
-4. **Producer-chosen block timestamps:** LEZ v0.4 block timestamps are chosen by the block producer (~10 s granularity); acceptable for vesting horizons of days to years.
+3. **Private-claim native LEZ gas requirement:** a production PPTX pays its fee from a witnessed private account (`ProvingInput.fee`; the prototype's proofs ran with `fee: None`, as recorded in E-02); the UI will verify native balance sufficiency pre-claim and surface an actionable error (`U4`, M4), and the SDK will use fixed fee-reserve tiers to avoid leaking small balances (M3).
+4. **Producer-chosen block timestamps:** LEZ v0.4 block timestamps are chosen by the block producer and the clock program does not enforce monotonic time; acceptable for vesting horizons of days to years, and the cancel clamp above keeps a backwards step from moving claimed tokens.

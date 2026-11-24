@@ -1,22 +1,20 @@
 //! Escapement — Privacy-Preserving Token Vesting Program for LEZ v0.4.
 //!
 //! Uses LEZ v0.4's actor-message execution model (`actor_entrypoint!(raw handle_message)`),
-//! `lez-admin-authority` v0.2.0 for bounded creation-fee governance, `clock_core` for live
-//! public time (`ClaimPublic`, `Cancel`, `SignalMilestone`), and `Response::timestamp_window`
-//! for expiry-free private claims (`ClaimExact`).
+//! `lez-admin-authority` v0.2.0 for bounded creation-fee governance, per-token fee vault PDAs,
+//! `clock_core` for live public time (`ClaimPublic`, `Cancel`, `SignalMilestone`), and
+//! `Response::timestamp_window` for expiry-free private claims (`ClaimExact`).
 
-use clock_core::{clock_actor, Message as ClockMessage, Reply as ClockReply};
+use clock_core::{clock_account_id, clock_actor, Message as ClockMessage, Reply as ClockReply};
 use escapement_core::{
     batch_coord_pda, batch_coord_seed, batch_escrow_pda, batch_escrow_seed, batch_schedule_pda,
     batch_schedule_seed, config_pda,
     event::{
-        BeneficiaryTransferred, Cancelled, Claimed, FeeConfigUpdated, MadeNonCancelable,
-        MilestoneSignaled, ScheduleCreated, VestingEvent as _,
+        BeneficiaryTransferred, Cancelled, Claimed, FeeConfigUpdated, FeeWithdrawn,
+        MadeNonCancelable, MilestoneSignaled, ScheduleCreated, VestingEvent as _,
     },
-    math::{
-        claimable_at, compute_fee_ceil, next_unlock_after, split_on_cancel,
-        validate_schedule_params,
-    },
+    fee_vault_pda, fee_vault_seed,
+    math::{claimable_at, compute_fee_ceil, split_on_cancel, validate_schedule_params},
     schedule_pda, schedule_seed, single_escrow_pda, single_escrow_seed, BatchCreateParams,
     CancellationRecord, Config, CreateScheduleParams, Internal, Message, PendingOp,
     ScheduleAccount, ScheduleKind, VestingActorState, VestingError, CONFIG_SEED,
@@ -70,8 +68,8 @@ pub fn handle_message(input: &ReceiveInput) -> Response {
     }
 
     // 4. Public / library message guarded by `lez-admin-authority` v0.2.0.
-    let wire: Wire<Message> =
-        borsh::from_slice(&input.message).expect("vesting wire message must decode");
+    let wire: Wire<Message> = borsh::from_slice(&input.message)
+        .unwrap_or_else(|_| VestingError::MalformedMessage.abort());
     let mut resp = lez_admin_authority::guard::<(Admin,), Config, Message>(
         input,
         &CONFIG_SEED,
@@ -80,9 +78,12 @@ pub fn handle_message(input: &ReceiveInput) -> Response {
         handle_public_message,
     );
     // Admit `config_pda` on first delivery (e.g., `AdminOp::Init`) under LEZ v0.4's
-    // `UnadmittedPublicActor` rule by attaching `CONFIG_SEED` to seat->config forwards.
+    // `UnadmittedPublicActor` rule by attaching `CONFIG_SEED` strictly to `lez-authority`
+    // library seat->config forwards.
     for msg in &mut resp.sync_messages {
-        if msg.to == Actor::new(cfg_id, own_program) {
+        if msg.to == Actor::new(cfg_id, own_program)
+            && msg.message.first().copied() == Some(LIBRARY_TAG)
+        {
             msg.pda_seeds.insert(CONFIG_SEED);
         }
     }
@@ -107,15 +108,36 @@ fn token_call(
 }
 
 fn require_schedule(input: &ReceiveInput) -> ScheduleAccount {
+    if input.receiver.account_id == config_pda(input.receiver.program_account_id) {
+        VestingError::NotASchedule.abort();
+    }
     match VestingActorState::decode(&input.pre_state) {
         Some(VestingActorState::Schedule(s)) => *s,
-        _ => VestingError::NotASchedule.panic_with(),
+        _ => VestingError::NotASchedule.abort(),
     }
 }
 
 fn require_non_zero(id: AccountId) {
     if id == ZERO_ACCOUNT_ID {
-        VestingError::ZeroAddress.panic_with();
+        VestingError::ZeroAddress.abort();
+    }
+}
+
+fn abort_nothing_claimable(schedule: &ScheduleAccount, timestamp_ms: u64) -> ! {
+    #[cfg(target_os = "zkvm")]
+    {
+        let _ = (schedule, timestamp_ms);
+        VestingError::NothingClaimable {
+            next_unlock_ts: None,
+        }
+        .abort()
+    }
+    #[cfg(not(target_os = "zkvm"))]
+    {
+        VestingError::NothingClaimable {
+            next_unlock_ts: escapement_core::math::next_unlock_after(schedule, timestamp_ms),
+        }
+        .abort()
     }
 }
 
@@ -125,6 +147,7 @@ fn require_non_zero(id: AccountId) {
 
 fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
     let own_program = input.receiver.program_account_id;
+    let cfg_id = config_pda(own_program);
     match message {
         Message::Configure {
             token_program_id,
@@ -136,10 +159,10 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
                     bps: fee_bps,
                     max_bps: MAX_PROTOCOL_FEE_BPS,
                 }
-                .panic_with();
+                .abort();
             }
             if fee_bps > 0 && fee_treasury.is_none() {
-                VestingError::FeeTreasuryRequired.panic_with();
+                VestingError::FeeTreasuryRequired.abort();
             }
             if let Some(treasury) = fee_treasury {
                 require_non_zero(treasury);
@@ -149,19 +172,21 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             match (config.token_program_id, token_program_id) {
                 (None, Some(id)) => {
                     require_non_zero(id);
+                    if id == own_program || id == cfg_id || id == clock_account_id() {
+                        VestingError::InvalidTokenProgram.abort();
+                    }
                     config.token_program_id = Some(id);
                 }
                 (Some(existing), Some(supplied)) if existing != supplied => {
-                    VestingError::TokenProgramImmutable.panic_with();
+                    VestingError::TokenProgramImmutable.abort();
                 }
-                (None, None) => VestingError::TokenProgramNotConfigured.panic_with(),
+                (None, None) => VestingError::TokenProgramNotConfigured.abort(),
                 _ => {}
             }
             config.fee_bps = fee_bps;
             config.fee_treasury = fee_treasury;
-            let resolved_token_program = config
-                .token_program_id
-                .expect("token_program_id set above");
+            let resolved_token_program =
+                config.token_program_id.expect("token_program_id set above");
             Response::set_state(borsh::to_vec(&config).expect("config encodes")).event(
                 FeeConfigUpdated {
                     token_program_id: resolved_token_program,
@@ -171,9 +196,31 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
                 .to_program_event(),
             )
         }
+        Message::WithdrawFees {
+            token_definition,
+            destination,
+            amount,
+        } => {
+            if !input.is_authorized {
+                VestingError::Unauthorized.abort();
+            }
+            require_non_zero(token_definition);
+            require_non_zero(destination);
+            if amount == 0 {
+                VestingError::ZeroAmount.abort();
+            }
+            Response::keep_state().send_sync(
+                own_actor(input, cfg_id),
+                &Internal::WithdrawFees {
+                    token_definition,
+                    destination,
+                    amount,
+                },
+            )
+        }
         Message::CreateSchedule(params) => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             let creator = input.receiver.account_id;
             let seed = schedule_seed(&creator, &params.salt);
@@ -188,7 +235,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
         }
         Message::BatchCreate(params) => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             let creator = input.receiver.account_id;
             let seed = batch_coord_seed(&creator, &params.batch_id);
@@ -207,7 +254,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             amount,
         } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             require_non_zero(destination);
             Response::keep_state().send_sync(
@@ -225,7 +272,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             effective_ts,
         } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             require_non_zero(destination);
             Response::keep_state().send_sync(
@@ -239,13 +286,13 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
         }
         Message::Cancel { schedule_id } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             Response::keep_state().send_sync(own_actor(input, schedule_id), &Internal::Cancel)
         }
         Message::MakeNonCancelable { schedule_id } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             Response::keep_state()
                 .send_sync(own_actor(input, schedule_id), &Internal::MakeNonCancelable)
@@ -255,7 +302,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             milestone_index,
         } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             Response::keep_state().send_sync(
                 own_actor(input, schedule_id),
@@ -267,7 +314,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             new_beneficiary,
         } => {
             if !input.is_authorized {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             require_non_zero(new_beneficiary);
             Response::keep_state().send_sync(
@@ -276,7 +323,9 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             )
         }
         Message::ReadState => {
-            let reader = input.from.expect("ReadState needs a sender");
+            let Some(reader) = input.from else {
+                VestingError::MalformedMessage.abort();
+            };
             Response::keep_state().send_sync(reader, &StateReply::from(input))
         }
     }
@@ -298,6 +347,44 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
             );
             Response::keep_state().send_sync(from, &StateReply::from(input))
         }
+        Internal::WithdrawFees {
+            token_definition,
+            destination,
+            amount,
+        } => {
+            assert_eq!(
+                input.receiver.account_id, cfg_id,
+                "WithdrawFees must target config account"
+            );
+            let config: Config = borsh::from_slice(&input.pre_state)
+                .unwrap_or_else(|_| VestingError::TokenProgramNotConfigured.abort());
+            let token_program_id = config
+                .token_program_id
+                .unwrap_or_else(|| VestingError::TokenProgramNotConfigured.abort());
+            if config.fee_treasury != Some(from.account_id) {
+                VestingError::Unauthorized.abort();
+            }
+            let fv_seed = fee_vault_seed(&token_definition);
+            let fv_pda = fee_vault_pda(own_program, &token_definition);
+            if destination == fv_pda {
+                VestingError::InvalidDestination.abort();
+            }
+            let ev = FeeWithdrawn {
+                token_definition,
+                amount,
+                withdrawn_by: from.account_id,
+            }
+            .to_program_event();
+            Response::keep_state().event(ev).send(token_call(
+                token_program_id,
+                fv_pda,
+                &TokenMessage::Transfer {
+                    to: destination,
+                    amount,
+                },
+                Some(fv_seed),
+            ))
+        }
         Internal::CreateSingle { creator, params } => {
             assert_eq!(
                 from.account_id, creator,
@@ -309,7 +396,7 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
                 "schedule PDA mismatch"
             );
             if !input.pre_state.is_empty() {
-                VestingError::ScheduleAlreadyExists.panic_with();
+                VestingError::ScheduleAlreadyExists.abort();
             }
             validate_single_create(&params);
             let pending = PendingOp::CreateReadConfig { creator, params };
@@ -327,7 +414,7 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
                 "batch coordinator PDA mismatch"
             );
             if !input.pre_state.is_empty() {
-                VestingError::BatchAlreadyExists.panic_with();
+                VestingError::BatchAlreadyExists.abort();
             }
             let total_batch_amount = validate_batch_create(&params);
             let pending = PendingOp::BatchReadConfig {
@@ -345,7 +432,7 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
                 "InitBatchSchedule must originate from batch coordinator PDA"
             );
             if !input.pre_state.is_empty() {
-                VestingError::ScheduleAlreadyExists.panic_with();
+                VestingError::ScheduleAlreadyExists.abort();
             }
             let ev = schedule_created_event(input.receiver.account_id, Some(batch_id), &schedule);
             Response::set_state(VestingActorState::Schedule(schedule).encode()).event(ev)
@@ -356,20 +443,23 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
         } => {
             let schedule = require_schedule(input);
             if from.account_id != schedule.beneficiary {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
-            if let Some(req) = amount {
-                if req == 0 {
-                    VestingError::ZeroAmount.panic_with();
-                }
+            if destination == schedule.escrow_account {
+                VestingError::InvalidDestination.abort();
+            }
+            if amount == Some(0) {
+                VestingError::ZeroAmount.abort();
             }
             let pending = PendingOp::ClaimPublicReadClock {
                 schedule: Box::new(schedule),
                 destination,
                 requested_amount: amount,
             };
-            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode())
-                .send_sync(clock_actor(), &ClockMessage::ReadTimestamp { granularity: 1 })
+            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode()).send_sync(
+                clock_actor(),
+                &ClockMessage::ReadTimestamp { granularity: 1 },
+            )
         }
         Internal::ClaimExact {
             destination,
@@ -378,32 +468,30 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
         } => {
             let mut schedule = require_schedule(input);
             if from.account_id != schedule.beneficiary {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
+            }
+            if destination == schedule.escrow_account {
+                VestingError::InvalidDestination.abort();
             }
             if amount == 0 {
-                VestingError::ZeroAmount.panic_with();
+                VestingError::ZeroAmount.abort();
             }
             let claimable = claimable_at(&schedule, effective_ts);
             if claimable == 0 {
-                VestingError::NothingClaimable {
-                    next_unlock_ts: next_unlock_after(&schedule, effective_ts),
-                }
-                .panic_with();
+                abort_nothing_claimable(&schedule, effective_ts);
             }
             if amount > claimable {
                 VestingError::ExceedsClaimable {
                     requested: amount,
                     claimable,
                 }
-                .panic_with();
+                .abort();
             }
-            let needs_time_window = schedule.cancelled.is_none()
-                && !matches!(schedule.kind, ScheduleKind::Milestone { .. });
 
             schedule.claimed_amount = schedule
                 .claimed_amount
                 .checked_add(amount)
-                .unwrap_or_else(|| VestingError::ArithmeticOverflow.panic_with());
+                .unwrap_or_else(|| VestingError::ArithmeticOverflow.abort());
 
             let token_program_id = schedule.token_program_id;
             let escrow_account = schedule.escrow_account;
@@ -417,52 +505,52 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
             }
             .to_program_event();
 
-            let mut resp = Response::set_state(
-                VestingActorState::Schedule(Box::new(schedule)).encode(),
-            )
-            .event(ev)
-            .send(token_call(
-                token_program_id,
-                escrow_account,
-                &TokenMessage::Transfer {
-                    to: destination,
-                    amount,
-                },
-                Some(escrow_seed),
-            ));
-            if needs_time_window {
-                resp = resp.timestamp_window(effective_ts..);
-            }
-            resp
+            // Always enforce `block_ts >= effective_ts` so `Claimed.timestamp_ms` can never be
+            // spoofed into the future even on cancelled or milestone schedules (`effective_ts = 0`
+            // remains valid whenever time does not gate vesting).
+            Response::set_state(VestingActorState::Schedule(Box::new(schedule)).encode())
+                .event(ev)
+                .timestamp_window(effective_ts..)
+                .send(token_call(
+                    token_program_id,
+                    escrow_account,
+                    &TokenMessage::Transfer {
+                        to: destination,
+                        amount,
+                    },
+                    Some(escrow_seed),
+                ))
         }
         Internal::Cancel => {
             let schedule = require_schedule(input);
             if from.account_id != schedule.effective_cancel_authority() {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             if !schedule.cancelable {
-                VestingError::NotCancelable.panic_with();
+                VestingError::NotCancelable.abort();
             }
             if schedule.cancelled.is_some() {
-                VestingError::AlreadyCancelled.panic_with();
+                VestingError::AlreadyCancelled.abort();
             }
             let pending = PendingOp::CancelReadClock {
                 schedule: Box::new(schedule),
                 cancelled_by: from.account_id,
             };
-            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode())
-                .send_sync(clock_actor(), &ClockMessage::ReadTimestamp { granularity: 1 })
+            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode()).send_sync(
+                clock_actor(),
+                &ClockMessage::ReadTimestamp { granularity: 1 },
+            )
         }
         Internal::MakeNonCancelable => {
             let mut schedule = require_schedule(input);
             if from.account_id != schedule.effective_cancel_authority() {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             if schedule.cancelled.is_some() {
-                VestingError::AlreadyCancelled.panic_with();
+                VestingError::AlreadyCancelled.abort();
             }
             if !schedule.cancelable {
-                VestingError::AlreadyNonCancelable.panic_with();
+                VestingError::AlreadyNonCancelable.abort();
             }
             schedule.cancelable = false;
             let ev = MadeNonCancelable {
@@ -475,40 +563,47 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
         Internal::SignalMilestone { milestone_index } => {
             let schedule = require_schedule(input);
             if from.account_id != schedule.effective_milestone_authority() {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             if schedule.cancelled.is_some() {
-                VestingError::AlreadyCancelled.panic_with();
+                VestingError::AlreadyCancelled.abort();
             }
             let ScheduleKind::Milestone { ref tranches } = schedule.kind else {
-                VestingError::NotMilestoneSchedule.panic_with();
+                VestingError::NotMilestoneSchedule.abort();
             };
             let idx = usize::from(milestone_index);
             let Some(tranche) = tranches.get(idx) else {
-                VestingError::MilestoneIndexOutOfBounds.panic_with();
+                VestingError::MilestoneIndexOutOfBounds.abort();
             };
             if tranche.unlocked {
-                VestingError::MilestoneAlreadyUnlocked(milestone_index).panic_with();
+                VestingError::MilestoneAlreadyUnlocked(milestone_index).abort();
             }
             let pending = PendingOp::SignalMilestoneReadClock {
                 schedule: Box::new(schedule),
                 milestone_index,
                 signaled_by: from.account_id,
             };
-            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode())
-                .send_sync(clock_actor(), &ClockMessage::ReadTimestamp { granularity: 1 })
+            Response::set_state(VestingActorState::Pending(Box::new(pending)).encode()).send_sync(
+                clock_actor(),
+                &ClockMessage::ReadTimestamp { granularity: 1 },
+            )
         }
         Internal::TransferBeneficiary { new_beneficiary } => {
             let mut schedule = require_schedule(input);
             if from.account_id != schedule.beneficiary {
-                VestingError::Unauthorized.panic_with();
+                VestingError::Unauthorized.abort();
             }
             if !schedule.transferable {
-                VestingError::NotTransferable.panic_with();
+                VestingError::NotTransferable.abort();
             }
             require_non_zero(new_beneficiary);
             if new_beneficiary == schedule.beneficiary {
-                VestingError::SameBeneficiary.panic_with();
+                VestingError::SameBeneficiary.abort();
+            }
+            if new_beneficiary == input.receiver.account_id
+                || new_beneficiary == schedule.escrow_account
+            {
+                VestingError::InvalidDestination.abort();
             }
             let old_beneficiary = schedule.beneficiary;
             schedule.beneficiary = new_beneficiary;
@@ -537,30 +632,31 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let reply: StateReply =
                 borsh::from_slice(&input.message).expect("config StateReply decodes");
             let config: Config = borsh::from_slice(&reply.state)
-                .unwrap_or_else(|_| VestingError::TokenProgramNotConfigured.panic_with());
+                .unwrap_or_else(|_| VestingError::TokenProgramNotConfigured.abort());
             let token_program_id = config
                 .token_program_id
-                .unwrap_or_else(|| VestingError::TokenProgramNotConfigured.panic_with());
-            let protocol_fee = compute_fee_ceil(
-                params.total_amount,
-                config.fee_bps,
-                MAX_PROTOCOL_FEE_BPS,
-            )
-            .unwrap_or_else(|e| e.panic_with());
+                .unwrap_or_else(|| VestingError::TokenProgramNotConfigured.abort());
+            let protocol_fee =
+                compute_fee_ceil(params.total_amount, config.fee_bps, MAX_PROTOCOL_FEE_BPS)
+                    .unwrap_or_else(|e| e.abort());
             if protocol_fee > 0 && config.fee_treasury.is_none() {
-                VestingError::FeeTreasuryRequired.panic_with();
+                VestingError::FeeTreasuryRequired.abort();
             }
             let broker_fee = match &params.broker {
                 Some(b) => compute_fee_ceil(params.total_amount, b.bps, MAX_BROKER_FEE_BPS)
-                    .unwrap_or_else(|e| e.panic_with()),
+                    .unwrap_or_else(|e| e.abort()),
                 None => 0,
             };
+            params
+                .total_amount
+                .checked_add(protocol_fee)
+                .and_then(|s| s.checked_add(broker_fee))
+                .unwrap_or_else(|| VestingError::ArithmeticOverflow.abort());
             let refund_holding = params.refund_holding;
             let next = PendingOp::CreateVerifyRefund {
                 creator,
                 token_program_id,
                 protocol_fee,
-                fee_treasury: config.fee_treasury,
                 broker_fee,
                 params,
             };
@@ -577,7 +673,6 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             creator,
             token_program_id,
             protocol_fee,
-            fee_treasury,
             broker_fee,
             params,
         } => {
@@ -590,7 +685,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 borsh::from_slice(&input.message).expect("refund StateReply decodes");
             match TokenState::decode(&reply.state) {
                 Some(TokenState::Holding(h)) if h.definition_id == params.token_definition => {}
-                _ => VestingError::InvalidRefundHolding.panic_with(),
+                _ => VestingError::InvalidRefundHolding.abort(),
             }
             let escrow_seed = single_escrow_seed(&input.receiver.account_id);
             let escrow_account = single_escrow_pda(own_program, &input.receiver.account_id);
@@ -601,11 +696,10 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 escrow_seed,
                 escrow_account,
                 protocol_fee,
-                fee_treasury,
                 broker_fee,
                 params,
             };
-            Response::set_state(VestingActorState::Pending(Box::new(next)).encode())
+            let mut resp = Response::set_state(VestingActorState::Pending(Box::new(next)).encode())
                 .send(token_call(
                     token_program_id,
                     escrow_account,
@@ -613,13 +707,27 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                         definition: token_def,
                     },
                     Some(escrow_seed),
-                ))
-                .send(token_call(
+                ));
+            if protocol_fee > 0 {
+                // Idempotent per-token fee vault PDA initialization: enables multi-token fee
+                // collection on LEZ v0.4's single-token-per-account holding model.
+                let fv_seed = fee_vault_seed(&token_def);
+                let fv_pda = fee_vault_pda(own_program, &token_def);
+                resp = resp.send(token_call(
                     token_program_id,
-                    escrow_account,
-                    &TokenMessage::ReadState,
-                    None,
-                ))
+                    fv_pda,
+                    &TokenMessage::InitializeHolding {
+                        definition: token_def,
+                    },
+                    Some(fv_seed),
+                ));
+            }
+            resp.send(token_call(
+                token_program_id,
+                escrow_account,
+                &TokenMessage::ReadState,
+                None,
+            ))
         }
         PendingOp::CreateVerifyEscrowPre {
             creator,
@@ -627,7 +735,6 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             escrow_seed,
             escrow_account,
             protocol_fee,
-            fee_treasury,
             broker_fee,
             params,
         } => {
@@ -646,6 +753,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             };
             let creator_holding = params.creator_holding;
             let total_amount = params.total_amount;
+            let token_def = params.token_definition;
             let broker_target = params.broker.as_ref().map(|b| b.holding);
             let next = PendingOp::CreateVerifyEscrowPost {
                 creator,
@@ -666,12 +774,12 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     None,
                 ));
             if protocol_fee > 0 {
-                let treasury = fee_treasury.expect("treasury validated above");
+                let fv_pda = fee_vault_pda(own_program, &token_def);
                 resp = resp.send(token_call(
                     token_program_id,
                     creator_holding,
                     &TokenMessage::Transfer {
-                        to: treasury,
+                        to: fv_pda,
                         amount: protocol_fee,
                     },
                     None,
@@ -723,7 +831,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     expected: params.total_amount,
                     actual,
                 }
-                .panic_with();
+                .abort();
             }
             let schedule = ScheduleAccount {
                 version: 1,
@@ -755,31 +863,31 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let reply: StateReply =
                 borsh::from_slice(&input.message).expect("config StateReply decodes");
             let config: Config = borsh::from_slice(&reply.state)
-                .unwrap_or_else(|_| VestingError::TokenProgramNotConfigured.panic_with());
+                .unwrap_or_else(|_| VestingError::TokenProgramNotConfigured.abort());
             let token_program_id = config
                 .token_program_id
-                .unwrap_or_else(|| VestingError::TokenProgramNotConfigured.panic_with());
-            let protocol_fee = compute_fee_ceil(
-                total_batch_amount,
-                config.fee_bps,
-                MAX_PROTOCOL_FEE_BPS,
-            )
-            .unwrap_or_else(|e| e.panic_with());
+                .unwrap_or_else(|| VestingError::TokenProgramNotConfigured.abort());
+            let protocol_fee =
+                compute_fee_ceil(total_batch_amount, config.fee_bps, MAX_PROTOCOL_FEE_BPS)
+                    .unwrap_or_else(|e| e.abort());
             if protocol_fee > 0 && config.fee_treasury.is_none() {
-                VestingError::FeeTreasuryRequired.panic_with();
+                VestingError::FeeTreasuryRequired.abort();
             }
             let broker_fee = match &params.broker {
                 Some(b) => compute_fee_ceil(total_batch_amount, b.bps, MAX_BROKER_FEE_BPS)
-                    .unwrap_or_else(|e| e.panic_with()),
+                    .unwrap_or_else(|e| e.abort()),
                 None => 0,
             };
+            total_batch_amount
+                .checked_add(protocol_fee)
+                .and_then(|s| s.checked_add(broker_fee))
+                .unwrap_or_else(|| VestingError::ArithmeticOverflow.abort());
             let refund_holding = params.refund_holding;
             let next = PendingOp::BatchVerifyRefund {
                 creator,
                 token_program_id,
                 total_batch_amount,
                 protocol_fee,
-                fee_treasury: config.fee_treasury,
                 broker_fee,
                 params,
             };
@@ -797,7 +905,6 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             token_program_id,
             total_batch_amount,
             protocol_fee,
-            fee_treasury,
             broker_fee,
             params,
         } => {
@@ -810,7 +917,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 borsh::from_slice(&input.message).expect("refund StateReply decodes");
             match TokenState::decode(&reply.state) {
                 Some(TokenState::Holding(h)) if h.definition_id == params.token_definition => {}
-                _ => VestingError::InvalidRefundHolding.panic_with(),
+                _ => VestingError::InvalidRefundHolding.abort(),
             }
             let escrow_seed = batch_escrow_seed(&creator, &params.batch_id);
             let escrow_account = batch_escrow_pda(own_program, &creator, &params.batch_id);
@@ -822,11 +929,10 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 escrow_account,
                 total_batch_amount,
                 protocol_fee,
-                fee_treasury,
                 broker_fee,
                 params,
             };
-            Response::set_state(VestingActorState::Pending(Box::new(next)).encode())
+            let mut resp = Response::set_state(VestingActorState::Pending(Box::new(next)).encode())
                 .send(token_call(
                     token_program_id,
                     escrow_account,
@@ -834,13 +940,25 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                         definition: token_def,
                     },
                     Some(escrow_seed),
-                ))
-                .send(token_call(
+                ));
+            if protocol_fee > 0 {
+                let fv_seed = fee_vault_seed(&token_def);
+                let fv_pda = fee_vault_pda(own_program, &token_def);
+                resp = resp.send(token_call(
                     token_program_id,
-                    escrow_account,
-                    &TokenMessage::ReadState,
-                    None,
-                ))
+                    fv_pda,
+                    &TokenMessage::InitializeHolding {
+                        definition: token_def,
+                    },
+                    Some(fv_seed),
+                ));
+            }
+            resp.send(token_call(
+                token_program_id,
+                escrow_account,
+                &TokenMessage::ReadState,
+                None,
+            ))
         }
         PendingOp::BatchVerifyEscrowPre {
             creator,
@@ -849,7 +967,6 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             escrow_account,
             total_batch_amount,
             protocol_fee,
-            fee_treasury,
             broker_fee,
             params,
         } => {
@@ -867,6 +984,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 _ => panic!("batch escrow holding failed to initialize"),
             };
             let creator_holding = params.creator_holding;
+            let token_def = params.token_definition;
             let broker_target = params.broker.as_ref().map(|b| b.holding);
             let next = PendingOp::BatchVerifyEscrowPost {
                 creator,
@@ -888,12 +1006,12 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     None,
                 ));
             if protocol_fee > 0 {
-                let treasury = fee_treasury.expect("treasury validated above");
+                let fv_pda = fee_vault_pda(own_program, &token_def);
                 resp = resp.send(token_call(
                     token_program_id,
                     creator_holding,
                     &TokenMessage::Transfer {
-                        to: treasury,
+                        to: fv_pda,
                         amount: protocol_fee,
                     },
                     None,
@@ -946,10 +1064,10 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     expected: total_batch_amount,
                     actual,
                 }
-                .panic_with();
+                .abort();
             }
             let count = u32::try_from(params.items.len())
-                .unwrap_or_else(|_| VestingError::ArithmeticOverflow.panic_with());
+                .unwrap_or_else(|_| VestingError::ArithmeticOverflow.abort());
             let committed = VestingActorState::BatchCommitted {
                 creator,
                 batch_id: params.batch_id,
@@ -960,7 +1078,8 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             for (idx, item) in params.items.into_iter().enumerate() {
                 let index_u32 = u32::try_from(idx).expect("checked count fits u32");
                 let seed = batch_schedule_seed(&creator, &params.batch_id, index_u32);
-                let sched_id = batch_schedule_pda(own_program, &creator, &params.batch_id, index_u32);
+                let sched_id =
+                    batch_schedule_pda(own_program, &creator, &params.batch_id, index_u32);
                 let schedule = ScheduleAccount {
                     version: 1,
                     token_program_id,
@@ -1016,10 +1135,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
         } => {
             let claimable = claimable_at(&schedule, now_ms);
             if claimable == 0 {
-                VestingError::NothingClaimable {
-                    next_unlock_ts: next_unlock_after(&schedule, now_ms),
-                }
-                .panic_with();
+                abort_nothing_claimable(&schedule, now_ms);
             }
             let amount = match requested_amount {
                 Some(req) => {
@@ -1028,7 +1144,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
                             requested: req,
                             claimable,
                         }
-                        .panic_with();
+                        .abort();
                     }
                     req
                 }
@@ -1037,7 +1153,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             schedule.claimed_amount = schedule
                 .claimed_amount
                 .checked_add(amount)
-                .unwrap_or_else(|| VestingError::ArithmeticOverflow.panic_with());
+                .unwrap_or_else(|| VestingError::ArithmeticOverflow.abort());
 
             let token_program_id = schedule.token_program_id;
             let escrow_account = schedule.escrow_account;
@@ -1068,7 +1184,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             cancelled_by,
         } => {
             let (vested_at_cancel, unvested_refund) =
-                split_on_cancel(&schedule, now_ms).unwrap_or_else(|e| e.panic_with());
+                split_on_cancel(&schedule, now_ms).unwrap_or_else(|e| e.abort());
             schedule.cancelled = Some(CancellationRecord {
                 cancelled_at_ms: now_ms,
                 vested_at_cancel,
@@ -1106,7 +1222,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             signaled_by,
         } => {
             let ScheduleKind::Milestone { ref mut tranches } = schedule.kind else {
-                VestingError::NotMilestoneSchedule.panic_with();
+                VestingError::NotMilestoneSchedule.abort();
             };
             let tranche = &mut tranches[usize::from(milestone_index)];
             tranche.unlocked = true;
@@ -1130,16 +1246,37 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
 // Validation & event helpers
 // ============================================================================
 
+fn validate_authorities(
+    cancelable: bool,
+    kind: &ScheduleKind,
+    cancel_authority: Option<AccountId>,
+    milestone_authority: Option<AccountId>,
+) {
+    if let Some(a) = cancel_authority {
+        if !cancelable {
+            VestingError::InvalidAuthorityForSchedule.abort();
+        }
+        require_non_zero(a);
+    }
+    if let Some(a) = milestone_authority {
+        if !matches!(kind, ScheduleKind::Milestone { .. }) {
+            VestingError::InvalidAuthorityForSchedule.abort();
+        }
+        require_non_zero(a);
+    }
+}
+
 fn validate_single_create(params: &CreateScheduleParams) {
+    require_non_zero(params.creator_holding);
     require_non_zero(params.beneficiary);
     require_non_zero(params.token_definition);
     require_non_zero(params.refund_holding);
-    if let Some(a) = params.cancel_authority {
-        require_non_zero(a);
-    }
-    if let Some(a) = params.milestone_authority {
-        require_non_zero(a);
-    }
+    validate_authorities(
+        params.cancelable,
+        &params.kind,
+        params.cancel_authority,
+        params.milestone_authority,
+    );
     let broker_bps = match &params.broker {
         Some(b) => {
             require_non_zero(b.holding);
@@ -1148,43 +1285,39 @@ fn validate_single_create(params: &CreateScheduleParams) {
         None => 0,
     };
     validate_schedule_params(params.total_amount, &params.kind, 0, broker_bps)
-        .unwrap_or_else(|e| e.panic_with());
+        .unwrap_or_else(|e| e.abort());
 }
 
 fn validate_batch_create(params: &BatchCreateParams) -> u128 {
+    require_non_zero(params.creator_holding);
     require_non_zero(params.token_definition);
     require_non_zero(params.refund_holding);
     if params.items.is_empty() {
-        VestingError::EmptyBatch.panic_with();
+        VestingError::EmptyBatch.abort();
     }
-    let broker_bps = match &params.broker {
-        Some(b) => {
-            require_non_zero(b.holding);
-            if b.bps > MAX_BROKER_FEE_BPS {
-                VestingError::FeeRateExceedsCap {
-                    bps: b.bps,
-                    max_bps: MAX_BROKER_FEE_BPS,
-                }
-                .panic_with();
+    if let Some(b) = &params.broker {
+        require_non_zero(b.holding);
+        if b.bps > MAX_BROKER_FEE_BPS {
+            VestingError::FeeRateExceedsCap {
+                bps: b.bps,
+                max_bps: MAX_BROKER_FEE_BPS,
             }
-            b.bps
+            .abort();
         }
-        None => 0,
-    };
+    }
     let mut sum = 0u128;
     for item in &params.items {
         require_non_zero(item.beneficiary);
-        if let Some(a) = item.cancel_authority {
-            require_non_zero(a);
-        }
-        if let Some(a) = item.milestone_authority {
-            require_non_zero(a);
-        }
-        validate_schedule_params(item.total_amount, &item.kind, 0, broker_bps)
-            .unwrap_or_else(|e| e.panic_with());
+        validate_authorities(
+            item.cancelable,
+            &item.kind,
+            item.cancel_authority,
+            item.milestone_authority,
+        );
+        validate_schedule_params(item.total_amount, &item.kind, 0, 0).unwrap_or_else(|e| e.abort());
         sum = sum
             .checked_add(item.total_amount)
-            .unwrap_or_else(|| VestingError::ArithmeticOverflow.panic_with());
+            .unwrap_or_else(|| VestingError::ArithmeticOverflow.abort());
     }
     sum
 }

@@ -18,16 +18,18 @@ pub const MAX_PROTOCOL_FEE_BPS: u16 = 100;
 pub const MAX_BROKER_FEE_BPS: u16 = 500;
 /// Maximum number of discrete milestone tranches per schedule.
 pub const MAX_MILESTONES: usize = 64;
-/// Reserved config PDA seed used by `lez-admin-authority`.
+/// Reserved config PDA seed used by `lez-admin-authority` (32-byte zero-padded label).
 pub const CONFIG_SEED: PdaSeed = lez_admin_authority::seed(b"escapement/config/v1");
 
-/// Zero account id sentinel rejected as beneficiary/authority.
+/// Zero account id sentinel rejected as beneficiary/authority/destination.
 pub const ZERO_ACCOUNT_ID: AccountId = AccountId::new([0u8; 32]);
 
 /// Global protocol configuration stored at `config_account(program_id, &CONFIG_SEED)`.
 ///
-/// `token_program_id` is write-once (immutable once set on initial `Configure`).
-/// `admin` is exclusively managed by `lez-admin-authority` (Init / Nominate / Accept / Renounce).
+/// - `token_program_id` is write-once (immutable once set on initial `Configure`).
+/// - `fee_treasury` is the authorized controller allowed to withdraw accrued fees from
+///   each per-token protocol fee vault PDA (`fee_vault_pda(program_id, token_definition)`).
+/// - `admin` is exclusively managed by `lez-admin-authority` (Init / Nominate / Accept / Renounce).
 #[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, HasSlot)]
 pub struct Config {
     pub token_program_id: Option<AccountId>,
@@ -72,7 +74,9 @@ impl ScheduleKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
 pub struct CancellationRecord {
     pub cancelled_at_ms: u64,
     pub vested_at_cancel: u128,
@@ -166,7 +170,6 @@ pub enum PendingOp {
         creator: AccountId,
         token_program_id: AccountId,
         protocol_fee: u128,
-        fee_treasury: Option<AccountId>,
         broker_fee: u128,
         params: Box<CreateScheduleParams>,
     },
@@ -176,7 +179,6 @@ pub enum PendingOp {
         escrow_seed: PdaSeed,
         escrow_account: AccountId,
         protocol_fee: u128,
-        fee_treasury: Option<AccountId>,
         broker_fee: u128,
         params: Box<CreateScheduleParams>,
     },
@@ -198,7 +200,6 @@ pub enum PendingOp {
         token_program_id: AccountId,
         total_batch_amount: u128,
         protocol_fee: u128,
-        fee_treasury: Option<AccountId>,
         broker_fee: u128,
         params: Box<BatchCreateParams>,
     },
@@ -209,7 +210,6 @@ pub enum PendingOp {
         escrow_account: AccountId,
         total_batch_amount: u128,
         protocol_fee: u128,
-        fee_treasury: Option<AccountId>,
         broker_fee: u128,
         params: Box<BatchCreateParams>,
     },
@@ -257,7 +257,7 @@ impl VestingActorState {
         if bytes.is_empty() {
             return None;
         }
-        Some(borsh::from_slice(bytes).expect("vesting actor state must decode"))
+        borsh::from_slice(bytes).ok()
     }
 
     #[must_use]
@@ -275,6 +275,12 @@ pub enum Message {
         token_program_id: Option<AccountId>,
         fee_bps: u16,
         fee_treasury: Option<AccountId>,
+    },
+    /// Withdraw accrued creation fees from a per-token fee vault PDA (authorized by `config.fee_treasury`).
+    WithdrawFees {
+        token_definition: AccountId,
+        destination: AccountId,
+        amount: u128,
     },
     /// Create and atomically fund one vesting schedule (sent to creator's actor).
     CreateSchedule(Box<CreateScheduleParams>),
@@ -294,13 +300,9 @@ pub enum Message {
         effective_ts: u64,
     },
     /// Cancel a cancelable schedule using live `clock_actor()` (sent to cancel authority's actor).
-    Cancel {
-        schedule_id: AccountId,
-    },
+    Cancel { schedule_id: AccountId },
     /// Irreversibly convert a cancelable schedule to non-cancelable (sent to cancel authority's actor).
-    MakeNonCancelable {
-        schedule_id: AccountId,
-    },
+    MakeNonCancelable { schedule_id: AccountId },
     /// Unlock a discrete milestone tranche (sent to milestone authority's actor).
     SignalMilestone {
         schedule_id: AccountId,
@@ -319,6 +321,11 @@ pub enum Message {
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum Internal {
     ReadConfig,
+    WithdrawFees {
+        token_definition: AccountId,
+        destination: AccountId,
+        amount: u128,
+    },
     CreateSingle {
         creator: AccountId,
         params: Box<CreateScheduleParams>,
@@ -383,10 +390,14 @@ pub enum VestingError {
     InvalidRefundHolding,
     EscrowFundingMismatch { expected: u128, actual: u128 },
     ArithmeticOverflow,
+    InvalidDestination,
+    MalformedMessage,
+    InvalidAuthorityForSchedule,
+    InvalidTokenProgram,
 }
 
 impl VestingError {
-    /// Deterministic non-zero guest exit code (`1..=30`).
+    /// Deterministic non-zero guest exit code (`1..=34`).
     ///
     /// On LEZ v0.4, exiting with a non-zero code (`env::exit(code)`) produces
     /// `LeeError::ProgramExitedWithCode { code, cycles }` and bills only metered cycles
@@ -424,6 +435,10 @@ impl VestingError {
             Self::InvalidRefundHolding => 28,
             Self::EscrowFundingMismatch { .. } => 29,
             Self::ArithmeticOverflow => 30,
+            Self::InvalidDestination => 31,
+            Self::MalformedMessage => 32,
+            Self::InvalidAuthorityForSchedule => 33,
+            Self::InvalidTokenProgram => 34,
         }
     }
 
@@ -461,6 +476,10 @@ impl VestingError {
             28 => "E028: refund_holding must be an initialized token holding for token_definition",
             29 => "E029: escrow delta does not match expected deposit",
             30 => "E030: arithmetic overflow",
+            31 => "E031: invalid destination or beneficiary PDA self-lock",
+            32 => "E032: malformed message or missing sender",
+            33 => "E033: authority option is invalid for this schedule configuration",
+            34 => "E034: invalid token_program_id",
             _ => "E999: unknown vesting exit code",
         }
     }
@@ -472,13 +491,19 @@ impl VestingError {
             Self::InvalidTimeRange => "E002: invalid schedule time range".into(),
             Self::InvalidCliffAmount => "E003: invalid cliff amount".into(),
             Self::InvalidMilestoneCount => "E004: milestone count must be in 1..=64".into(),
-            Self::InvalidMilestoneTranche => "E005: milestone tranche must be positive and locked".into(),
-            Self::MilestoneSumMismatch => "E006: milestone tranche sum must equal total_amount".into(),
+            Self::InvalidMilestoneTranche => {
+                "E005: milestone tranche must be positive and locked".into()
+            }
+            Self::MilestoneSumMismatch => {
+                "E006: milestone tranche sum must equal total_amount".into()
+            }
             Self::FeeRateExceedsCap { bps, max_bps } => {
                 format!("E007: fee rate {bps} bps exceeds cap {max_bps} bps")
             }
             Self::FeeTreasuryRequired => "E008: fee_treasury is required when fee_bps > 0".into(),
-            Self::TokenProgramImmutable => "E009: token_program_id is write-once and immutable".into(),
+            Self::TokenProgramImmutable => {
+                "E009: token_program_id is write-once and immutable".into()
+            }
             Self::TokenProgramNotConfigured => "E010: token_program_id is not configured".into(),
             Self::ZeroAddress => "E011: zero address is not permitted".into(),
             Self::EmptyBatch => "E012: batch must contain at least one recipient".into(),
@@ -489,7 +514,9 @@ impl VestingError {
             Self::NotCancelable => "E017: schedule is not cancelable".into(),
             Self::AlreadyCancelled => "E018: schedule is already cancelled".into(),
             Self::AlreadyNonCancelable => "E019: schedule is already non-cancelable".into(),
-            Self::AlreadyFullyVested => "E020: schedule is already fully vested; nothing to cancel".into(),
+            Self::AlreadyFullyVested => {
+                "E020: schedule is already fully vested; nothing to cancel".into()
+            }
             Self::NotTransferable => "E021: schedule is non-transferable".into(),
             Self::SameBeneficiary => "E022: new_beneficiary equals current beneficiary".into(),
             Self::NotMilestoneSchedule => "E023: schedule is not milestone-based".into(),
@@ -499,23 +526,35 @@ impl VestingError {
             }
             Self::NothingClaimable { next_unlock_ts } => match next_unlock_ts {
                 Some(ts) => format!("E026: nothing claimable yet; next unlock at {ts} ms"),
-                None => "E026: nothing claimable (awaiting milestone signal or fully claimed)".into(),
+                None => {
+                    "E026: nothing claimable (awaiting milestone signal or fully claimed)".into()
+                }
             },
             Self::ExceedsClaimable {
                 requested,
                 claimable,
             } => format!("E027: requested {requested} exceeds claimable {claimable}"),
             Self::InvalidRefundHolding => {
-                "E028: refund_holding must be an initialized token holding for token_definition".into()
+                "E028: refund_holding must be an initialized token holding for token_definition"
+                    .into()
             }
             Self::EscrowFundingMismatch { expected, actual } => {
                 format!("E029: escrow delta {actual} does not match expected {expected}")
             }
             Self::ArithmeticOverflow => "E030: arithmetic overflow".into(),
+            Self::InvalidDestination => {
+                "E031: invalid destination or beneficiary PDA self-lock".into()
+            }
+            Self::MalformedMessage => "E032: malformed message or missing sender".into(),
+            Self::InvalidAuthorityForSchedule => {
+                "E033: authority option is invalid for this schedule configuration".into()
+            }
+            Self::InvalidTokenProgram => "E034: invalid token_program_id".into(),
         }
     }
 
-    pub fn panic_with(&self) -> ! {
+    /// Terminates execution with a cycle-metered guest exit code on zkVM, or panics on host.
+    pub fn abort(&self) -> ! {
         #[cfg(target_os = "zkvm")]
         {
             risc0_zkvm::guest::env::exit(self.code())
@@ -541,6 +580,21 @@ fn hash_seed(parts: &[&[u8]]) -> PdaSeed {
 #[must_use]
 pub fn config_pda(program_id: AccountId) -> AccountId {
     lez_admin_authority::config_account(program_id, &CONFIG_SEED)
+}
+
+/// Deterministic per-token protocol fee vault PDA seed.
+///
+/// LEZ v0.4 token holdings are single-token-per-account; routing protocol creation fees into
+/// a dedicated per-`token_definition` PDA ensures multi-token schedule creation always works
+/// permissionlessly whenever `fee_bps > 0`, even after `AdminOp::Renounce`.
+#[must_use]
+pub fn fee_vault_seed(token_definition: &AccountId) -> PdaSeed {
+    hash_seed(&[b"escapement/feevault/v1", token_definition.value()])
+}
+
+#[must_use]
+pub fn fee_vault_pda(program_id: AccountId, token_definition: &AccountId) -> AccountId {
+    AccountId::for_public_pda(&program_id, &fee_vault_seed(token_definition))
 }
 
 #[must_use]

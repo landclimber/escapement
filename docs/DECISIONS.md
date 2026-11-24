@@ -22,17 +22,18 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 - **Reason:** Verified in `s1_private_claim_blinded_alias_single_tx_and_unlinkability` and `s1_real_proof_dev_mode_0`: completes in **1 LEZ transaction** (`P1`), leaves **zero** mailbox publications, emits **zero** `Transferred` events (`M::EMITS_EVENTS == false` on private execution), never exposes `dest_priv` in any public byte or event (`F2`), makes repeated claims to the same private wallet pairwise unlinkable (`20/20` distinct aliases), and fails atomically (`UnboundAsyncDestination`) if promotion is omitted (`R1`).
 - **Alternative rejected:** Public-to-private mailbox credit (`Publication::Clear`, which exposes `dest_priv` in plaintext, requires a pre-registered `recovery_binding`, and takes 2 transactions) or intermediate public burn/shield hop (2 transactions, violates `P1`).
 
-## D-04 (2026-11-20): Cycle-metered guest exit codes (`env::exit(1..=30)`) instead of panics
+## D-04 (2026-11-20): Cycle-metered guest exit codes (`env::exit(1..=34)`) instead of panics
 
-- **Decision:** Every deterministic vesting refusal (`VestingError`, codes `1..=30`) exits with `risc0_zkvm::guest::env::exit(code)` on `target_os = "zkvm"` rather than `panic!`.
-- **Reason:** Verified in LEZ `v0.4.0-rc3` (`validated_state_diff/mod.rs:503-513`): panics lose the cycle count and bill the caller's entire declared `gas_limit` (up to `10,000,000` cycles). Non-zero exit codes return `LeeError::ProgramExitedWithCode { code, cycles }` and bill only metered cycles executed (`16,003` cycles measured on a pre-cliff refusal — `0.16%` of the 10M cap, a 625× savings over a panic).
+- **Decision:** Every deterministic vesting refusal (`VestingError`, codes `1..=34`) exits with `risc0_zkvm::guest::env::exit(code)` on `target_os = "zkvm"` rather than `panic!`.
+- **Reason:** Verified in LEZ `v0.4.0-rc3` (`validated_state_diff/mod.rs:503-513`): panics lose the cycle count and bill the caller's entire declared `gas_limit` (up to `10,000,000` cycles). Non-zero exit codes return `LeeError::ProgramExitedWithCode { code, cycles }` and bill only metered cycles executed (`15,836` cycles measured on a pre-cliff refusal, `0.16%` of the 10M cap, 631× less than a panic).
 - **Alternative rejected:** `panic!` on user errors (penalizes accidental early claims or stale retries with full gas-limit burn).
 
 ## D-05 (2026-11-20): Creator-paid, creation-only fee switch (`0 bps` default, `<= 100 bps` immutable cap) via `lez-admin-authority` v0.2.0
 
 - **Decision:** Reuse `mmlado/lez-admin-authority` `v0.2.0` (RFP-001 on LEZ v0.4) to gate `Message::Configure`. Initial protocol fee is `0 bps`; immutable compile-time cap is `100 bps` (1.00%); optional integrator broker fee is caller-supplied up to `500 bps` (default `0`). Fees are additive and collected strictly from the creator at schedule creation, never from beneficiaries and never retroactively on existing schedules. `token_program_id` is write-once and immutable once set.
 - **Reason:** Matches RFP-017's recommended baseline and the zero-fee market equilibrium (Sablier, Hedgey, Jupiter Lock), avoids any beneficiary skim on private claims, and guarantees existing schedules are immune to governance capture.
-- **Implementation note:** `lez-admin-authority` v0.2.0 forwards seat messages to `config_pda` without `pda_seeds`, which triggers `UnadmittedPublicActor` on `AdminOp::Init` against live `V03State`. Our guest attaches `CONFIG_SEED` to seat->config forwards so `config_pda` admits cleanly onchain without requiring extra wallet-side `admission_evidence`.
+- **Implementation note:** `lez-admin-authority` v0.2.0 forwards seat messages to `config_pda` without `pda_seeds`, which triggers `UnadmittedPublicActor` on `AdminOp::Init` against live `V03State`. Our guest attaches `CONFIG_SEED` only to `lez-authority` library forwards (first byte `LIBRARY_TAG`) so `config_pda` admits cleanly onchain without extra wallet-side `admission_evidence`; schedule operations aimed at `config_pda` exit with `NotASchedule` (code `16`).
+- **Fee routing (revised 2026-11-20 after review):** protocol fees go to a program-owned fee vault PDA per token (`sha256("escapement/feevault/v1" ‖ token_definition)`), initialized idempotently on first fee-bearing creation; `config.fee_treasury` withdraws with `WithdrawFees` (event `FeeWithdrawn`). The first design sent fees straight to one `fee_treasury` account, but a LEZ v0.4 token holding holds one token only, so any `fee_bps > 0` would have blocked schedule creation for every other token, permanently after `Renounce`. `token_program_id` cannot be set to the program, its config PDA, or the clock (code `34`).
 
 ## D-06 (2026-11-20): Exclusive delegated authorities (`Soft-1`, `Soft-2`) with immutably pinned `refund_holding`
 
@@ -42,14 +43,26 @@ All decisions recorded with UTC date, rationale, and rejected alternatives. Ever
 ## D-07 (2026-11-20): Dedicated single-schedule escrow PDA + shared batch escrow PDA + donation-proof balance-delta checks
 
 - **Decision:** Single schedules use a dedicated `escrow_pda`; `BatchCreate` uses a write-once `batch_coord_pda` and a shared `batch_escrow_pda` funded in one `token::Transfer`, creating independent per-recipient `schedule_pda_i` actors. Creation verifies exact balance delta `post - pre == total_amount` via `token::ReadState` before and after transfer; vesting and cancellation math never read `escrow_account.balance`.
-- **Reason:** Achieves `N_max = 204` schedules in a single LEZ v0.4 transaction (`9,896,440` cycles, `98.96%` of 10M cap) while keeping claims completely isolated per schedule and immune to unsolicited direct donations to escrow addresses.
+- **Reason:** Achieves up to `N_max = 208` schedules in a single LEZ v0.4 transaction (`Linear`; `9,992,839` cycles, `99.93%` of the 10M cap; 179 for `CliffLinear` with a cancel authority, 149 for 4-tranche `Milestone` with both authorities) while keeping claims completely isolated per schedule and immune to unsolicited direct donations to escrow addresses.
 
 ## D-08 (2026-11-20): Zero-dependency 256-bit `mul_div` in `escapement-core`
 
-- **Decision:** Implement exact 256-bit `wide_mul_u128` + restoring long division directly in `escapement-core/src/math.rs`, fuzz-verified over 12,288 `proptest` cases across full `u128`/`u64` domains.
-- **Reason:** Zero external math crate bloat inside the RISC Zero guest ELF (`472,612` bytes), zero `unsafe`, exact overflow-free precision up to `u128::MAX`, floor rounding on intermediate claims, and exact terminal release with zero stranded dust.
+- **Decision:** Implement exact 256-bit `wide_mul_u128` + restoring long division directly in `escapement-core/src/math.rs`, fuzz-verified over 12,288 `proptest` cases (28,672 across all seven property suites) across full `u128`/`u64` domains.
+- **Reason:** Zero external math crate bloat inside the RISC Zero guest ELF (`482,284` bytes), zero `unsafe`, exact overflow-free precision up to `u128::MAX`, floor rounding on intermediate claims, and exact terminal release with zero stranded dust.
 
-## D-09 (2026-11-20): Actor IDL v2 (`idl-gen`) on LEZ v0.4 with SPEL parity once upstream supports v0.4
+## D-09 (2026-11-20): IDL from SPEL's v0.4 actor IDL v2 generator
 
-- **Decision:** Generate and CI-drift-check the program's LEZ v0.4 actor IDL v2 using `lez-programs`'s `tools/idl-gen` format (used by `token`, `nft`, `twap_oracle`, `ata`, and `amm` on `refactor/lez-v0.4.x`), and add SPEL IDL regeneration if `logos-co/spel` releases v0.4 actor support prior to M5.
-- **Reason:** As of 2026-11-20, `logos-co/spel` (`v0.7.0`) still pins LEZ `v0.2.5-rc2` and emits removed v0.2 macros (`read_lee_call`, `ProgramOutput`). Shipping actor IDL v2 gives v0.4 consumers a machine-checked schema immediately.
+- **Decision:** Generate and CI-drift-check the program's actor IDL v2 with `spel-framework-core` (feature `idl-gen`) from SPEL's `refactor/lez-v0.4.x` branch (`c90ca0bc`, pins LEZ `v0.4.0-rc3`), the same generator `lez-programs@cad71fc6`'s `tools/idl-gen` uses for `token`, `nft`, and `twap_oracle` (its `ata` and `amm` IDLs are still version `0.1.0` on that commit). Move to the tagged SPEL v0.4 release when it is cut.
+- **Reason:** As of 2026-11-20 the latest SPEL release (`v0.7.0`) pins LEZ `v0.2.4` (SPEL `main` pins `v0.2.5-rc2`), so a released SPEL cannot describe a v0.4 actor program yet, while the v0.4 branch already can.
+
+## D-10 (2026-11-20): Cancel never refunds claimed tokens (clock-lag clamp)
+
+- **Decision:** `split_on_cancel` computes `vested_at_cancel = max(vested(clock_now), claimed_amount)`.
+- **Reason:** On `v0.4.0-rc3` the clock ticks at the end of each block, so `Cancel` (live `clock_actor()`) sees the previous block's time while `ClaimExact`'s `timestamp_window` is checked against the current block; the clock program also does not enforce monotonic time. Without the clamp, a claim and a cancel in the same block could leave `vested_at_cancel < claimed_amount` and over-refund from a shared batch escrow, taking other recipients' tokens. Found by a fresh-context AI security review on 2026-11-20; covered by `math::tests::split_on_cancel_clamps_to_claimed_under_clock_lag` and `c1_same_block_clock_lag_cancel_protects_shared_batch_escrow`.
+
+## D-11 (2026-11-20): Threats checked and ruled out or accepted
+
+- **Ruled out: a third party pre-initializing an escrow or fee-vault PDA.** On `v0.4.0-rc3` a PDA seed admits and authorizes only `for_public_pda(issuer, seed)`, where `issuer` is the *sending actor's program* (`lee/state_machine/core/src/execution_state.rs:353-357` `issuer()`, `:1196-1201` `admit`, `:1446-1451` `authorize`). Every Escapement escrow and fee vault is `for_public_pda(VESTING, seed)`, so only a message sent by an Escapement actor can admit or authorize it, and Escapement only ever sends `InitializeHolding` there with the schedule's own `token_definition`. Another program attaching the same seed derives a different account. A root (user) transaction has no issuer and cannot authorize a PDA at all. So no outsider can stamp a foreign token state on a future escrow or fee vault.
+- **Accepted (low): a broker holding of the wrong token.** If a creator names a `broker.holding` that holds a different token, the broker credit fails late in creation and the whole transaction reverts at full gas. No funds move; the creator chose the broker. The SDK will check the broker holding before submitting (M3).
+- **Accepted (info): `WithdrawFees` above the vault balance** reverts at full gas. Only `fee_treasury` can reach it; the SDK will read the vault balance first (M3).
+- **Accepted (info): `lez-authority` refusals are panics by design** (`lez-authority` `guard`), so a non-admin `Configure` costs the sender the full budget. Escapement's own refusals all exit with metered codes.

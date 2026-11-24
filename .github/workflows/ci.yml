@@ -4,32 +4,167 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual trigger runs the optional `real-stark-proof` job (RISC0_DEV_MODE=0),
+  # which is too slow for per-push CI but must stay reproducible on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   core-and-guest:
     runs-on: ubuntu-latest
+    # fmt + clippy + a cold build of the LEZ dependency tree + the real-ELF test
+    # suite (the 2026-11-20 verified run alone takes ~11 min of test time; allow
+    # 90 so a cold runner with no caches never flakes on the deadline).
+    timeout-minutes: 90
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+      RISC0_BUILD_LOCKED: "1"
     steps:
-      # Actions pinned by commit SHA (aligned with logos-co/rfp PR 255).
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # All actions pinned by verified commit SHA (aligned with logos-co/rfp PR 255).
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Free runner disk space for zkVM guest builds
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h .
 
       - name: Install Rust 1.98.1
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
         with:
           toolchain: 1.98.1
           components: clippy, rustfmt
 
-      - name: Install RISC Zero 3.0.5 (pinned rzup 0.5.2 + guest Rust 1.91.1)
+      - name: Cache RISC Zero 3.0.5 toolchains and pinned rzup 0.5.2
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.risc0
+            ~/.cargo/bin/rzup
+          key: risc0-3.0.5-rzup-0.5.2-rust-1.91.1-cpp-2024.1.5-v1
+
+      - name: Install pinned rzup 0.5.2 and RISC Zero 3.0.5 (guest Rust 1.91.1 + C++ 2024.1.5)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          cargo install --locked rzup --version 0.5.2
+          export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+          # Explicitly pin the HOST rustup/cargo homes so any rustup proxies that
+          # rzup drops into ~/.risc0/bin defer to the dtolnay host toolchain
+          # pinned by rust-toolchain.toml (1.98.1) instead of resolving rzup's
+          # guest 1.91.1. Mirrors upstream LEZ's CI image, which keeps
+          # RUSTUP_HOME and CARGO_HOME pointing at the host for exactly this
+          # reason (lez-v0.4.0-rc3/.github/docker/ci.Dockerfile:11-16).
+          echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+          # Pinned crates.io install without publish/AWS-SDK features (no unpinned curl|bash scripts).
+          command -v rzup >/dev/null || cargo install --locked --no-default-features --features cli,install rzup --version 0.5.2
+          # Always run rzup install even on cache hit so ~/.cargo/bin and rustup symlinks are refreshed.
           rzup install cargo-risczero 3.0.5
           rzup install r0vm 3.0.5
           rzup install rust 1.91.1
           rzup install cpp 2024.1.5
+          r0vm --version
+          # Smoke-test the exact environment later steps will see (~/.risc0/bin first
+          # on PATH + explicit host RUSTUP_HOME): if rzup's proxies hijack `rustc`,
+          # `cargo`, or `rustfmt` away from the pinned 1.98.1 host toolchain, fail
+          # here instead of deep inside fmt/clippy/test. Mirrors the upstream LEZ
+          # CI image's "smoke-test every tool the jobs use" rule.
+          PATH="$HOME/.risc0/bin:$PATH" RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" bash -c '
+            rustc --version | grep -F "1.98.1" &&
+            rustfmt --version &&
+            cargo clippy --version &&
+            cargo --version
+          '
 
-      - name: Run core math, proptest fuzzing, and real-ELF v0.4 integration/privacy/invariant tests
+      - name: Cache Cargo workspace
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: escapement-v04
+
+      - name: Format check (workspace + guest)
+        run: |
+          cargo fmt --all -- --check
+          rustfmt --edition 2021 --check crates/escapement-methods/guest/src/bin/escapement.rs
+
+      - name: Clippy check
+        env:
+          RISC0_DEV_MODE: "1"
+          # clippy-driver cannot cross-compile the riscv32im guest; the guest is a 3-line wrapper
+          # around escapement-program, which clippy lints as a host crate.
+          RISC0_SKIP_BUILD: "1"
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Run core math, proptest fuzzing, and real-ELF v0.4 integration/privacy/invariant/negative tests
         env:
           RISC0_DEV_MODE: "1"
         run: cargo test --workspace --locked -- --nocapture
+
+  # Optional, manual-only (`workflow_dispatch`): reproduces E-02's real STARK
+  # proof (RISC0_DEV_MODE=0) end to end. Too slow to gate every push, but kept
+  # in CI so the non-dev-mode claim can never silently rot.
+  real-stark-proof:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+      RISC0_BUILD_LOCKED: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Free runner disk space for zkVM guest builds
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h .
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: 1.98.1
+          components: clippy, rustfmt
+
+      - name: Cache RISC Zero 3.0.5 toolchains and pinned rzup 0.5.2
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.risc0
+            ~/.cargo/bin/rzup
+          key: risc0-3.0.5-rzup-0.5.2-rust-1.91.1-cpp-2024.1.5-v1
+
+      - name: Install pinned rzup 0.5.2 and RISC Zero 3.0.5 (guest Rust 1.91.1 + C++ 2024.1.5)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          export PATH="$HOME/.cargo/bin:$HOME/.risc0/bin:$PATH"
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+          echo "RUSTUP_HOME=$HOME/.rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+          command -v rzup >/dev/null || cargo install --locked --no-default-features --features cli,install rzup --version 0.5.2
+          rzup install cargo-risczero 3.0.5
+          rzup install r0vm 3.0.5
+          rzup install rust 1.91.1
+          rzup install cpp 2024.1.5
+          r0vm --version
+          # Same fail-fast proxy smoke test as the core job.
+          PATH="$HOME/.risc0/bin:$PATH" RUSTUP_HOME="$HOME/.rustup" CARGO_HOME="$HOME/.cargo" bash -c '
+            rustc --version | grep -F "1.98.1" &&
+            rustfmt --version &&
+            cargo clippy --version &&
+            cargo --version
+          '
+
+      - name: Cache Cargo workspace
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          shared-key: escapement-v04-real-proof
+
+      - name: Prove the blinded-alias private claim with real STARK receipts (E-02)
+        env:
+          RISC0_DEV_MODE: "0"
+        run: cargo test --locked -p escapement-tests --test escapement_e2e s1_real_proof_dev_mode_0 -- --ignored --nocapture
