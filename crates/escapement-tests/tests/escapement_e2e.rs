@@ -6309,7 +6309,7 @@ fn sec_signer_authority_review_gaps() {
     //    sending program, with no grant passed on) is refused like a relayed one, even when the
     //    right account signs; so is AsPda sent that way by the PDA's own program.
     let p5 = linear_params(0x46, Asset::Native, creator, user, 1_000);
-    let async_cases: Vec<(&str, &PrivateKey, Actor, Vec<u8>, Vec<Actor>)> = vec![
+    let async_cases = vec![
         (
             "ClaimPublic, the beneficiary signing",
             &user_k,
