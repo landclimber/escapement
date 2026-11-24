@@ -9,6 +9,7 @@ borsh.workspace = true
 clock_core.workspace = true
 escapement-core.workspace = true
 escapement-methods.workspace = true
+escapement-test-methods = { path = "../escapement-test-methods" }
 lee.workspace = true
 lee_core.workspace = true
 lez-admin-authority.workspace = true

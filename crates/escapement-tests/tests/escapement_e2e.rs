@@ -19,11 +19,12 @@ use escapement_core::{
         BeneficiaryTransferred, Cancelled, Claimed, FeeConfigUpdated, FeeWithdrawn,
         MadeNonCancelable, MilestoneSignaled, ScheduleCreated, VestingEvent,
     },
-    fee_vault_pda, schedule_pda, single_escrow_pda, BatchCreateParams, BatchRecipient, BrokerFee,
-    Config, CreateScheduleParams, Message as VestingMessage, MilestoneTranche, ScheduleAccount,
-    ScheduleKind, VestingActorState, MAX_BROKER_FEE_BPS, ZERO_ACCOUNT_ID,
+    fee_vault_pda, schedule_pda, single_escrow_pda, Asset, BatchCreateParams, BatchRecipient,
+    BrokerFee, Config, CreateScheduleParams, Message as VestingMessage, MilestoneTranche, PdaCall,
+    ScheduleAccount, ScheduleKind, VestingActorState, MAX_BROKER_FEE_BPS, ZERO_ACCOUNT_ID,
 };
 use escapement_methods::{ESCAPEMENT_ELF, ESCAPEMENT_ID};
+use escapement_test_methods::{RelayMessage, RELAY_ELF};
 use lee::{
     error::LeeError,
     privacy_preserving_transaction::{
@@ -42,6 +43,7 @@ use lee::{
 use lee_core::{
     account::{Account, AccountId, Actor},
     execution_state::{BoundaryStep, PublicExecutionContext, TransactionEntry},
+    program::PdaSeed,
     program::TransactionEvent,
     AuthorizationSecretKey, Commitment, EncryptionScheme, PrivacyPreservingCircuitOutput,
     ProvingInput, RegularKey, RootCall, SenderPresentation, SharedSecretKey, WitnessKind,
@@ -53,6 +55,11 @@ use token_core::{Message as TokenMessage, TokenHolding, TokenState};
 use token_methods::TOKEN_ELF;
 
 const MAX_GAS_EXEC: u64 = 10_000_000;
+/// Two program ids running the test relay guest (a third-party program, a multisig, a launchpad).
+const RELAY_A: AccountId = AccountId::new([0x7a; 32]);
+const RELAY_B: AccountId = AccountId::new([0x7b; 32]);
+/// LEZ v0.4's native balance program (`NATIVE_TOKEN_PROGRAM_ID`).
+const NATIVE: AccountId = escapement_core::NATIVE_PROGRAM_ID;
 
 fn key(byte: u8) -> PrivateKey {
     PrivateKey::try_new([byte; 32]).expect("valid test key")
@@ -187,6 +194,11 @@ struct TestChain {
 
 impl TestChain {
     fn new_unconfigured(initial_ts_ms: u64) -> Self {
+        Self::new_unconfigured_funded(initial_ts_ms, &[])
+    }
+
+    /// Like `new_unconfigured`, with genesis native balances for `funded` accounts.
+    fn new_unconfigured_funded(initial_ts_ms: u64, funded: &[(AccountId, u128)]) -> Self {
         let deployer = key(100);
         let vesting = account(&deployer);
         let token = AccountId::new([0x70; 32]);
@@ -205,12 +217,32 @@ impl TestChain {
                     Program::new(Cow::Borrowed(TOKEN_ELF)).expect("token elf loads"),
                 ),
                 (clock_account_id(), programs::clock()),
+                (
+                    RELAY_A,
+                    Program::new(Cow::Borrowed(RELAY_ELF)).expect("relay elf loads"),
+                ),
+                (
+                    RELAY_B,
+                    Program::new(Cow::Borrowed(RELAY_ELF)).expect("relay elf loads"),
+                ),
             ])
-            .with_public_accounts([(
-                CLOCK_PROGRAM_ACCOUNT_ID,
-                Account::default()
-                    .with_actor_state(clock_account_id(), clock_data.to_bytes().into()),
-            )]);
+            .with_public_accounts(
+                [(
+                    CLOCK_PROGRAM_ACCOUNT_ID,
+                    Account::default()
+                        .with_actor_state(clock_account_id(), clock_data.to_bytes().into()),
+                )]
+                .into_iter()
+                .chain(funded.iter().map(|(id, amount)| {
+                    (
+                        *id,
+                        Account::default().with_actor_state(
+                            NATIVE,
+                            lee_core::native_token::encode_balance(*amount),
+                        ),
+                    )
+                })),
+            );
 
         Self {
             state,
@@ -223,7 +255,12 @@ impl TestChain {
     }
 
     fn new(initial_ts_ms: u64) -> Self {
-        let mut chain = Self::new_unconfigured(initial_ts_ms);
+        Self::new_funded(initial_ts_ms, &[])
+    }
+
+    /// Initialized and configured chain with genesis native balances for `funded` accounts.
+    fn new_funded(initial_ts_ms: u64, funded: &[(AccountId, u128)]) -> Self {
+        let mut chain = Self::new_unconfigured_funded(initial_ts_ms, funded);
         let vesting = chain.vesting;
         let token = chain.token;
         let cfg = config_pda(vesting);
@@ -251,11 +288,16 @@ impl TestChain {
     }
 
     fn catalog(&self) -> ProgramCatalog {
-        [(self.vesting, ESCAPEMENT_ELF), (self.token, TOKEN_ELF)]
-            .into_iter()
-            .map(|(id, elf)| (id, Program::new(Cow::Borrowed(elf)).expect("guest loads")))
-            .chain([(clock_account_id(), programs::clock())])
-            .collect()
+        [
+            (self.vesting, ESCAPEMENT_ELF),
+            (self.token, TOKEN_ELF),
+            (RELAY_A, RELAY_ELF),
+            (RELAY_B, RELAY_ELF),
+        ]
+        .into_iter()
+        .map(|(id, elf)| (id, Program::new(Cow::Borrowed(elf)).expect("guest loads")))
+        .chain([(clock_account_id(), programs::clock())])
+        .collect()
     }
 
     fn simulation_for(&self, public: &[Actor]) -> Simulation {
@@ -397,6 +439,92 @@ impl TestChain {
         }
     }
 
+    fn native_balance(&self, id: AccountId) -> u128 {
+        lee_core::native_token::decode_balance(
+            self.state.get_account_by_id(id).data.actor_state(NATIVE),
+        )
+        .expect("canonical native balance")
+    }
+
+    /// Actors a native-asset `CreateSchedule` touches (fee vault actors when a fee is due).
+    fn native_create_actors(
+        &self,
+        creator: AccountId,
+        params: &CreateScheduleParams,
+        with_fee_vault: bool,
+    ) -> Vec<Actor> {
+        let sched_id = schedule_pda(self.vesting, &creator, &params.salt);
+        let escrow_id = single_escrow_pda(self.vesting, &sched_id);
+        let mut actors = vec![
+            Actor::new(creator, self.vesting),
+            Actor::new(sched_id, self.vesting),
+            Actor::new(config_pda(self.vesting), self.vesting),
+            Actor::new(creator, NATIVE),
+            Actor::new(escrow_id, NATIVE),
+        ];
+        if let Some(b) = &params.broker {
+            actors.push(Actor::new(b.holding, NATIVE));
+        }
+        if with_fee_vault {
+            let fv = fee_vault_pda(self.vesting, &Asset::Native.key());
+            actors.push(Actor::new(fv, self.vesting));
+            actors.push(Actor::new(fv, NATIVE));
+        }
+        actors
+    }
+
+    /// Actors a native-asset `BatchCreate` touches.
+    fn native_batch_actors(
+        &self,
+        creator: AccountId,
+        params: &BatchCreateParams,
+        with_fee_vault: bool,
+    ) -> Vec<Actor> {
+        let coord = batch_coord_pda(self.vesting, &creator, &params.batch_id);
+        let escrow = batch_escrow_pda(self.vesting, &creator, &params.batch_id);
+        let mut actors = vec![
+            Actor::new(creator, self.vesting),
+            Actor::new(coord, self.vesting),
+            Actor::new(config_pda(self.vesting), self.vesting),
+            Actor::new(creator, NATIVE),
+            Actor::new(escrow, NATIVE),
+        ];
+        for i in 0..params.items.len() {
+            let sid = batch_schedule_pda(self.vesting, &creator, &params.batch_id, i as u32);
+            actors.push(Actor::new(sid, self.vesting));
+        }
+        if with_fee_vault {
+            let fv = fee_vault_pda(self.vesting, &Asset::Native.key());
+            actors.push(Actor::new(fv, self.vesting));
+            actors.push(Actor::new(fv, NATIVE));
+        }
+        actors
+    }
+
+    /// Submits `message` through relay program `relay` rooted at `(signer, relay)`: the relay
+    /// forwards it to `to`, granting `seeds` (the relay's own PDA seeds).
+    #[allow(clippy::too_many_arguments)]
+    fn submit_via_relay(
+        &mut self,
+        relay: AccountId,
+        signer_k: &PrivateKey,
+        to: Actor,
+        message: Vec<u8>,
+        seeds: Vec<PdaSeed>,
+        extra: &[Actor],
+    ) -> Result<Vec<TransactionEvent>, LeeError> {
+        let signer = account(signer_k);
+        let root = Actor::new(signer, relay);
+        let mut declared = vec![root, to];
+        declared.extend_from_slice(extra);
+        self.submit_public(
+            root,
+            &declared,
+            &[signer_k],
+            &RelayMessage::Forward { to, message, seeds },
+        )
+    }
+
     fn schedule(&self, sched_id: AccountId) -> ScheduleAccount {
         match VestingActorState::decode(
             self.state
@@ -434,7 +562,7 @@ impl TestChain {
             Actor::new(config_pda(self.vesting), self.vesting),
             Actor::new(params.refund_holding, self.token),
             Actor::new(escrow_id, self.token),
-            Actor::new(params.token_definition, self.token),
+            Actor::new(params.asset.key(), self.token),
             Actor::new(params.creator_holding, self.token),
         ];
         if let Some(b) = &params.broker {
@@ -460,7 +588,7 @@ impl TestChain {
             Actor::new(config_pda(self.vesting), self.vesting),
             Actor::new(params.refund_holding, self.token),
             Actor::new(escrow, self.token),
-            Actor::new(params.token_definition, self.token),
+            Actor::new(params.asset.key(), self.token),
             Actor::new(params.creator_holding, self.token),
         ];
         for i in 0..params.items.len() {
@@ -549,7 +677,7 @@ impl TestChain {
         let public = [
             root,
             Actor::new(args.schedule_id, self.vesting),
-            Actor::new(sched.escrow_account, self.token),
+            Actor::new(sched.escrow_account, sched.asset_program_id),
         ];
 
         let mut witness = match &dest.account {
@@ -589,7 +717,7 @@ impl TestChain {
 
         let sim = self.simulation_for(&public);
         let catalog = self.catalog();
-        let token_prog = self.token;
+        let token_prog = sched.asset_program_id;
         let promote = args.promote_credit;
         let pub_cycles = simulate_privacy_preserving_transaction(
             &proving_input,
@@ -781,7 +909,7 @@ fn s1_private_claim_blinded_alias_single_tx_and_unlinkability() {
 
     let params = CreateScheduleParams {
         salt: [0x11; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -1034,7 +1162,7 @@ fn s1_real_proof_dev_mode_0() {
 
     let params = CreateScheduleParams {
         salt: [0x99; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -1143,7 +1271,7 @@ fn s2_time_asymmetry_validity_window_and_live_clock_cancel() {
 
     let params = CreateScheduleParams {
         salt: [0x22; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -1293,7 +1421,7 @@ fn c1_same_block_clock_lag_cancel_protects_shared_batch_escrow() {
     let batch_id = [0xC1; 32];
     let params = BatchCreateParams {
         batch_id,
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -1563,7 +1691,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
     let fv_a = fee_vault_pda(chain.vesting, &def_a);
     let params_a = CreateScheduleParams {
         salt: [0x33; 32],
-        token_definition: def_a,
+        asset: Asset::Token { definition: def_a },
         creator_holding: creator_a,
         refund_holding: creator_a,
         beneficiary: account(&benef_k),
@@ -1605,7 +1733,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
     let fv_b = fee_vault_pda(chain.vesting, &def_b);
     let batch_b = BatchCreateParams {
         batch_id: [0x3B; 32],
-        token_definition: def_b,
+        asset: Asset::Token { definition: def_b },
         creator_holding: creator_b,
         refund_holding: creator_b,
         broker: Some(BrokerFee {
@@ -1668,7 +1796,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
         ],
         &[&outsider_k],
         &Wire::Program(VestingMessage::WithdrawFees {
-            token_definition: def_a,
+            asset: Asset::Token { definition: def_a },
             destination: account(&treasury_dest_a_k),
             amount: 51,
         }),
@@ -1684,7 +1812,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
         ],
         &[&treasury_k],
         &Wire::Program(VestingMessage::WithdrawFees {
-            token_definition: def_a,
+            asset: Asset::Token { definition: def_a },
             destination: fv_a,
             amount: 51,
         }),
@@ -1702,7 +1830,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
             ],
             &[&treasury_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: def_a,
+                asset: Asset::Token { definition: def_a },
                 destination: account(&treasury_dest_a_k),
                 amount: 51,
             }),
@@ -1723,7 +1851,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
             ],
             &[&treasury_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: def_b,
+                asset: Asset::Token { definition: def_b },
                 destination: account(&treasury_dest_b_k),
                 amount: 151,
             }),
@@ -1802,7 +1930,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
     let fv_c = fee_vault_pda(chain.vesting, &def_c);
     let params_c = CreateScheduleParams {
         salt: [0x3C; 32],
-        token_definition: def_c,
+        asset: Asset::Token { definition: def_c },
         creator_holding: creator_c,
         refund_holding: creator_c,
         beneficiary: account(&benef_k),
@@ -1838,7 +1966,7 @@ fn s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability() {
             ],
             &[&treasury_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: def_c,
+                asset: Asset::Token { definition: def_c },
                 destination: account(&treasury_dest_c_k),
                 amount: 100,
             }),
@@ -1881,7 +2009,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
     // 1. Milestone schedule with exclusive Soft-1 & Soft-2 AND distinct refund_holding != creator_holding.
     let ms_params = CreateScheduleParams {
         salt: [0x44; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: refund_treasury,
         beneficiary: benef,
@@ -2109,7 +2237,7 @@ fn full_lifecycle_all_schedule_types_authorities_and_refusals() {
     // 2. Cliff+Linear: pre-cliff metered exit code 26; MakeNonCancelable irreversible; non-transferable.
     let cl_params = CreateScheduleParams {
         salt: [0x45; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -2285,7 +2413,7 @@ fn comprehensive_error_codes_and_security_hardening_suite() {
 
     let base_params = |salt: u8| CreateScheduleParams {
         salt: [salt; 32],
-        token_definition: def1,
+        asset: Asset::Token { definition: def1 },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -2515,7 +2643,7 @@ fn comprehensive_error_codes_and_security_hardening_suite() {
     // `negative_guards_authority_zero_address_and_overclaim_suite`.
     let empty_b = BatchCreateParams {
         batch_id: [0x12; 32],
-        token_definition: def1,
+        asset: Asset::Token { definition: def1 },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -2534,7 +2662,7 @@ fn comprehensive_error_codes_and_security_hardening_suite() {
 
     let over_b = BatchCreateParams {
         batch_id: [0x30; 32],
-        token_definition: def1,
+        asset: Asset::Token { definition: def1 },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -2601,7 +2729,7 @@ fn comprehensive_error_codes_and_security_hardening_suite() {
 
     let b_ok = BatchCreateParams {
         batch_id: [0x56; 32],
-        token_definition: def1,
+        asset: Asset::Token { definition: def1 },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -3049,7 +3177,7 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
             &wactors,
             &[&benef_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: def,
+                asset: Asset::Token { definition: def },
                 destination: benef,
                 amount: 0,
             }),
@@ -3062,7 +3190,9 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
             &wactors,
             &[&benef_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: ZERO_ACCOUNT_ID,
+                asset: Asset::Token {
+                    definition: ZERO_ACCOUNT_ID,
+                },
                 destination: benef,
                 amount: 10,
             }),
@@ -3075,7 +3205,7 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
             &wactors,
             &[&benef_k],
             &Wire::Program(VestingMessage::WithdrawFees {
-                token_definition: def,
+                asset: Asset::Token { definition: def },
                 destination: ZERO_ACCOUNT_ID,
                 amount: 10,
             }),
@@ -3087,7 +3217,7 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
     //    at the midpoint tick below.
     let base_params = |salt: u8| CreateScheduleParams {
         salt: [salt; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: benef,
@@ -3125,7 +3255,11 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
         ),
         (
             0x73u8,
-            Box::new(|p: &mut CreateScheduleParams| p.token_definition = ZERO_ACCOUNT_ID),
+            Box::new(|p: &mut CreateScheduleParams| {
+                p.asset = Asset::Token {
+                    definition: ZERO_ACCOUNT_ID,
+                }
+            }),
         ),
         (
             0x74u8,
@@ -3181,7 +3315,7 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
     // 6. BatchCreate broker guards: zero holding -> 11; 501 bps -> 7.
     let b_params = |broker_fee: Option<BrokerFee>, batch_id: [u8; 32]| BatchCreateParams {
         batch_id,
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         broker: broker_fee,
@@ -3525,7 +3659,7 @@ fn batch_create_concurrent_claims_and_exact_ceiling_benchmark() {
     chain.init_public_holding(&b0_k, def);
     let single_params = CreateScheduleParams {
         salt: [0x51; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: account(&b0_k),
@@ -3663,7 +3797,7 @@ fn batch_create_concurrent_claims_and_exact_ceiling_benchmark() {
 
     let ms_params = CreateScheduleParams {
         salt: [0x52; 32],
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         beneficiary: account(&b0_k),
@@ -3747,7 +3881,7 @@ fn batch_create_concurrent_claims_and_exact_ceiling_benchmark() {
     let batch_id = [0xBB; 32];
     let batch8 = BatchCreateParams {
         batch_id,
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -3915,7 +4049,7 @@ fn batch_create_concurrent_claims_and_exact_ceiling_benchmark() {
                 .collect();
             let params = BatchCreateParams {
                 batch_id: bid,
-                token_definition: def,
+                asset: Asset::Token { definition: def },
                 creator_holding: creator,
                 refund_holding: creator,
                 broker: None,
@@ -4175,7 +4309,7 @@ fn stateful_handler_conservation_invariant_suite() {
         chain.init_private_holding(&mut pw, def);
         let params = CreateScheduleParams {
             salt,
-            token_definition: def,
+            asset: Asset::Token { definition: def },
             creator_holding: creator,
             refund_holding: creator,
             beneficiary: account(&bk),
@@ -4219,7 +4353,7 @@ fn stateful_handler_conservation_invariant_suite() {
     }
     let batch_params = BatchCreateParams {
         batch_id: bid,
-        token_definition: def,
+        asset: Asset::Token { definition: def },
         creator_holding: creator,
         refund_holding: creator,
         broker: None,
@@ -4706,7 +4840,7 @@ fn adversarial_20_claim_privacy_linkability_suite() {
         chain.init_private_holding(&mut priv_wallets[i], def);
         let params = CreateScheduleParams {
             salt: [0x80 + i as u8; 32],
-            token_definition: def,
+            asset: Asset::Token { definition: def },
             creator_holding: creator,
             refund_holding: creator,
             beneficiary: account(bk),
@@ -4819,4 +4953,940 @@ fn adversarial_20_claim_privacy_linkability_suite() {
         assert_eq!(w.balance(chain.token), 40_000);
     }
     eprintln!("[PRIVACY_20] 20/20 private claims verified: 0 real private IDs/npks/vpks leaked across full tx+events+state, 0 blinded aliases in events, 20/20 pairwise-distinct aliases/nullifiers/commitments/epks, 5/5 wallets reconciled");
+}
+
+// ============================================================================
+// T1 (24 Nov): signer-relay refusal, direct-PDA calls, native-asset schedules
+// ============================================================================
+
+fn wire(msg: VestingMessage) -> Vec<u8> {
+    borsh::to_vec(&Wire::Program(msg)).expect("wire encodes")
+}
+
+fn linear_params(
+    salt: u8,
+    asset: Asset,
+    creator: AccountId,
+    beneficiary: AccountId,
+    total: u128,
+) -> CreateScheduleParams {
+    CreateScheduleParams {
+        salt: [salt; 32],
+        asset,
+        creator_holding: creator,
+        refund_holding: creator,
+        beneficiary,
+        total_amount: total,
+        kind: ScheduleKind::Linear {
+            start_ts: 1_000_000,
+            end_ts: 2_000_000,
+        },
+        cancelable: true,
+        transferable: true,
+        cancel_authority: None,
+        milestone_authority: None,
+        broker: None,
+    }
+}
+
+/// LEZ v0.4 authorizes a signer's account on every message of the call tree. A program the user
+/// signs a transaction for (here the relay) must not be able to act in the user's name: every
+/// user transition arriving from another program without `AsPda` exits with code 35, metered,
+/// and leaves state byte-identical.
+#[test]
+fn sec_relay_eoa_refused() {
+    let mut chain = TestChain::new(1_000_000);
+    let def_k = key(201);
+    let creator_k = key(202);
+    let benef_k = key(203);
+    let treasury_k = key(204);
+    let def = account(&def_k);
+    let creator = account(&creator_k);
+    let benef = account(&benef_k);
+    let treasury = account(&treasury_k);
+    chain.create_token(&def_k, &creator_k, 1_000_000);
+    chain.init_public_holding(&benef_k, def);
+    chain.init_public_holding(&treasury_k, def);
+
+    let mut params = linear_params(
+        0x21,
+        Asset::Token { definition: def },
+        creator,
+        benef,
+        100_000,
+    );
+    params.kind = ScheduleKind::Milestone {
+        tranches: vec![MilestoneTranche {
+            amount: 100_000,
+            unlocked: false,
+            unlocked_at_ms: None,
+        }],
+    };
+    let actors = chain.create_schedule_actors(creator, &params, &[]);
+    let sched = schedule_pda(chain.vesting, &creator, &params.salt);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &actors,
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(params.clone()))),
+        )
+        .expect("schedule created");
+
+    let attacker = AccountId::new([0xEE; 32]);
+    let cases: Vec<(&str, &PrivateKey, AccountId, VestingMessage)> = vec![
+        (
+            "ClaimPublic",
+            &benef_k,
+            benef,
+            VestingMessage::ClaimPublic {
+                schedule_id: sched,
+                destination: attacker,
+                amount: None,
+            },
+        ),
+        (
+            "ClaimExact",
+            &benef_k,
+            benef,
+            VestingMessage::ClaimExact {
+                schedule_id: sched,
+                destination: attacker,
+                amount: 1,
+                effective_ts: 0,
+            },
+        ),
+        (
+            "TransferBeneficiary",
+            &benef_k,
+            benef,
+            VestingMessage::TransferBeneficiary {
+                schedule_id: sched,
+                new_beneficiary: attacker,
+            },
+        ),
+        (
+            "Cancel",
+            &creator_k,
+            creator,
+            VestingMessage::Cancel { schedule_id: sched },
+        ),
+        (
+            "MakeNonCancelable",
+            &creator_k,
+            creator,
+            VestingMessage::MakeNonCancelable { schedule_id: sched },
+        ),
+        (
+            "SignalMilestone",
+            &creator_k,
+            creator,
+            VestingMessage::SignalMilestone {
+                schedule_id: sched,
+                milestone_index: 0,
+            },
+        ),
+        (
+            "CreateSchedule",
+            &creator_k,
+            creator,
+            VestingMessage::CreateSchedule(Box::new(CreateScheduleParams {
+                salt: [0x22; 32],
+                beneficiary: attacker,
+                ..params.clone()
+            })),
+        ),
+        (
+            "WithdrawFees",
+            &treasury_k,
+            treasury,
+            VestingMessage::WithdrawFees {
+                asset: Asset::Token { definition: def },
+                destination: attacker,
+                amount: 1,
+            },
+        ),
+    ];
+    for (name, signer_k, seat, msg) in cases {
+        let before = chain.state.clone();
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            signer_k,
+            Actor::new(seat, chain.vesting),
+            wire(msg),
+            vec![],
+            &[Actor::new(sched, chain.vesting), clock_actor()],
+        );
+        let cycles = assert_exit_code(&res, 35);
+        assert!(chain.state == before, "{name}: relayed call changed state");
+        eprintln!("[SEC_RELAY] {name} relayed by another program -> exit 35 ({cycles} cycles)");
+    }
+    // The same calls signed directly still work (root rule does not block the owner).
+    chain.tick(1_500_000);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &[
+                Actor::new(creator, chain.vesting),
+                Actor::new(sched, chain.vesting),
+                clock_actor(),
+            ],
+            &[&creator_k],
+            &Wire::Program(VestingMessage::SignalMilestone {
+                schedule_id: sched,
+                milestone_index: 0,
+            }),
+        )
+        .expect("direct signal by the creator still succeeds");
+}
+
+/// A multisig/launchpad program acting as one of its own PDAs (`AsPda`) can create, signal,
+/// claim, make non-cancelable and cancel; another program holding only an inherited grant of
+/// that PDA, or the right program with a wrong seed, is refused with code 35.
+#[test]
+fn sec_pda_cpi_succeeds_and_inherited_seed_relay_refused() {
+    let user_k = key(210);
+    let creator_k = key(211);
+    let user = account(&user_k);
+    let creator = account(&creator_k);
+    let seed = PdaSeed::new([0x5e; 32]);
+    let pda = AccountId::for_public_pda(&RELAY_A, &seed);
+    let mut chain = TestChain::new_funded(
+        1_000_000,
+        &[(user, 1_000), (creator, 10_000_000), (pda, 5_000_000)],
+    );
+    let as_pda = |call: PdaCall| {
+        wire(VestingMessage::AsPda {
+            seed,
+            call: Box::new(call),
+        })
+    };
+
+    // 1) The PDA creates a native schedule as creator (its own native balance funds it).
+    let params = linear_params(0x31, Asset::Native, pda, creator, 1_000_000);
+    let sched_by_pda = schedule_pda(chain.vesting, &pda, &params.salt);
+    let mut extra = chain.native_create_actors(pda, &params, false);
+    extra.retain(|a| *a != Actor::new(pda, chain.vesting));
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(PdaCall::CreateSchedule(Box::new(params.clone()))),
+            vec![seed],
+            &extra,
+        )
+        .expect("PDA-created native schedule");
+    assert_eq!(chain.schedule(sched_by_pda).creator, pda);
+    assert_eq!(chain.native_balance(pda), 4_000_000);
+
+    // 2) An EOA creates a milestone schedule whose beneficiary and both authorities are the PDA.
+    let ms = CreateScheduleParams {
+        salt: [0x32; 32],
+        asset: Asset::Native,
+        creator_holding: creator,
+        refund_holding: creator,
+        beneficiary: pda,
+        total_amount: 300_000,
+        kind: ScheduleKind::Milestone {
+            tranches: vec![
+                MilestoneTranche {
+                    amount: 100_000,
+                    unlocked: false,
+                    unlocked_at_ms: None,
+                },
+                MilestoneTranche {
+                    amount: 200_000,
+                    unlocked: false,
+                    unlocked_at_ms: None,
+                },
+            ],
+        },
+        cancelable: true,
+        transferable: false,
+        cancel_authority: Some(pda),
+        milestone_authority: Some(pda),
+        broker: None,
+    };
+    let ms_sched = schedule_pda(chain.vesting, &creator, &ms.salt);
+    let ms_escrow = single_escrow_pda(chain.vesting, &ms_sched);
+    let actors = chain.native_create_actors(creator, &ms, false);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &actors,
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(ms))),
+        )
+        .expect("EOA-created milestone schedule");
+
+    // Inherited grant: RELAY_A grants the PDA seed to RELAY_B's actor at the PDA account, and
+    // RELAY_B forwards `AsPda` to the vesting seat. RELAY_B does not own the PDA -> 35.
+    let inner = RelayMessage::Forward {
+        to: Actor::new(pda, chain.vesting),
+        message: as_pda(PdaCall::SignalMilestone {
+            schedule_id: ms_sched,
+            milestone_index: 0,
+        }),
+        seeds: vec![],
+    };
+    let before = chain.state.clone();
+    let res = chain.submit_via_relay(
+        RELAY_A,
+        &user_k,
+        Actor::new(pda, RELAY_B),
+        borsh::to_vec(&inner).unwrap(),
+        vec![seed],
+        &[
+            Actor::new(pda, chain.vesting),
+            Actor::new(ms_sched, chain.vesting),
+            clock_actor(),
+        ],
+    );
+    assert_exit_code(&res, 35);
+    assert!(chain.state == before);
+    // The same inherited grant used for a plain (root-style) call -> 35.
+    let inner_plain = RelayMessage::Forward {
+        to: Actor::new(pda, chain.vesting),
+        message: wire(VestingMessage::SignalMilestone {
+            schedule_id: ms_sched,
+            milestone_index: 0,
+        }),
+        seeds: vec![],
+    };
+    let res = chain.submit_via_relay(
+        RELAY_A,
+        &user_k,
+        Actor::new(pda, RELAY_B),
+        borsh::to_vec(&inner_plain).unwrap(),
+        vec![seed],
+        &[
+            Actor::new(pda, chain.vesting),
+            Actor::new(ms_sched, chain.vesting),
+            clock_actor(),
+        ],
+    );
+    assert_exit_code(&res, 35);
+    // The owning program with a seed that does not derive the PDA -> 35.
+    let res = chain.submit_via_relay(
+        RELAY_A,
+        &user_k,
+        Actor::new(pda, chain.vesting),
+        wire(VestingMessage::AsPda {
+            seed: PdaSeed::new([0x5f; 32]),
+            call: Box::new(PdaCall::SignalMilestone {
+                schedule_id: ms_sched,
+                milestone_index: 0,
+            }),
+        }),
+        vec![PdaSeed::new([0x5f; 32])],
+        &[Actor::new(ms_sched, chain.vesting), clock_actor()],
+    );
+    assert_exit_code(&res, 35);
+    assert!(chain.state == before);
+
+    // 3) The owning program signals tranche 0 as the PDA (milestone authority) -> succeeds.
+    chain.tick(1_100_000);
+    let evs = chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(PdaCall::SignalMilestone {
+                schedule_id: ms_sched,
+                milestone_index: 0,
+            }),
+            vec![seed],
+            &[Actor::new(ms_sched, chain.vesting), clock_actor()],
+        )
+        .expect("PDA milestone signal");
+    assert_eq!(events_of::<MilestoneSignaled>(&evs)[0].signaled_by, pda);
+
+    // 4) The PDA (beneficiary) claims tranche 0 to the creator's account.
+    let creator_before = chain.native_balance(creator);
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(PdaCall::ClaimPublic {
+                schedule_id: ms_sched,
+                destination: creator,
+                amount: None,
+            }),
+            vec![seed],
+            &[
+                Actor::new(ms_sched, chain.vesting),
+                clock_actor(),
+                Actor::new(ms_escrow, NATIVE),
+                Actor::new(creator, NATIVE),
+            ],
+        )
+        .expect("PDA claim");
+    assert_eq!(chain.native_balance(creator), creator_before + 100_000);
+    assert_eq!(chain.native_balance(ms_escrow), 200_000);
+
+    // 5) The PDA (cancel authority) cancels: the unvested 200,000 return to the refund account.
+    let creator_before = chain.native_balance(creator);
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(PdaCall::Cancel {
+                schedule_id: ms_sched,
+            }),
+            vec![seed],
+            &[
+                Actor::new(ms_sched, chain.vesting),
+                clock_actor(),
+                Actor::new(ms_escrow, NATIVE),
+                Actor::new(creator, NATIVE),
+            ],
+        )
+        .expect("PDA cancel");
+    assert_eq!(chain.native_balance(creator), creator_before + 200_000);
+    assert_eq!(chain.native_balance(ms_escrow), 0);
+
+    // 6) The PDA, as creator of its own schedule, makes it non-cancelable.
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(PdaCall::MakeNonCancelable {
+                schedule_id: sched_by_pda,
+            }),
+            vec![seed],
+            &[Actor::new(sched_by_pda, chain.vesting)],
+        )
+        .expect("PDA make non-cancelable");
+    assert!(!chain.schedule(sched_by_pda).cancelable);
+    eprintln!("[SEC_PDA] AsPda create/signal/claim/cancel/make-non-cancelable succeed; inherited grant, plain relay and wrong seed refused with 35");
+}
+
+/// Native LEZ schedules end to end: create (single, batch), public claims (partial, full),
+/// cancel with refund, milestone, protocol fee into the native fee vault and its withdrawal,
+/// a one-transaction private claim, refusals, cycle costs and the batch ceiling per shape.
+#[test]
+fn native_asset_lifecycle_fees_batch_private_claim_and_ceilings() {
+    let creator_k = key(221);
+    let benef_k = key(222);
+    let benef2_k = key(223);
+    let treasury_k = key(224);
+    let creator = account(&creator_k);
+    let benef = account(&benef_k);
+    let benef2 = account(&benef2_k);
+    let treasury = account(&treasury_k);
+    let mut chain = TestChain::new_funded(
+        1_000_000,
+        &[
+            (creator, 1_000_000_000),
+            (benef, 1),
+            (benef2, 1),
+            (treasury, 1),
+        ],
+    );
+
+    // Refusals: funding from another account (13), refund to the schedule's own escrow (28).
+    let mut bad = linear_params(0x40, Asset::Native, creator, benef, 1_000);
+    bad.creator_holding = benef;
+    let res = chain.submit_public(
+        Actor::new(creator, chain.vesting),
+        &chain.native_create_actors(creator, &bad, false),
+        &[&creator_k],
+        &Wire::Program(VestingMessage::CreateSchedule(Box::new(bad))),
+    );
+    assert_exit_code(&res, 13);
+    let mut bad = linear_params(0x41, Asset::Native, creator, benef, 1_000);
+    let bad_sched = schedule_pda(chain.vesting, &creator, &bad.salt);
+    bad.refund_holding = single_escrow_pda(chain.vesting, &bad_sched);
+    let res = chain.submit_public(
+        Actor::new(creator, chain.vesting),
+        &chain.native_create_actors(creator, &bad, false),
+        &[&creator_k],
+        &Wire::Program(VestingMessage::CreateSchedule(Box::new(bad))),
+    );
+    assert_exit_code(&res, 28);
+
+    // 1) Linear native schedule: escrow holds exactly the total, creator debited.
+    let params = linear_params(0x42, Asset::Native, creator, benef, 1_000_000);
+    let sched = schedule_pda(chain.vesting, &creator, &params.salt);
+    let escrow = single_escrow_pda(chain.vesting, &sched);
+    let actors = chain.native_create_actors(creator, &params, false);
+    let (cyc_create, r) = chain.measure_public(
+        Actor::new(creator, chain.vesting),
+        &actors,
+        &[&creator_k],
+        &Wire::Program(VestingMessage::CreateSchedule(Box::new(params.clone()))),
+    );
+    r.expect("native create simulates");
+    let creator_before = chain.native_balance(creator);
+    let evs = chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &actors,
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(params))),
+        )
+        .expect("native schedule created");
+    assert_eq!(chain.native_balance(escrow), 1_000_000);
+    assert_eq!(chain.native_balance(creator), creator_before - 1_000_000);
+    assert_eq!(events_of::<ScheduleCreated>(&evs)[0].asset, Asset::Native);
+    assert_eq!(chain.schedule(sched).asset_program_id, NATIVE);
+
+    // 2) Partial then full public claim.
+    chain.tick(1_250_000);
+    let claim_actors = [
+        Actor::new(benef, chain.vesting),
+        Actor::new(sched, chain.vesting),
+        clock_actor(),
+        Actor::new(escrow, NATIVE),
+        Actor::new(benef, NATIVE),
+    ];
+    let partial = Wire::Program(VestingMessage::ClaimPublic {
+        schedule_id: sched,
+        destination: benef,
+        amount: Some(100_000),
+    });
+    let (cyc_claim, r) = chain.measure_public(
+        Actor::new(benef, chain.vesting),
+        &claim_actors,
+        &[&benef_k],
+        &partial,
+    );
+    r.expect("native claim simulates");
+    chain
+        .submit_public(
+            Actor::new(benef, chain.vesting),
+            &claim_actors,
+            &[&benef_k],
+            &partial,
+        )
+        .expect("partial native claim");
+    assert_eq!(chain.native_balance(benef), 1 + 100_000);
+    // Overclaim (27) and nothing changed.
+    let before = chain.state.clone();
+    let res = chain.submit_public(
+        Actor::new(benef, chain.vesting),
+        &claim_actors,
+        &[&benef_k],
+        &Wire::Program(VestingMessage::ClaimPublic {
+            schedule_id: sched,
+            destination: benef,
+            amount: Some(200_000),
+        }),
+    );
+    assert_exit_code(&res, 27);
+    assert!(chain.state == before);
+    chain.tick(2_000_000);
+    chain
+        .submit_public(
+            Actor::new(benef, chain.vesting),
+            &claim_actors,
+            &[&benef_k],
+            &Wire::Program(VestingMessage::ClaimPublic {
+                schedule_id: sched,
+                destination: benef,
+                amount: None,
+            }),
+        )
+        .expect("full native claim");
+    assert_eq!(chain.native_balance(benef), 1 + 1_000_000);
+    assert_eq!(chain.native_balance(escrow), 0);
+
+    // 3) Cancel mid-schedule: unvested back to the creator, vested stays claimable.
+    let mut cp = linear_params(0x43, Asset::Native, creator, benef2, 400_000);
+    cp.kind = ScheduleKind::Linear {
+        start_ts: 2_000_000,
+        end_ts: 3_000_000,
+    };
+    let c_sched = schedule_pda(chain.vesting, &creator, &cp.salt);
+    let c_escrow = single_escrow_pda(chain.vesting, &c_sched);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &chain.native_create_actors(creator, &cp, false),
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(cp))),
+        )
+        .expect("cancelable native schedule");
+    chain.tick(2_250_000);
+    let cancel_actors = [
+        Actor::new(creator, chain.vesting),
+        Actor::new(c_sched, chain.vesting),
+        clock_actor(),
+        Actor::new(c_escrow, NATIVE),
+        Actor::new(creator, NATIVE),
+    ];
+    let cancel = Wire::Program(VestingMessage::Cancel {
+        schedule_id: c_sched,
+    });
+    let (cyc_cancel, r) = chain.measure_public(
+        Actor::new(creator, chain.vesting),
+        &cancel_actors,
+        &[&creator_k],
+        &cancel,
+    );
+    r.expect("native cancel simulates");
+    let creator_before = chain.native_balance(creator);
+    let evs = chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &cancel_actors,
+            &[&creator_k],
+            &cancel,
+        )
+        .expect("native cancel");
+    let c = &events_of::<Cancelled>(&evs)[0];
+    assert_eq!(c.vested_at_cancel, 100_000);
+    assert_eq!(c.refunded_amount, 300_000);
+    assert_eq!(chain.native_balance(creator), creator_before + 300_000);
+    assert_eq!(chain.native_balance(c_escrow), 100_000);
+    chain
+        .submit_public(
+            Actor::new(benef2, chain.vesting),
+            &[
+                Actor::new(benef2, chain.vesting),
+                Actor::new(c_sched, chain.vesting),
+                clock_actor(),
+                Actor::new(c_escrow, NATIVE),
+                Actor::new(benef2, NATIVE),
+            ],
+            &[&benef2_k],
+            &Wire::Program(VestingMessage::ClaimPublic {
+                schedule_id: c_sched,
+                destination: benef2,
+                amount: None,
+            }),
+        )
+        .expect("vested share claimable after cancel");
+    assert_eq!(chain.native_balance(benef2), 1 + 100_000);
+    assert_eq!(chain.native_balance(c_escrow), 0);
+
+    // 4) Protocol fee (50 bps) on a native creation lands in the native fee vault; the treasury
+    //    withdraws it; a non-treasury caller is refused (13).
+    let cfg = config_pda(chain.vesting);
+    chain
+        .submit_public(
+            Actor::new(chain.vesting, chain.vesting),
+            &[
+                Actor::new(chain.vesting, chain.vesting),
+                Actor::new(cfg, chain.vesting),
+            ],
+            &[&key(100)],
+            &Wire::Program(VestingMessage::Configure {
+                token_program_id: Some(chain.token),
+                fee_bps: 50,
+                fee_treasury: Some(treasury),
+            }),
+        )
+        .expect("fee switch on");
+    let fp = linear_params(0x44, Asset::Native, creator, benef, 200_000);
+    let fv = fee_vault_pda(chain.vesting, &Asset::Native.key());
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &chain.native_create_actors(creator, &fp, true),
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(fp))),
+        )
+        .expect("native create with protocol fee");
+    assert_eq!(chain.native_balance(fv), 1_000);
+    let withdraw_actors = [
+        Actor::new(treasury, chain.vesting),
+        Actor::new(cfg, chain.vesting),
+        Actor::new(fv, NATIVE),
+        Actor::new(treasury, NATIVE),
+    ];
+    let res = chain.submit_public(
+        Actor::new(benef, chain.vesting),
+        &[
+            Actor::new(benef, chain.vesting),
+            Actor::new(cfg, chain.vesting),
+            Actor::new(fv, NATIVE),
+            Actor::new(benef, NATIVE),
+        ],
+        &[&benef_k],
+        &Wire::Program(VestingMessage::WithdrawFees {
+            asset: Asset::Native,
+            destination: benef,
+            amount: 1_000,
+        }),
+    );
+    assert_exit_code(&res, 13);
+    let evs = chain
+        .submit_public(
+            Actor::new(treasury, chain.vesting),
+            &withdraw_actors,
+            &[&treasury_k],
+            &Wire::Program(VestingMessage::WithdrawFees {
+                asset: Asset::Native,
+                destination: treasury,
+                amount: 1_000,
+            }),
+        )
+        .expect("treasury withdraws native fees");
+    assert_eq!(events_of::<FeeWithdrawn>(&evs)[0].asset, Asset::Native);
+    assert_eq!(chain.native_balance(treasury), 1 + 1_000);
+    assert_eq!(chain.native_balance(fv), 0);
+    chain
+        .submit_public(
+            Actor::new(chain.vesting, chain.vesting),
+            &[
+                Actor::new(chain.vesting, chain.vesting),
+                Actor::new(cfg, chain.vesting),
+            ],
+            &[&key(100)],
+            &Wire::Program(VestingMessage::Configure {
+                token_program_id: Some(chain.token),
+                fee_bps: 0,
+                fee_treasury: None,
+            }),
+        )
+        .expect("fee switch off");
+
+    // 5) Native batch of 8 with per-recipient amounts over one shared escrow; two claims.
+    let items: Vec<BatchRecipient> = (0..8u8)
+        .map(|i| BatchRecipient {
+            beneficiary: if i % 2 == 0 { benef } else { benef2 },
+            total_amount: 10_000 * (u128::from(i) + 1),
+            kind: ScheduleKind::Linear {
+                start_ts: 2_000_000,
+                end_ts: 3_000_000,
+            },
+            cancelable: true,
+            transferable: false,
+            cancel_authority: None,
+            milestone_authority: None,
+        })
+        .collect();
+    let bp = BatchCreateParams {
+        batch_id: [0x45; 32],
+        asset: Asset::Native,
+        creator_holding: creator,
+        refund_holding: creator,
+        broker: None,
+        items,
+    };
+    let b_escrow = batch_escrow_pda(chain.vesting, &creator, &bp.batch_id);
+    let b_actors = chain.native_batch_actors(creator, &bp, false);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &b_actors,
+            &[&creator_k],
+            &Wire::Program(VestingMessage::BatchCreate(Box::new(bp.clone()))),
+        )
+        .expect("native batch of 8");
+    assert_eq!(chain.native_balance(b_escrow), 360_000);
+    chain.tick(3_000_000);
+    for (idx, who_k) in [(0u32, &benef_k), (7u32, &benef2_k)] {
+        let who = account(who_k);
+        let sid = batch_schedule_pda(chain.vesting, &creator, &bp.batch_id, idx);
+        let before = chain.native_balance(who);
+        chain
+            .submit_public(
+                Actor::new(who, chain.vesting),
+                &[
+                    Actor::new(who, chain.vesting),
+                    Actor::new(sid, chain.vesting),
+                    clock_actor(),
+                    Actor::new(b_escrow, NATIVE),
+                    Actor::new(who, NATIVE),
+                ],
+                &[who_k],
+                &Wire::Program(VestingMessage::ClaimPublic {
+                    schedule_id: sid,
+                    destination: who,
+                    amount: None,
+                }),
+            )
+            .expect("batch claim");
+        assert_eq!(
+            chain.native_balance(who),
+            before + 10_000 * (u128::from(idx) + 1)
+        );
+    }
+    assert_eq!(chain.native_balance(b_escrow), 360_000 - 10_000 - 80_000);
+
+    // 6) One-transaction private native claim into a fresh blinded alias (dev-mode receipt).
+    let mut pp = linear_params(0x46, Asset::Native, creator, benef, 500_000);
+    pp.kind = ScheduleKind::Linear {
+        start_ts: 3_000_000,
+        end_ts: 4_000_000,
+    };
+    let p_sched = schedule_pda(chain.vesting, &creator, &pp.salt);
+    let p_escrow = single_escrow_pda(chain.vesting, &p_sched);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &chain.native_create_actors(creator, &pp, false),
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(pp))),
+        )
+        .expect("native schedule for private claim");
+    chain.tick(3_500_000);
+    let mut dest = PrivateWallet::new(0xA7);
+    let res = chain
+        .claim_private_blinded(
+            &PrivateClaimArgs {
+                beneficiary_key: &benef_k,
+                schedule_id: p_sched,
+                blinding_factor: [0xA8; 32],
+                random_seed: [0xA9; 32],
+                amount: 200_000,
+                effective_ts: 3_400_000,
+                promote_credit: true,
+            },
+            &mut dest,
+        )
+        .expect("one-tx private native claim");
+    let cyc_claim_priv = res.pub_cycles;
+    assert_eq!(chain.native_balance(p_escrow), 300_000);
+    assert_eq!(chain.schedule(p_sched).claimed_amount, 200_000);
+    let acct = dest.account.as_ref().expect("private account committed");
+    assert_eq!(
+        lee_core::native_token::decode_balance(acct.data.actor_state(NATIVE)),
+        Ok(200_000)
+    );
+    assert_eq!(events_of::<Claimed>(&res.events)[0].amount, 200_000);
+    let tx_bytes = borsh::to_vec(&res.tx_msg).unwrap();
+    assert!(!contains_subslice(&tx_bytes, dest.id().value()));
+
+    // 7) Batch ceilings for native schedules, per shape (simulated at the 10M cap).
+    #[derive(Clone, Copy)]
+    enum Shape {
+        Linear,
+        CliffLinearCancelAuth,
+        Milestone4BothAuth,
+    }
+    let make = |n: usize, tag: u8, shape: Shape| -> (Vec<Actor>, Wire<VestingMessage>) {
+        let items = (0..n)
+            .map(|i| {
+                let mut b = [0u8; 32];
+                b[0..8].copy_from_slice(&(i as u64 + 1).to_le_bytes());
+                b[31] = 0x78;
+                let (kind, cancel_authority, milestone_authority) = match shape {
+                    Shape::Linear => (
+                        ScheduleKind::Linear {
+                            start_ts: 5_000_000,
+                            end_ts: 6_000_000,
+                        },
+                        None,
+                        None,
+                    ),
+                    Shape::CliffLinearCancelAuth => (
+                        ScheduleKind::CliffLinear {
+                            start_ts: 5_000_000,
+                            cliff_ts: 5_500_000,
+                            end_ts: 7_000_000,
+                            cliff_amount: 250,
+                        },
+                        Some(AccountId::new([0xC1; 32])),
+                        None,
+                    ),
+                    Shape::Milestone4BothAuth => (
+                        ScheduleKind::Milestone {
+                            tranches: vec![
+                                MilestoneTranche {
+                                    amount: 250,
+                                    unlocked: false,
+                                    unlocked_at_ms: None,
+                                };
+                                4
+                            ],
+                        },
+                        Some(AccountId::new([0xC1; 32])),
+                        Some(AccountId::new([0xD1; 32])),
+                    ),
+                };
+                BatchRecipient {
+                    beneficiary: AccountId::new(b),
+                    total_amount: 1_000,
+                    kind,
+                    cancelable: true,
+                    transferable: true,
+                    cancel_authority,
+                    milestone_authority,
+                }
+            })
+            .collect();
+        let params = BatchCreateParams {
+            batch_id: [tag; 32],
+            asset: Asset::Native,
+            creator_holding: creator,
+            refund_holding: creator,
+            broker: None,
+            items,
+        };
+        (
+            chain.native_batch_actors(creator, &params, false),
+            Wire::Program(VestingMessage::BatchCreate(Box::new(params))),
+        )
+    };
+    let fits = |n: usize, tag: u8, shape: Shape| -> (u64, bool, usize) {
+        let (a, w) = make(n, tag, shape);
+        let (cyc, r) =
+            chain.measure_public(Actor::new(creator, chain.vesting), &a, &[&creator_k], &w);
+        let bytes = borsh::to_vec(&chain.build_public_tx(
+            Actor::new(creator, chain.vesting),
+            &a,
+            &[&creator_k],
+            &w,
+        ))
+        .unwrap()
+        .len();
+        if let Err(e) = &r {
+            assert!(
+                matches!(e, LeeError::OutOfGas { .. }),
+                "unexpected batch failure {e:?}"
+            );
+        }
+        (cyc, r.is_ok(), bytes)
+    };
+    for (shape, name, tag) in [
+        (Shape::Linear, "Linear", 0xE0u8),
+        (Shape::CliffLinearCancelAuth, "CliffLinear+Soft1", 0xE4),
+        (Shape::Milestone4BothAuth, "Milestone4+Soft1/2", 0xE8),
+    ] {
+        let (mut lo, mut hi) = (1usize, 256usize);
+        while fits(hi, tag, shape).1 {
+            lo = hi;
+            hi *= 2;
+        }
+        while lo + 1 < hi {
+            let mid = (lo + hi) / 2;
+            if fits(mid, tag + 1, shape).1 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        let (cyc, ok, bytes) = fits(lo, tag + 2, shape);
+        assert!(ok);
+        let (cyc_over, ok_over, _) = fits(lo + 1, tag + 3, shape);
+        assert!(!ok_over);
+        assert!(lo >= 100, "native {name} N_max {lo} below 100");
+        eprintln!(
+            "NATIVE BatchCreate({name} N_max={lo}) = {cyc} cycles ({:.2}%), tx_bytes={bytes}, N_max+1 charged={cyc_over}",
+            cyc as f64 / 100_000.0
+        );
+    }
+    eprintln!(
+        "NATIVE CreateSchedule       = {cyc_create} cycles ({:.2}%)",
+        cyc_create as f64 / 100_000.0
+    );
+    eprintln!(
+        "NATIVE ClaimPublic          = {cyc_claim} cycles ({:.2}%)",
+        cyc_claim as f64 / 100_000.0
+    );
+    eprintln!(
+        "NATIVE ClaimExact (private) = {cyc_claim_priv} public cycles ({:.2}%)",
+        cyc_claim_priv as f64 / 100_000.0
+    );
+    eprintln!(
+        "NATIVE Cancel               = {cyc_cancel} cycles ({:.2}%)",
+        cyc_cancel as f64 / 100_000.0
+    );
 }

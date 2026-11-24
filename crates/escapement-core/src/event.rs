@@ -5,6 +5,8 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use lee_core::{account::AccountId, program::ProgramEvent};
+
+use crate::Asset;
 use risc0_zkvm::sha::{Impl, Sha256 as _};
 
 pub trait VestingEvent: BorshSerialize {
@@ -40,7 +42,7 @@ pub struct ScheduleCreated {
     pub batch_id: Option<[u8; 32]>,
     pub creator: AccountId,
     pub beneficiary: AccountId,
-    pub token_definition: AccountId,
+    pub asset: Asset,
     pub escrow_account: AccountId,
     pub refund_holding: AccountId,
     pub total_amount: u128,
@@ -136,11 +138,11 @@ impl VestingEvent for FeeConfigUpdated {
     const SELECTOR: [u8; 8] = [39, 110, 61, 35, 80, 218, 24, 101];
 }
 
-/// Emitted when `fee_treasury` withdraws accrued creation fees from a per-token fee vault PDA.
+/// Emitted when `fee_treasury` withdraws accrued creation fees from a per-asset fee vault PDA.
 /// Omits destination so treasury sweeps can target either public or private accounts.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct FeeWithdrawn {
-    pub token_definition: AccountId,
+    pub asset: Asset,
     pub amount: u128,
     pub withdrawn_by: AccountId,
 }

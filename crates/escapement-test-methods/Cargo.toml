@@ -1,0 +1,18 @@
+[package]
+name = "escapement-test-methods"
+description = "Test-only guests (never deployed): a relay program that forwards messages, with seeds of its own PDAs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[build-dependencies]
+risc0-build.workspace = true
+
+[dependencies]
+borsh.workspace = true
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+risc0-zkvm = { version = "3.0.5", features = ["std"] }
+
+[package.metadata.risc0]
+methods = ["relay"]

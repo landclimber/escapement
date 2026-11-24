@@ -24,11 +24,42 @@ pub const CONFIG_SEED: PdaSeed = lez_admin_authority::seed(b"escapement/config/v
 /// Zero account id sentinel rejected as beneficiary/authority/destination.
 pub const ZERO_ACCOUNT_ID: AccountId = AccountId::new([0u8; 32]);
 
+/// LEZ v0.4's hardcoded native token program address (`lee_core::native_token::NATIVE_TOKEN_PROGRAM_ID`).
+/// A native balance lives at the actor `(account, NATIVE_PROGRAM_ID)`.
+pub const NATIVE_PROGRAM_ID: AccountId = AccountId::new([0u8; 32]);
+
+/// The asset a schedule escrows: the native LEZ balance, or one fungible token definition of the
+/// configured (write-once) token program.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
+pub enum Asset {
+    Native,
+    Token { definition: AccountId },
+}
+
+impl Asset {
+    /// Key used for per-asset PDAs (fee vaults): the token definition, or the zero id for native.
+    #[must_use]
+    pub const fn key(&self) -> AccountId {
+        match self {
+            Self::Native => NATIVE_PROGRAM_ID,
+            Self::Token { definition } => *definition,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_native(&self) -> bool {
+        matches!(self, Self::Native)
+    }
+}
+
 /// Global protocol configuration stored at `config_account(program_id, &CONFIG_SEED)`.
 ///
 /// - `token_program_id` is write-once (immutable once set on initial `Configure`).
 /// - `fee_treasury` is the authorized controller allowed to withdraw accrued fees from
-///   each per-token protocol fee vault PDA (`fee_vault_pda(program_id, token_definition)`).
+///   each per-asset protocol fee vault PDA (`fee_vault_pda(program_id, &asset.key())`).
+/// - Native schedules need only an initialized config; token schedules need `token_program_id`.
 /// - `admin` is exclusively managed by `lez-admin-authority` (Init / Nominate / Accept / Renounce).
 #[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, HasSlot)]
 pub struct Config {
@@ -93,10 +124,12 @@ pub struct BrokerFee {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct ScheduleAccount {
     pub version: u8,
-    pub token_program_id: AccountId,
+    /// Program holding the escrowed balance: `NATIVE_PROGRAM_ID` for `Asset::Native`, else the
+    /// configured token program at creation time.
+    pub asset_program_id: AccountId,
     pub creator: AccountId,
     pub beneficiary: AccountId,
-    pub token_definition: AccountId,
+    pub asset: Asset,
     pub escrow_seed: PdaSeed,
     pub escrow_account: AccountId,
     pub refund_holding: AccountId,
@@ -125,7 +158,8 @@ impl ScheduleAccount {
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct CreateScheduleParams {
     pub salt: [u8; 32],
-    pub token_definition: AccountId,
+    pub asset: Asset,
+    /// Token holding funding the schedule; for `Asset::Native` it must be the creator itself.
     pub creator_holding: AccountId,
     pub refund_holding: AccountId,
     pub beneficiary: AccountId,
@@ -152,7 +186,8 @@ pub struct BatchRecipient {
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct BatchCreateParams {
     pub batch_id: [u8; 32],
-    pub token_definition: AccountId,
+    pub asset: Asset,
+    /// Token holding funding the batch; for `Asset::Native` it must be the creator itself.
     pub creator_holding: AccountId,
     pub refund_holding: AccountId,
     pub broker: Option<BrokerFee>,
@@ -168,14 +203,14 @@ pub enum PendingOp {
     },
     CreateVerifyRefund {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         protocol_fee: u128,
         broker_fee: u128,
         params: Box<CreateScheduleParams>,
     },
     CreateVerifyEscrowPre {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         escrow_seed: PdaSeed,
         escrow_account: AccountId,
         protocol_fee: u128,
@@ -184,7 +219,7 @@ pub enum PendingOp {
     },
     CreateVerifyEscrowPost {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         escrow_seed: PdaSeed,
         escrow_account: AccountId,
         pre_balance: u128,
@@ -197,7 +232,7 @@ pub enum PendingOp {
     },
     BatchVerifyRefund {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         total_batch_amount: u128,
         protocol_fee: u128,
         broker_fee: u128,
@@ -205,7 +240,7 @@ pub enum PendingOp {
     },
     BatchVerifyEscrowPre {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         escrow_seed: PdaSeed,
         escrow_account: AccountId,
         total_batch_amount: u128,
@@ -215,7 +250,7 @@ pub enum PendingOp {
     },
     BatchVerifyEscrowPost {
         creator: AccountId,
-        token_program_id: AccountId,
+        asset_program_id: AccountId,
         escrow_seed: PdaSeed,
         escrow_account: AccountId,
         total_batch_amount: u128,
@@ -276,9 +311,9 @@ pub enum Message {
         fee_bps: u16,
         fee_treasury: Option<AccountId>,
     },
-    /// Withdraw accrued creation fees from a per-token fee vault PDA (authorized by `config.fee_treasury`).
+    /// Withdraw accrued creation fees from a per-asset fee vault PDA (authorized by `config.fee_treasury`).
     WithdrawFees {
-        token_definition: AccountId,
+        asset: Asset,
         destination: AccountId,
         amount: u128,
     },
@@ -315,14 +350,115 @@ pub enum Message {
     },
     /// Read any actor's state via `StateReply`.
     ReadState,
+    /// A user transition sent by another program as one of its own PDAs (a multisig, DAO or
+    /// launchpad vault). Accepted only when the immediate sender's program derives the receiving
+    /// account from `seed` (`for_public_pda(sender_program, seed) == receiver`), so neither a
+    /// signer's authority nor an inherited seed grant can be relayed by a third program.
+    AsPda { seed: PdaSeed, call: Box<PdaCall> },
+}
+
+/// User transitions a program may send as its own PDA through `Message::AsPda`.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub enum PdaCall {
+    WithdrawFees {
+        asset: Asset,
+        destination: AccountId,
+        amount: u128,
+    },
+    CreateSchedule(Box<CreateScheduleParams>),
+    BatchCreate(Box<BatchCreateParams>),
+    ClaimPublic {
+        schedule_id: AccountId,
+        destination: AccountId,
+        amount: Option<u128>,
+    },
+    ClaimExact {
+        schedule_id: AccountId,
+        destination: AccountId,
+        amount: u128,
+        effective_ts: u64,
+    },
+    Cancel {
+        schedule_id: AccountId,
+    },
+    MakeNonCancelable {
+        schedule_id: AccountId,
+    },
+    SignalMilestone {
+        schedule_id: AccountId,
+        milestone_index: u8,
+    },
+    TransferBeneficiary {
+        schedule_id: AccountId,
+        new_beneficiary: AccountId,
+    },
+}
+
+impl From<PdaCall> for Message {
+    fn from(call: PdaCall) -> Self {
+        match call {
+            PdaCall::WithdrawFees {
+                asset,
+                destination,
+                amount,
+            } => Self::WithdrawFees {
+                asset,
+                destination,
+                amount,
+            },
+            PdaCall::CreateSchedule(p) => Self::CreateSchedule(p),
+            PdaCall::BatchCreate(p) => Self::BatchCreate(p),
+            PdaCall::ClaimPublic {
+                schedule_id,
+                destination,
+                amount,
+            } => Self::ClaimPublic {
+                schedule_id,
+                destination,
+                amount,
+            },
+            PdaCall::ClaimExact {
+                schedule_id,
+                destination,
+                amount,
+                effective_ts,
+            } => Self::ClaimExact {
+                schedule_id,
+                destination,
+                amount,
+                effective_ts,
+            },
+            PdaCall::Cancel { schedule_id } => Self::Cancel { schedule_id },
+            PdaCall::MakeNonCancelable { schedule_id } => Self::MakeNonCancelable { schedule_id },
+            PdaCall::SignalMilestone {
+                schedule_id,
+                milestone_index,
+            } => Self::SignalMilestone {
+                schedule_id,
+                milestone_index,
+            },
+            PdaCall::TransferBeneficiary {
+                schedule_id,
+                new_beneficiary,
+            } => Self::TransferBeneficiary {
+                schedule_id,
+                new_beneficiary,
+            },
+        }
+    }
 }
 
 /// Internal messages decoded only when `input.from_own_program()` is true (tag byte < 255).
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum Internal {
     ReadConfig,
+    /// No-op delivered with a fee vault's seed so LEZ admits the vault account before a native
+    /// fee credit reaches it (native balances need no holding initialization).
+    AdmitFeeVault {
+        asset_key: AccountId,
+    },
     WithdrawFees {
-        token_definition: AccountId,
+        asset: Asset,
         destination: AccountId,
         amount: u128,
     },
@@ -394,10 +530,11 @@ pub enum VestingError {
     MalformedMessage,
     InvalidAuthorityForSchedule,
     InvalidTokenProgram,
+    NotRootOrDirectPda,
 }
 
 impl VestingError {
-    /// Deterministic non-zero guest exit code (`1..=34`).
+    /// Deterministic non-zero guest exit code (`1..=35`).
     ///
     /// On LEZ v0.4, exiting with a non-zero code (`env::exit(code)`) produces
     /// `LeeError::ProgramExitedWithCode { code, cycles }` and bills only metered cycles
@@ -439,6 +576,7 @@ impl VestingError {
             Self::MalformedMessage => 32,
             Self::InvalidAuthorityForSchedule => 33,
             Self::InvalidTokenProgram => 34,
+            Self::NotRootOrDirectPda => 35,
         }
     }
 
@@ -473,13 +611,16 @@ impl VestingError {
             25 => "E025: milestone index is already unlocked",
             26 => "E026: nothing claimable yet",
             27 => "E027: requested amount exceeds claimable",
-            28 => "E028: refund_holding must be an initialized token holding for token_definition",
+            28 => "E028: refund_holding is not a valid refund account for this asset",
             29 => "E029: escrow delta does not match expected deposit",
             30 => "E030: arithmetic overflow",
             31 => "E031: invalid destination or beneficiary PDA self-lock",
             32 => "E032: malformed message or missing sender",
             33 => "E033: authority option is invalid for this schedule configuration",
             34 => "E034: invalid token_program_id",
+            35 => {
+                "E035: call must come from the signer directly or from the program owning this PDA"
+            }
             _ => "E999: unknown vesting exit code",
         }
     }
@@ -535,8 +676,7 @@ impl VestingError {
                 claimable,
             } => format!("E027: requested {requested} exceeds claimable {claimable}"),
             Self::InvalidRefundHolding => {
-                "E028: refund_holding must be an initialized token holding for token_definition"
-                    .into()
+                "E028: refund_holding is not a valid refund account for this asset".into()
             }
             Self::EscrowFundingMismatch { expected, actual } => {
                 format!("E029: escrow delta {actual} does not match expected {expected}")
@@ -550,6 +690,10 @@ impl VestingError {
                 "E033: authority option is invalid for this schedule configuration".into()
             }
             Self::InvalidTokenProgram => "E034: invalid token_program_id".into(),
+            Self::NotRootOrDirectPda => {
+                "E035: call must come from the signer directly or from the program owning this PDA"
+                    .into()
+            }
         }
     }
 
@@ -582,19 +726,19 @@ pub fn config_pda(program_id: AccountId) -> AccountId {
     lez_admin_authority::config_account(program_id, &CONFIG_SEED)
 }
 
-/// Deterministic per-token protocol fee vault PDA seed.
+/// Deterministic per-asset protocol fee vault PDA seed (`asset_key = Asset::key()`).
 ///
 /// LEZ v0.4 token holdings are single-token-per-account; routing protocol creation fees into
-/// a dedicated per-`token_definition` PDA ensures multi-token schedule creation always works
+/// a dedicated per-asset PDA ensures multi-asset schedule creation always works
 /// permissionlessly whenever `fee_bps > 0`, even after `AdminOp::Renounce`.
 #[must_use]
-pub fn fee_vault_seed(token_definition: &AccountId) -> PdaSeed {
-    hash_seed(&[b"escapement/feevault/v1", token_definition.value()])
+pub fn fee_vault_seed(asset_key: &AccountId) -> PdaSeed {
+    hash_seed(&[b"escapement/feevault/v1", asset_key.value()])
 }
 
 #[must_use]
-pub fn fee_vault_pda(program_id: AccountId, token_definition: &AccountId) -> AccountId {
-    AccountId::for_public_pda(&program_id, &fee_vault_seed(token_definition))
+pub fn fee_vault_pda(program_id: AccountId, asset_key: &AccountId) -> AccountId {
+    AccountId::for_public_pda(&program_id, &fee_vault_seed(asset_key))
 }
 
 #[must_use]

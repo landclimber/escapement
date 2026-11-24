@@ -4,9 +4,11 @@ members = [
     "crates/escapement-program",
     "crates/escapement-methods",
     "crates/escapement-tests",
+    "crates/escapement-test-methods",
 ]
 exclude = [
     "crates/escapement-methods/guest",
+    "crates/escapement-test-methods/relay",
 ]
 resolver = "2"
 

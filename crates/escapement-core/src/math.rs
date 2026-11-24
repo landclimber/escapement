@@ -308,10 +308,10 @@ mod tests {
         let a = AccountId::new([1u8; 32]);
         ScheduleAccount {
             version: 1,
-            token_program_id: a,
+            asset_program_id: a,
             creator: a,
             beneficiary: a,
-            token_definition: a,
+            asset: crate::Asset::Token { definition: a },
             escrow_seed: PdaSeed::new([2u8; 32]),
             escrow_account: a,
             refund_holding: a,
