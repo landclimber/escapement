@@ -525,6 +525,28 @@ impl TestChain {
         )
     }
 
+    /// Like `submit_via_relay`, but the relay sends `message` to `to` as an asynchronous message
+    /// (LEZ's mailbox path; to a declared public actor it runs in the same transaction).
+    fn submit_via_relay_async(
+        &mut self,
+        relay: AccountId,
+        signer_k: &PrivateKey,
+        to: Actor,
+        message: Vec<u8>,
+        extra: &[Actor],
+    ) -> Result<Vec<TransactionEvent>, LeeError> {
+        let signer = account(signer_k);
+        let root = Actor::new(signer, relay);
+        let mut declared = vec![root, to];
+        declared.extend(extra.iter().filter(|a| **a != to && **a != root));
+        self.submit_public(
+            root,
+            &declared,
+            &[signer_k],
+            &RelayMessage::ForwardAsync { to, message },
+        )
+    }
+
     fn schedule(&self, sched_id: AccountId) -> ScheduleAccount {
         match VestingActorState::decode(
             self.state
@@ -894,7 +916,7 @@ fn assert_no_private_leak(
 // ============================================================================
 
 #[test]
-fn s1_private_claim_blinded_alias_single_tx_and_unlinkability() {
+fn s1_private_claim_blinded_alias_single_tx_and_fresh_values_per_claim() {
     let mut chain = TestChain::new(1_000_000);
     let def_k = key(1);
     let creator_k = key(2);
@@ -1086,7 +1108,7 @@ fn s1_private_claim_blinded_alias_single_tx_and_unlinkability() {
         "raced PPTX must leave state intact"
     );
 
-    // 6) Second private claim into SAME private account uses a distinct unlinkable alias + distinct nullifier/commitment/epk!
+    // 6) Second private claim into SAME private account uses a fresh alias + distinct nullifier/commitment/epk!
     let f2 = [0xC2; 32];
     assert_ne!(dest_priv.id().blinded(&f1), dest_priv.id().blinded(&f2));
     let res2 = chain
@@ -4822,7 +4844,7 @@ fn stateful_handler_conservation_invariant_suite() {
 // ============================================================================
 
 #[test]
-fn adversarial_20_claim_privacy_linkability_suite() {
+fn adversarial_20_claim_no_leak_and_distinct_values_suite() {
     let mut chain = TestChain::new(1_000_000);
     let def_k = key(81);
     let creator_k = key(82);
@@ -5094,6 +5116,30 @@ fn sec_relay_eoa_refused() {
                 salt: [0x22; 32],
                 beneficiary: attacker,
                 ..params.clone()
+            })),
+        ),
+        (
+            "BatchCreate",
+            &creator_k,
+            creator,
+            VestingMessage::BatchCreate(Box::new(BatchCreateParams {
+                batch_id: [0x23; 32],
+                asset: Asset::Token { definition: def },
+                creator_holding: creator,
+                refund_holding: creator,
+                broker: None,
+                items: vec![BatchRecipient {
+                    beneficiary: attacker,
+                    total_amount: 1_000,
+                    kind: ScheduleKind::Linear {
+                        start_ts: 1_000_000,
+                        end_ts: 2_000_000,
+                    },
+                    cancelable: true,
+                    transferable: true,
+                    cancel_authority: None,
+                    milestone_authority: None,
+                }],
             })),
         ),
         (
@@ -5889,4 +5935,441 @@ fn native_asset_lifecycle_fees_batch_private_claim_and_ceilings() {
         "NATIVE Cancel               = {cyc_cancel} cycles ({:.2}%)",
         cyc_cancel as f64 / 100_000.0
     );
+}
+
+/// The signer-authority checks the 24 Nov review listed as missing:
+/// - `AsPda` from the PDA's own program with the right seed but no grant on the delivery: 35;
+/// - every user operation sent as the PDA without a grant, through an inherited grant (another
+///   program) or with a seed that does not derive it: 35 each, state byte-identical;
+/// - `AsPda` succeeds for `ClaimExact`, `TransferBeneficiary`, `BatchCreate` and `WithdrawFees`;
+/// - admin operations relayed by another program, even when the admin signs: refused, unchanged;
+/// - forged `Internal`, `StateReply` and clock-reply messages sent by another program to a
+///   schedule: refused, unchanged;
+/// - user operations (and `AsPda`) that arrive as asynchronous messages from another program
+///   (LEZ's mailbox path) even when the right account signs: 35, unchanged.
+#[test]
+fn sec_signer_authority_review_gaps() {
+    let user_k = key(230);
+    let creator_k = key(231);
+    let user = account(&user_k);
+    let creator = account(&creator_k);
+    let seed = PdaSeed::new([0x6e; 32]);
+    let wrong_seed = PdaSeed::new([0x6f; 32]);
+    let pda = AccountId::for_public_pda(&RELAY_A, &seed);
+    let mut chain = TestChain::new_funded(
+        1_000_000,
+        &[(user, 1_000), (creator, 10_000_000), (pda, 5_000_000)],
+    );
+    let as_pda = |s: PdaSeed, call: PdaCall| {
+        wire(VestingMessage::AsPda {
+            seed: *s.as_bytes(),
+            call: Box::new(call),
+        })
+    };
+
+    // A schedule whose beneficiary and cancel authority are the PDA.
+    let mut p = linear_params(0x41, Asset::Native, creator, pda, 1_000_000);
+    p.cancel_authority = Some(pda);
+    let sched = schedule_pda(chain.vesting, &creator, &p.salt);
+    let escrow = single_escrow_pda(chain.vesting, &sched);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &chain.native_create_actors(creator, &p, false),
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(p.clone()))),
+        )
+        .expect("schedule for the PDA");
+    chain.tick(1_500_000);
+
+    // 1) Every user operation, sent as the PDA in the three ways that must fail.
+    let item = BatchRecipient {
+        beneficiary: user,
+        total_amount: 1_000,
+        kind: ScheduleKind::Linear {
+            start_ts: 1_000_000,
+            end_ts: 2_000_000,
+        },
+        cancelable: true,
+        transferable: true,
+        cancel_authority: None,
+        milestone_authority: None,
+    };
+    let calls: Vec<(&str, PdaCall)> = vec![
+        (
+            "ClaimPublic",
+            PdaCall::ClaimPublic {
+                schedule_id: sched,
+                destination: user,
+                amount: None,
+            },
+        ),
+        (
+            "ClaimExact",
+            PdaCall::ClaimExact {
+                schedule_id: sched,
+                destination: user,
+                amount: 1,
+                effective_ts: 0,
+            },
+        ),
+        (
+            "TransferBeneficiary",
+            PdaCall::TransferBeneficiary {
+                schedule_id: sched,
+                new_beneficiary: user,
+            },
+        ),
+        ("Cancel", PdaCall::Cancel { schedule_id: sched }),
+        (
+            "MakeNonCancelable",
+            PdaCall::MakeNonCancelable { schedule_id: sched },
+        ),
+        (
+            "SignalMilestone",
+            PdaCall::SignalMilestone {
+                schedule_id: sched,
+                milestone_index: 0,
+            },
+        ),
+        (
+            "CreateSchedule",
+            PdaCall::CreateSchedule(Box::new(linear_params(
+                0x42,
+                Asset::Native,
+                pda,
+                user,
+                1_000,
+            ))),
+        ),
+        (
+            "BatchCreate",
+            PdaCall::BatchCreate(Box::new(BatchCreateParams {
+                batch_id: [0x43; 32],
+                asset: Asset::Native,
+                creator_holding: pda,
+                refund_holding: pda,
+                broker: None,
+                items: vec![item.clone()],
+            })),
+        ),
+        (
+            "WithdrawFees",
+            PdaCall::WithdrawFees {
+                asset: Asset::Native,
+                destination: user,
+                amount: 1,
+            },
+        ),
+    ];
+    for (name, call) in &calls {
+        let before = chain.state.clone();
+        // a) the owning program and the right seed, but no grant on the delivery
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(seed, call.clone()),
+            vec![],
+            &[Actor::new(sched, chain.vesting), clock_actor()],
+        );
+        assert_exit_code(&res, 35);
+        assert!(chain.state == before, "{name}: no grant changed state");
+        // b) a grant inherited by another program, which forwards AsPda
+        let inner = RelayMessage::Forward {
+            to: Actor::new(pda, chain.vesting),
+            message: as_pda(seed, call.clone()),
+            seeds: vec![],
+        };
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, RELAY_B),
+            borsh::to_vec(&inner).unwrap(),
+            vec![seed],
+            &[
+                Actor::new(pda, chain.vesting),
+                Actor::new(sched, chain.vesting),
+                clock_actor(),
+            ],
+        );
+        assert_exit_code(&res, 35);
+        assert!(
+            chain.state == before,
+            "{name}: inherited grant changed state"
+        );
+        // c) the owning program with a seed that does not derive the PDA
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(wrong_seed, call.clone()),
+            vec![wrong_seed],
+            &[Actor::new(sched, chain.vesting), clock_actor()],
+        );
+        assert_exit_code(&res, 35);
+        assert!(chain.state == before, "{name}: wrong seed changed state");
+        eprintln!("[SEC_PDA_NEG] {name}: no grant, inherited grant, wrong seed -> 35, unchanged");
+    }
+
+    // 2) AsPda succeeds for the operations not covered by the earlier test.
+    // ClaimExact as the beneficiary PDA, to a public destination.
+    let creator_before = chain.native_balance(creator);
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(
+                seed,
+                PdaCall::ClaimExact {
+                    schedule_id: sched,
+                    destination: creator,
+                    amount: 100_000,
+                    effective_ts: 1_500_000,
+                },
+            ),
+            vec![seed],
+            &[
+                Actor::new(sched, chain.vesting),
+                Actor::new(escrow, NATIVE),
+                Actor::new(creator, NATIVE),
+            ],
+        )
+        .expect("PDA ClaimExact");
+    assert_eq!(chain.schedule(sched).claimed_amount, 100_000);
+    assert_eq!(chain.native_balance(creator), creator_before + 100_000);
+    // TransferBeneficiary as the beneficiary PDA.
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(
+                seed,
+                PdaCall::TransferBeneficiary {
+                    schedule_id: sched,
+                    new_beneficiary: user,
+                },
+            ),
+            vec![seed],
+            &[Actor::new(sched, chain.vesting)],
+        )
+        .expect("PDA TransferBeneficiary");
+    assert_eq!(chain.schedule(sched).beneficiary, user);
+    // BatchCreate as the creating PDA, funded from its own native balance.
+    let bp = BatchCreateParams {
+        batch_id: [0x44; 32],
+        asset: Asset::Native,
+        creator_holding: pda,
+        refund_holding: pda,
+        broker: None,
+        items: vec![item.clone(), item],
+    };
+    let b_escrow = batch_escrow_pda(chain.vesting, &pda, &bp.batch_id);
+    let mut extra = chain.native_batch_actors(pda, &bp, false);
+    extra.retain(|a| *a != Actor::new(pda, chain.vesting));
+    let pda_before = chain.native_balance(pda);
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(seed, PdaCall::BatchCreate(Box::new(bp))),
+            vec![seed],
+            &extra,
+        )
+        .expect("PDA BatchCreate");
+    assert_eq!(chain.native_balance(b_escrow), 2_000);
+    assert_eq!(chain.native_balance(pda), pda_before - 2_000);
+    // WithdrawFees as the treasury PDA.
+    let cfg = config_pda(chain.vesting);
+    chain
+        .submit_public(
+            Actor::new(chain.vesting, chain.vesting),
+            &[
+                Actor::new(chain.vesting, chain.vesting),
+                Actor::new(cfg, chain.vesting),
+            ],
+            &[&key(100)],
+            &Wire::Program(VestingMessage::Configure {
+                token_program_id: Some(chain.token),
+                fee_bps: 50,
+                fee_treasury: Some(pda),
+            }),
+        )
+        .expect("fee switch on, treasury = PDA");
+    let fp = linear_params(0x45, Asset::Native, creator, user, 200_000);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &chain.native_create_actors(creator, &fp, true),
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(fp))),
+        )
+        .expect("native create with a fee");
+    let fv = fee_vault_pda(chain.vesting, &Asset::Native.key());
+    assert_eq!(chain.native_balance(fv), 1_000);
+    let creator_before = chain.native_balance(creator);
+    chain
+        .submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(
+                seed,
+                PdaCall::WithdrawFees {
+                    asset: Asset::Native,
+                    destination: creator,
+                    amount: 1_000,
+                },
+            ),
+            vec![seed],
+            &[
+                Actor::new(cfg, chain.vesting),
+                Actor::new(fv, NATIVE),
+                Actor::new(creator, NATIVE),
+            ],
+        )
+        .expect("PDA WithdrawFees");
+    assert_eq!(chain.native_balance(fv), 0);
+    assert_eq!(chain.native_balance(creator), creator_before + 1_000);
+
+    // 3) Admin operations relayed by another program are refused even when the admin signs.
+    for (name, message) in [
+        (
+            "Configure",
+            wire(VestingMessage::Configure {
+                token_program_id: Some(chain.token),
+                fee_bps: 100,
+                fee_treasury: Some(user),
+            }),
+        ),
+        (
+            "Renounce",
+            borsh::to_vec(&admin_op::<VestingMessage>(AdminOp::Renounce)).unwrap(),
+        ),
+    ] {
+        let before = chain.state.clone();
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            &key(100),
+            Actor::new(chain.vesting, chain.vesting),
+            message,
+            vec![],
+            &[Actor::new(cfg, chain.vesting)],
+        );
+        assert!(res.is_err(), "relayed admin {name} accepted");
+        assert!(chain.state == before, "relayed admin {name} changed state");
+        eprintln!("[SEC_ADMIN_RELAY] {name} relayed by another program -> refused: {res:?}");
+    }
+    assert_eq!(chain.config().fee_bps, 50, "fee unchanged");
+
+    // 4) Forged continuations and internal messages from another program are refused.
+    let sched_state = chain
+        .state
+        .get_account_by_id(sched)
+        .data
+        .actor_state(chain.vesting)
+        .clone();
+    for (name, bytes) in [
+        (
+            "Internal::ClaimPublic",
+            borsh::to_vec(&escapement_core::Internal::ClaimPublic {
+                destination: user,
+                amount: None,
+            })
+            .unwrap(),
+        ),
+        (
+            "StateReply",
+            borsh::to_vec(&lee_core::program::StateReply { state: sched_state }).unwrap(),
+        ),
+        (
+            "clock Reply::Timestamp",
+            borsh::to_vec(&clock_core::Reply::Timestamp(u64::MAX)).unwrap(),
+        ),
+    ] {
+        let before = chain.state.clone();
+        let res = chain.submit_via_relay(
+            RELAY_A,
+            &user_k,
+            Actor::new(sched, chain.vesting),
+            bytes,
+            vec![],
+            &[Actor::new(escrow, NATIVE), clock_actor()],
+        );
+        assert!(res.is_err(), "forged {name} accepted");
+        assert!(chain.state == before, "forged {name} changed state");
+        eprintln!("[SEC_FORGED] {name} from another program -> refused: {res:?}");
+    }
+
+    // 5) A user operation that reaches Escapement as an asynchronous message from another program
+    //    (LEZ's mailbox path: to a declared public actor it runs in the same transaction, from the
+    //    sending program, with no grant passed on) is refused like a relayed one, even when the
+    //    right account signs; so is AsPda sent that way by the PDA's own program.
+    let p5 = linear_params(0x46, Asset::Native, creator, user, 1_000);
+    let async_cases: Vec<(&str, &PrivateKey, Actor, Vec<u8>, Vec<Actor>)> = vec![
+        (
+            "ClaimPublic, the beneficiary signing",
+            &user_k,
+            Actor::new(user, chain.vesting),
+            wire(VestingMessage::ClaimPublic {
+                schedule_id: sched,
+                destination: user,
+                amount: None,
+            }),
+            vec![
+                Actor::new(sched, chain.vesting),
+                Actor::new(escrow, NATIVE),
+                Actor::new(user, NATIVE),
+                clock_actor(),
+            ],
+        ),
+        (
+            "CreateSchedule, the creator signing",
+            &creator_k,
+            Actor::new(creator, chain.vesting),
+            wire(VestingMessage::CreateSchedule(Box::new(p5.clone()))),
+            chain.native_create_actors(creator, &p5, true),
+        ),
+        (
+            "AsPda Cancel from the PDA's own program",
+            &user_k,
+            Actor::new(pda, chain.vesting),
+            as_pda(seed, PdaCall::Cancel { schedule_id: sched }),
+            vec![
+                Actor::new(sched, chain.vesting),
+                Actor::new(escrow, NATIVE),
+                Actor::new(creator, NATIVE),
+                clock_actor(),
+            ],
+        ),
+    ];
+    for (name, signer_k, to, msg, extra) in async_cases {
+        let before = chain.state.clone();
+        let res = chain.submit_via_relay_async(RELAY_A, signer_k, to, msg, &extra);
+        assert_exit_code(&res, 35);
+        assert!(chain.state == before, "async {name} changed state");
+        eprintln!("[SEC_ASYNC] {name}, as an async message from another program -> 35, unchanged");
+    }
+    // The same claim signed directly still succeeds.
+    chain
+        .submit_public(
+            Actor::new(user, chain.vesting),
+            &[
+                Actor::new(user, chain.vesting),
+                Actor::new(sched, chain.vesting),
+                Actor::new(escrow, NATIVE),
+                Actor::new(user, NATIVE),
+                clock_actor(),
+            ],
+            &[&user_k],
+            &Wire::Program(VestingMessage::ClaimPublic {
+                schedule_id: sched,
+                destination: user,
+                amount: None,
+            }),
+        )
+        .expect("direct claim by the beneficiary still succeeds");
 }

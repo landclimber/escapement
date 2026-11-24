@@ -8,13 +8,18 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use lee_core::{account::Actor, program::PdaSeed};
 
 /// A relay forwards `message` to `to` as a sync message, granting `seeds` (seeds of the relay
-/// program's own PDAs only: LEZ ignores any other). It forwards at any call depth; anything else
-/// sent to it is recorded as its actor state.
+/// program's own PDAs only: LEZ ignores any other), or as an asynchronous message (LEZ passes no
+/// grant on with those). It forwards at any call depth; anything else sent to it is recorded as its
+/// actor state.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
 pub enum RelayMessage {
     Forward {
         to: Actor,
         message: Vec<u8>,
         seeds: Vec<PdaSeed>,
+    },
+    ForwardAsync {
+        to: Actor,
+        message: Vec<u8>,
     },
 }
