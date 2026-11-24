@@ -182,7 +182,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-records
-          path: e2e/.run/out/
+          # The run's devnet key files (e2e/.run/out/keys/) are never published.
+          path: |
+            e2e/.run/out/
+            !e2e/.run/out/keys/
 
   # Optional, manual-only (`workflow_dispatch`): reproduces the in-process real STARK
   # proof (RISC0_DEV_MODE=0) end to end. Too slow to gate every push, but kept
