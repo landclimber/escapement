@@ -58,14 +58,14 @@ Types: `AccountId` = 32 bytes; `Asset` = Borsh enum, tag `0` `Native`, tag `1` `
 No event carries a claim's destination. On a private claim, `Claimed` is emitted by the schedule
 actor, which runs in the transaction's public part; the destination is a one-time blinded alias that
 appears only in the `ClaimExact` message, and the private account behind it appears nowhere in the
-transaction's public bytes (checked by `adversarial_20_claim_privacy_linkability_suite` and, on the
-sequencer, by `e2e/run_e2e.sh`'s `claim-private-applied` step). `FeeWithdrawn` omits its destination too.
+transaction's public bytes (checked by `adversarial_20_claim_no_leak_and_distinct_values_suite` and, on the
+sequencer, by `e2e/run_e2e.sh`'s `claim-private-*-applied` steps). `FeeWithdrawn` omits its destination too.
 
 ## Reading events
 
 On LEZ `v0.4.0-rc3`, `getEvents` is an RPC of the **indexer** service (`lez/indexer/service/rpc/src/lib.rs:113`),
-not of the sequencer: a standalone sequencer answers it with JSON-RPC error `-32601 Method not found` (recorded by
-`e2e/run_e2e.sh`, step `getEvents-observation`), and the sequencer stores a block's events with the
+not of the sequencer: a standalone sequencer answers it with JSON-RPC error `-32601 Method not found` (asserted by
+`e2e/run_e2e.sh`, step `getEvents-is-not-a-sequencer-rpc-on-rc3`), and the sequencer stores a block's events with the
 blocks it finalizes through Bedrock (`lez/sequencer/core/src/lib.rs`, `apply_finalized`). So events
 cannot be read back from the standalone sequencer the suite runs on. Every event's fields are
 asserted in the in-process tests on LEZ's own state machine (`crates/escapement-tests`, including the

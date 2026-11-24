@@ -20,26 +20,26 @@ tests, `SDK` = `crates/escapement-sdk`, `IDL` = `crates/escapement-idl/tests/idl
 | Req | Requirement (short) | Status | Shown by |
 |---|---|---|---|
 | F1 | Escrowed schedules: cliff+linear, linear, milestone | shown | T `full_lifecycle_all_schedule_types_authorities_and_refusals`, `native_asset_lifecycle_*`; M property suites; E2E `create-linear`, `create-milestone`, `escrow-holds-total` |
-| F2 | Beneficiary fixed at creation; claim to public or private account; creator does not learn the private account | shown | T `s1_private_claim_blinded_alias_single_tx_and_unlinkability`, `adversarial_20_claim_privacy_linkability_suite`, `native_asset_*` (private native claim); E2E `claim-public-partial`, `claim-private-one-tx` (`private_account_id_in_tx_bytes == false`) |
+| F2 | Beneficiary fixed at creation; claim to public or private account; creator does not learn the private account | shown | T `s1_private_claim_blinded_alias_single_tx_and_fresh_values_per_claim`, `adversarial_20_claim_no_leak_and_distinct_values_suite`, `native_asset_*` (private native claim); E2E `claim-public-partial`, `claim-private-new-account-*`, `claim-private-same-account-*`, `claim-private-token-*` (`private_account_id_in_tx_bytes == false`) |
 | F3 | Cancelable by default; one-way non-cancelable; unvested back to creator; vested stays claimable | shown | T `s2_time_asymmetry_*`, `c1_same_block_clock_lag_*`, `full_lifecycle_*`; SDK `f3a_requests_default_to_cancelable_*`; E2E `cancel-by-creator`, `cancel-froze-vesting`, `claim-vested-after-cancel`, `refusal-cancel-after-noncancelable-*` |
 | F4 | Transferability set at creation, immutable | shown | T `full_lifecycle_*` (code 21); E2E `transfer-beneficiary`, `refusal-old-beneficiary-*`, `claim-by-new-beneficiary` |
 | F5 | Batch creation; maximum per transaction documented | shown (testnet re-measure waits on Logos) | T `batch_create_concurrent_claims_and_exact_ceiling_benchmark`, `native_asset_*`; `docs/gas-and-batch.md` |
-| F6 | An event per transition; schema documented | in part: emitted and asserted in-process (private claims included); schema in `docs/events.md` and the IDL; read-back through an indexer waits on Logos (testnet 0.4) | T (every suite decodes its events); `event::tests::compile_time_selectors_match_sha256`; IDL test |
+| F6 | An event per transition; schema documented | in part: emitted and asserted in-process (private claims included); schema in `docs/events.md` and the IDL; read-back through an indexer waits on Logos (testnet 0.4) | T (every suite decodes its events); `event::tests::compile_time_selectors_match_sha256`; IDL test; E2E `getEvents-is-not-a-sequencer-rpc-on-rc3` |
 | U1 | SDK for Logos modules: full lifecycle, public and private claims | in part: Rust SDK (builders for every operation and both assets, claim gates, error mapping) and a CLI that drives a sequencer with it; a Logos Core module wrapper is not built | SDK tests (20); E2E (every step goes through SDK builders) |
 | U2 | Basecamp mini-app (recipient and creator views) | not yet | |
-| U3 | CLI: create, claim, cancel, signal, query claimable | shown for native schedules; token schedules through the SDK only | `crates/escapement-cli`; E2E (all steps) |
-| U4 | Pre-claim summary (claimable, fee); private-path gas check with an actionable error | in part: SDK and CLI; mini-app display not yet | SDK `u4_an_underfunded_private_payer_is_refused_with_the_shortfall`, `fees::tests::*` |
-| U5 | Privacy disclosure before each private claim | in part: SDK disclosure bound to a confirmation token, printed and required by the CLI; mini-app not yet | SDK `u5_*`, `disclosure::tests::*`; CLI `--accept-privacy-disclosure` |
+| U3 | CLI: create, claim, cancel, signal, query claimable | in part: native and token schedules on a local sequencer (create, claim public and private, cancel, signal, show/claimable, token definition and holdings, private accounts); remote endpoints and wallet-held keys for testnet 0.4 not yet | `crates/escapement-cli` (unit tests: key file); E2E (all steps) |
+| U4 | Pre-claim summary (claimable, fee); private-path gas check with an actionable error | in part: SDK and CLI (the CLI checks the private account's balance against the exact fee reserve before proving); mini-app display not yet | SDK `u4_an_underfunded_private_payer_is_refused_with_the_shortfall`, `fees::tests::*`; E2E `claim-private-*-applied`, `private-token-holding-applied` (balance after = credit − the reserve shown) |
+| U5 | Privacy disclosure before each private claim | in part: SDK disclosure bound to a confirmation token; the CLI prints it with its token and sends only with `--confirm <token>`; mini-app not yet | SDK `u5_*`, `disclosure::tests::*`; E2E `*-disclosure-shown-and-nothing-sent`, `claim-private-wrong-token-refused`, `claim-private-wrong-token-changed-nothing` |
 | U6 | IDL with SPEL | shown (SPEL's v0.4 generator from its `refactor/lez-v0.4.x` branch; released SPEL predates LEZ v0.4) | `idl/escapement.idl.json`; IDL `u6_generated_idl_matches_committed`, `u6_idl_covers_all_messages_states_events_and_round_trips` |
-| U7 | Actionable errors, incl. next unlock time when nothing is claimable | shown | `VestingError` codes 1..=35 (T `comprehensive_error_codes_*`); SDK `codes::tests::*`, `u7_nothing_claimable_carries_the_next_unlock`; CLI `show` |
+| U7 | Actionable errors, incl. next unlock time when nothing is claimable | in part: exit codes, SDK messages with the next unlock, CLI `show` and refusal before sending; mini-app display not yet | `VestingError` codes 1..=35 (T `comprehensive_error_codes_*`); SDK `codes::tests::*`, `u7_nothing_claimable_carries_the_next_unlock`; CLI `show` |
 | R1 | Atomic claims; a failed claim loses nothing and can be retried | shown | T `s1_*` (rollbacks incl. a raced proven claim), `negative_guards_*`; E2E `refusal-overclaim-reverted-state-unchanged` |
-| R2 | Atomic cancellation | shown | T `stateful_handler_conservation_invariant_suite` (double-cancel probe), `c1_*`; E2E `refusal-cancel-after-noncancelable-reverted` |
+| R2 | Atomic cancellation | shown | T `stateful_handler_conservation_invariant_suite` (double-cancel probe), `c1_*`; E2E `refusal-cancel-after-noncancelable-reverted-state-unchanged` |
 | R3 | Concurrent claims on independent schedules do not corrupt state | shown | T `batch_create_concurrent_*`, `stateful_handler_conservation_invariant_suite` |
-| R4 | Milestone signalling idempotent, deterministic error | shown | T `full_lifecycle_*` (code 25), `negative_guards_*`; E2E `refusal-double-signal-reverted` |
-| P1 | One claim, one transaction | shown | T `s1_*`, `native_asset_*`; E2E `claim-public-partial`, `claim-private-one-tx` |
-| P2 | Cost of each operation, measured on testnet 0.4 | in part: measured on LEZ `v0.4.0-rc3` (`docs/gas-and-batch.md`); testnet 0.4 waits on Logos | T benchmark suites |
+| R4 | Milestone signalling idempotent, deterministic error | shown | T `full_lifecycle_*` (code 25), `negative_guards_*`; E2E `refusal-double-signal-reverted-state-unchanged` |
+| P1 | One claim, one transaction | shown (public: native and token; private: native and token on the sequencer, one transaction per claim; a new private account first needs one private `InitializeHolding` transaction per token) | T `s1_*`, `native_asset_*`; E2E `claim-public-partial`, `claim-token-public`, `claim-private-new-account-confirm`, `claim-private-token-confirm`, `private-token-holding` |
+| P2 | Cost of each operation, measured on testnet 0.4 | waits on Logos (measured on LEZ `v0.4.0-rc3`: `docs/gas-and-batch.md`) | T benchmark suites |
 | S1 | Deployed and tested on testnet 0.4 | waits on Logos (immutable deployment and admin init shown on a standalone rc3 sequencer: E2E `deploy-immutable-and-init-admin`) | |
-| S2 | E2E tests against a standalone sequencer, in CI, green on the default branch | in part: suite passes on a standalone rc3 sequencer (EVIDENCE); the CI job is written (`.github/workflows/ci.yml`, `e2e-standalone-sequencer`); green on a public default branch once the repository is published | `e2e/run_e2e.sh` |
+| S2 | E2E tests against a standalone sequencer, in CI, green on the default branch | shown: CI job `e2e-standalone-sequencer` (`.github/workflows/ci.yml`) green on the default branch (first public run, 24 Nov 2026, see EVIDENCE "CI"); it re-runs on every push | `e2e/run_e2e.sh` (EVIDENCE E-12, E-13) |
 | S3 | A test for every hard requirement | in part (U2 has none) | this table |
 | S4 | README with deployment, addresses, CLI and mini-app usage | in part: deployment and CLI usage; testnet addresses and mini-app usage not yet | `README.md` |
 
@@ -47,23 +47,23 @@ tests, `SDK` = `crates/escapement-sdk`, `IDL` = `crates/escapement-idl/tests/idl
 
 | Req | Requirement (short) | Status | Shown by |
 |---|---|---|---|
-| Pr1 | Mini-app and SDK support public and private claims | in part: SDK and CLI; mini-app not yet | SDK, CLI, E2E `claim-private-one-tx` |
+| Pr1 | Mini-app and SDK support public and private claims | in part: SDK and CLI; mini-app not yet | SDK, CLI, E2E `claim-private-new-account-*`, `claim-private-token-*` |
 | Pr2 | Disclosure in the mini-app before each private claim | in part: SDK/CLI disclosure; mini-app not yet | SDK `u5_*` |
-| Pr3 | SDK validates the private target before submitting | shown | SDK `pr3_a_public_target_on_the_private_path_is_refused_before_anything_is_built`, `destination::tests::*` |
+| Pr3 | SDK validates the private target before submitting | shown (the CLI runs the same check on its key file's account before building anything) | SDK `pr3_a_public_target_on_the_private_path_is_refused_before_anything_is_built`, `destination::tests::*` |
 
 ## Soft requirements and fee statements
 
 | Req | Status | Shown by |
 |---|---|---|
 | SR1 separate cancellation authority | shown (exclusive; a multisig/DAO PDA acts through `AsPda`) | T `full_lifecycle_*`, `sec_pda_cpi_succeeds_and_inherited_seed_relay_refused` |
-| SR2 separate milestone authority, creator excluded | shown | T `full_lifecycle_*` (creator refused, 13), `sec_pda_*`; E2E `refusal-creator-signal-reverted`, `signal-by-authority` |
+| SR2 separate milestone authority, creator excluded | shown | T `full_lifecycle_*` (creator refused, 13), `sec_pda_*`; E2E `refusal-creator-signal-reverted-state-unchanged`, `signal-by-authority` |
 | FS1–FS4 who pays, when, rate, routing | shown: creator only, at creation, 0 bps at launch (cap 100 bps, broker up to 500 bps), per-asset fee vaults withdrawn by the treasury | T `s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability`, `native_asset_*` |
 
 ## Security properties beyond the RFP
 
 | Property | Shown by |
 |---|---|
-| A program the user signs for cannot act in the user's name (code 35) | T `sec_relay_eoa_refused`, `sec_pda_*` |
+| A program the user signs for cannot act in the user's name (code 35), by a sync or an asynchronous message | T `sec_relay_eoa_refused`, `sec_pda_*`, `sec_signer_authority_review_gaps` |
 | Cancel never refunds claimed tokens under clock lag | T `c1_*`; M `split_on_cancel_*`; Kani harness (see EVIDENCE) |
 | Reproducible guest (image id independent of build path) | `scripts/build-guest.sh --check`, `image-ids.tsv` |
 | Immutable deployment, header read back | E2E `deploy-immutable-and-init-admin`, `header-immutable-and-image-id` |
