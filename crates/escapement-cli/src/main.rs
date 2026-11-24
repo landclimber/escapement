@@ -1,36 +1,63 @@
 //! `escapement`: the Escapement vesting program's CLI over a LEZ v0.4.0-rc3 sequencer's JSON-RPC.
 //!
 //! ```text
-//! escapement keygen                                   a fresh public key (hex) and its account id
-//! escapement fund --to-key HEX --amount N             native transfer to a fresh account (admits it)
-//! escapement probe                                    head block, clock, fee state
-//! escapement deploy ELF [--init-admin] [--keys-out F] immutable program_loader deployment, header read back
+//! escapement keygen                                    a fresh public key (hex) and its account id
+//! escapement fund --to-key HEX --amount N              native transfer to a fresh account (admits it)
+//! escapement probe                                     head block, clock, fee state
+//! escapement deploy ELF [--init-admin] [--keys-out F]  immutable program_loader deployment, header read back
 //! escapement configure --admin-key HEX --fee-bps N [--treasury ID] [--token-program ID]
+//! escapement token new --supply N                      a token definition, supply to the signer's holding
+//! escapement token init-holding --definition ID        the signer's public holding of a token
 //! escapement create --beneficiary ID --total N (--linear S,E | --cliff S,C,E,CLIFF | --milestones A,B,..)
-//!                   [--non-cancelable] [--transferable] [--cancel-authority ID] [--milestone-authority ID]
-//!                   [--refund-to ID] [--salt HEX] [--fee]                    (native asset)
-//! escapement show --schedule ID                       terms, claimable now, next unlock
-//! escapement claim --schedule ID [--amount N] (--to ID | --private) [--accept-privacy-disclosure]
+//!                   [--token ID [--funding-holding ID]] [--non-cancelable] [--transferable]
+//!                   [--cancel-authority ID] [--milestone-authority ID] [--refund-to ID] [--salt HEX] [--fee]
+//! escapement show --schedule ID                        terms, tranches, claimable now, next unlock
+//! escapement claim --schedule ID [--amount N] --to ID  public claim
+//! escapement claim --schedule ID [--amount N] --to-private FILE [--confirm TOKEN]
+//!                                                      private claim into a private account you own
+//! escapement private-account new --out FILE            a private account's keys, written 0600
+//! escapement private-account show --file FILE          its id, last known balances, whether that state is on chain
+//! escapement private-account shield --file FILE --amount N           native into it (pays its own fee)
+//! escapement private-account init-holding --file FILE --definition ID   a private token holding (fee from its native balance)
 //! escapement cancel --schedule ID | make-non-cancelable --schedule ID
 //! escapement signal --schedule ID --index I | transfer-beneficiary --schedule ID --to ID
-//! escapement withdraw-fees --to ID --amount N         (native fee vault; treasury key)
+//! escapement withdraw-fees --to ID --amount N          (native fee vault; treasury key)
 //! ```
 //!
-//! Every mutating command takes `--dry-run` (print what would be sent, send nothing) and
-//! `--no-precheck` (skip the SDK's checks and the local simulation, so the program itself refuses:
-//! used by the end-to-end suite to test refusals on chain).
+//! **Private claims go only to a private account whose keys you hold.** `private-account new` writes
+//! the account's secret material to a 0600 file before anything is proven; every private transaction
+//! spends from the state recorded there and records the account's new state (decrypted from its own
+//! note) afterwards, so claimed funds are never sent to an account nobody can spend from. A private
+//! claim runs in two steps: the first prints the privacy disclosure for this exact claim (amount,
+//! one-time alias, fee reserve) and its confirmation token and stores the prepared claim (0600); the
+//! second, with `--confirm TOKEN`, rebuilds the same claim, refuses if the disclosure changed, proves
+//! and sends it. The SDK's checks run first: the target is a private account derived from the keys
+//! given (+Privacy 3), something is claimable (U7, with the next unlock time), and the fee payer
+//! covers the fee reserve before anything is proven (U4). The fee is paid inside the proof by the
+//! private account itself: out of the claimed credit for native schedules, from its native balance
+//! (fund it with `private-account shield`) for token schedules. The reserve is the fee at the current
+//! base fees, so no refund has to be received later.
+//!
+//! `--dry-run` is available on create, claim, cancel, make-non-cancelable, signal,
+//! transfer-beneficiary and withdraw-fees (print what would be sent, send nothing); `--no-precheck`
+//! (skip the SDK's checks and the local simulation, so the program itself refuses: used by the
+//! end-to-end suite to test refusals on chain). Unknown flags are refused.
 //!
 //! Environment: `LEZ_RPC` (default `http://127.0.0.1:3040`, loopback only: this tool never talks
 //! to a public network), `ESCAPEMENT_KEY` (signer and fee payer, hex; default LEZ's published local
 //! test key from `lez/sequencer/service/networks/local.json`), `ESCAPEMENT_PROGRAM` (the deployed
 //! program's address), `ESCAPEMENT_ELF` (the deployed guest binary, for local simulation and
-//! private-claim proving). Proofs are real unless `RISC0_DEV_MODE=1`. Each command prints one JSON
-//! line to stdout; progress and human-readable summaries go to stderr.
+//! private-claim proving), `ESCAPEMENT_TOKEN_PROGRAM` and `ESCAPEMENT_TOKEN_ELF` (the token program's
+//! address and binary, for token schedules). Proofs are real unless `RISC0_DEV_MODE=1`. Each command
+//! prints one JSON line to stdout; progress and human-readable summaries go to stderr.
+
+mod keyfile;
 
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
-    io::Read,
+    io::{Read, Write as _},
+    os::unix::fs::OpenOptionsExt as _,
     time::{Duration, Instant},
 };
 
@@ -44,10 +71,13 @@ use escapement_sdk::{
     builders::{self, Call, Deployment, ScheduleRequest},
     claim::{prepare_public_claim, ClaimContext},
     codes,
+    destination::{validate_private_target, AccountLookup, PrivateDestination},
     disclosure::PrivacyDisclosure,
-    fees::FeeQuote,
+    fees::{check_private_gas, estimate_private_fee, FeeQuote},
     unlock::{next_unlock, utc},
+    SdkError,
 };
+use keyfile::{PendingClaim, PrivateAccountFile, PrivateKeys};
 use lee::{
     error::LeeError,
     privacy_preserving_transaction::{
@@ -61,17 +91,18 @@ use lee::{
 };
 use lee_core::{
     account::{ActorState, Nonce},
-    encryption::{Ciphertext, EncryptedNote, MlKem768EncapsulationKey, ViewingPublicKey},
+    encryption::{Ciphertext, EncryptedNote, MlKem768EncapsulationKey},
     execution_state::TransactionEntry,
     native_token,
     program::{MessageBody, ProgramHeader, PROGRAM_LOADER_ACCOUNT_ID},
-    AuthorizationSecretKey, Commitment, DummyInput, DummyOutput, EphemeralSecretKey, FeeTransfer,
-    NullifierPublicKey, NullifierSecretKey, NullifierWitness, PrivateAccountKind, PrivateWitness,
-    RegularKey, RootCall, SharedSecretKey, WitnessKind, DUMMY_COMMITMENT_HASH,
+    Commitment, DummyInput, DummyOutput, EncryptionScheme, EphemeralSecretKey, FeeTransfer,
+    NullifierWitness, PrivateAccountKind, PrivateWitness, RegularKey, RootCall, SharedSecretKey,
+    WitnessKind, DUMMY_COMMITMENT_HASH,
 };
 use lez_admin_authority::{admin_op, AdminOp};
 use sequencer_service_rpc::{RpcClient as _, SequencerClient, SequencerClientBuilder};
 use serde_json::json;
+use token_core::{Message as TokenMessage, TokenState};
 
 /// LEZ's published local test key (Justfile `wallet-import-test-accounts`), funded by `local.json`.
 const DEFAULT_KEY: &str = "7f273098f25b71e6c005a9519f2678da8d1c7f01f6a27778e2d9948abdf901fb";
@@ -163,6 +194,24 @@ impl Args {
 
     fn has(&self, name: &str) -> bool {
         self.flags.contains_key(name)
+    }
+
+    /// Refuses any flag the command does not take (a typo must never send a different
+    /// transaction from the one meant).
+    fn check(&self, allowed: &[&str]) -> Result<()> {
+        for name in self.flags.keys() {
+            if !allowed.contains(&name.as_str()) {
+                bail!(
+                    "unknown flag --{name} for this command (takes: {})",
+                    allowed
+                        .iter()
+                        .map(|f| format!("--{f}"))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+            }
+        }
+        Ok(())
     }
 
     fn get(&self, name: &str) -> Option<&str> {
@@ -415,29 +464,41 @@ impl Ctx {
     }
 }
 
-fn load_elf() -> Result<Option<(Vec<u8>, Program)>> {
-    let Ok(path) = std::env::var("ESCAPEMENT_ELF") else {
+fn read_elf(var: &str) -> Result<Option<Vec<u8>>> {
+    let Ok(path) = std::env::var(var) else {
         return Ok(None);
     };
-    let elf = std::fs::read(&path).with_context(|| format!("read ESCAPEMENT_ELF {path}"))?;
-    let program =
-        Program::new(Cow::Owned(elf.clone())).map_err(|e| anyhow!("not a ProgramBinary: {e}"))?;
-    Ok(Some((elf, program)))
+    Ok(Some(
+        std::fs::read(&path).with_context(|| format!("read {var} {path}"))?,
+    ))
 }
 
-fn catalog_for(program_id: AccountId) -> Result<Option<ProgramCatalog>> {
-    let Some((elf, _)) = load_elf()? else {
-        return Ok(None);
-    };
-    let ours = Program::new(Cow::Owned(elf)).map_err(|e| anyhow!("not a ProgramBinary: {e}"))?;
-    Ok(Some(
-        [
-            (program_id, ours),
-            (clock_core::clock_account_id(), programs::clock()),
-        ]
-        .into_iter()
-        .collect(),
-    ))
+fn program_of(elf: Vec<u8>) -> Result<Program> {
+    Program::new(Cow::Owned(elf)).map_err(|e| anyhow!("not a ProgramBinary: {e}"))
+}
+
+fn token_program_id() -> Result<Option<AccountId>> {
+    std::env::var("ESCAPEMENT_TOKEN_PROGRAM")
+        .ok()
+        .map(|v| {
+            v.parse::<AccountId>()
+                .map_err(|e| anyhow!("ESCAPEMENT_TOKEN_PROGRAM: {e:?}"))
+        })
+        .transpose()
+}
+
+/// The programs a local simulation or proof runs: Escapement, the LEZ clock, and the token
+/// program when configured.
+fn catalog_for(program_id: Option<AccountId>) -> Result<ProgramCatalog> {
+    let mut entries: Vec<(AccountId, Program)> =
+        vec![(clock_core::clock_account_id(), programs::clock())];
+    if let (Some(id), Some(elf)) = (program_id, read_elf("ESCAPEMENT_ELF")?) {
+        entries.push((id, program_of(elf)?));
+    }
+    if let (Some(id), Some(elf)) = (token_program_id()?, read_elf("ESCAPEMENT_TOKEN_ELF")?) {
+        entries.push((id, program_of(elf)?));
+    }
+    Ok(entries.into_iter().collect())
 }
 
 fn program_id() -> Result<AccountId> {
@@ -445,6 +506,47 @@ fn program_id() -> Result<AccountId> {
         .context("ESCAPEMENT_PROGRAM (the deployed program's address) is required")?
         .parse::<AccountId>()
         .map_err(|e| anyhow!("ESCAPEMENT_PROGRAM: {e:?}"))
+}
+
+fn deployment() -> Result<Deployment> {
+    Ok(Deployment {
+        program: program_id()?,
+        token_program: token_program_id()?,
+    })
+}
+
+/// A token holding in an actor state of the token program (`None` for anything else; never panics,
+/// unlike `TokenState::decode`, which expects token-written bytes).
+fn token_holding(state: &[u8]) -> Option<(AccountId, u128)> {
+    if state.is_empty() {
+        return None;
+    }
+    match borsh::from_slice::<TokenState>(state) {
+        Ok(TokenState::Holding(h)) => Some((h.definition_id, h.balance)),
+        _ => None,
+    }
+}
+
+/// `account`'s balance of `asset` (0 when it holds none).
+async fn asset_balance(ctx: &Ctx, asset: Asset, account: AccountId) -> Result<u128> {
+    match asset {
+        Asset::Native => ctx.balance(account).await,
+        Asset::Token { definition } => {
+            let program = token_program_id()?.context("ESCAPEMENT_TOKEN_PROGRAM is required")?;
+            Ok(
+                token_holding(&ctx.actor_state(Actor::new(account, program)).await?)
+                    .filter(|(def, _)| *def == definition)
+                    .map_or(0, |(_, balance)| balance),
+            )
+        }
+    }
+}
+
+fn asset_label(asset: Asset) -> String {
+    match asset {
+        Asset::Native => "native units".into(),
+        Asset::Token { definition } => format!("units of token {definition}"),
+    }
 }
 
 async fn probe(ctx: &Ctx) -> Result<serde_json::Value> {
@@ -496,7 +598,7 @@ async fn fund(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
 async fn deploy(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
     let elf_path = a.positional.first().context("deploy ELF")?;
     let elf = std::fs::read(elf_path).with_context(|| format!("read {elf_path}"))?;
-    let program = Program::new(Cow::Owned(elf)).map_err(|e| anyhow!("not a ProgramBinary: {e}"))?;
+    let program = program_of(elf)?;
     let user_elf = program.user_elf().map_err(|e| anyhow!("{e}"))?;
     let segment_keys: Vec<PrivateKey> = (0..program_loader_core::segment_count(&user_elf))
         .map(|_| fresh_key())
@@ -589,9 +691,16 @@ async fn deploy(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
     }
     if let Some(path) = a.get("keys-out") {
         // Local devnet only: the header key is the program's admin seat.
-        std::fs::write(
-            path,
-            json!({"program": header.to_string(), "header_key": key_hex(&header_key)}).to_string(),
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)
+            .with_context(|| format!("create {path}"))?;
+        f.write_all(
+            json!({"program": header.to_string(), "header_key": key_hex(&header_key)})
+                .to_string()
+                .as_bytes(),
         )?;
         out["keys_out"] = json!(path);
     }
@@ -618,6 +727,60 @@ async fn configure(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         .send_call(&call, &[&admin_key], vec![], None, false, 1_000_000)
         .await?;
     Ok(json!({"tx": included.json()}))
+}
+
+async fn token(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
+    let program = token_program_id()?.context("ESCAPEMENT_TOKEN_PROGRAM is required")?;
+    let catalog = catalog_for(None)?;
+    match a.positional.first().map(String::as_str) {
+        Some("new") => {
+            a.check(&["supply", "name"])?;
+            let def_key = fresh_key();
+            let def = id_of(&def_key);
+            let supply = a.u128("supply")?;
+            let call = Call {
+                root: Actor::new(def, program),
+                declared: vec![Actor::new(def, program), Actor::new(ctx.me, program)],
+                message: borsh::to_vec(&TokenMessage::NewDefinition {
+                    name: a.get("name").unwrap_or("VEST-TEST").to_string(),
+                    total_supply: supply,
+                    mint_authority: None,
+                    holding: ctx.me,
+                })?,
+            };
+            let (included, cycles) = ctx
+                .send_call(
+                    &call,
+                    &[&def_key],
+                    vec![PublicAccountEvidence::Key(PublicKey::new_from_private_key(
+                        &def_key,
+                    ))],
+                    Some(&catalog),
+                    true,
+                    500_000,
+                )
+                .await?;
+            let holding = token_holding(&ctx.actor_state(Actor::new(ctx.me, program)).await?);
+            Ok(
+                json!({"tx": included.json(), "simulated_cycles": cycles, "definition": def.to_string(),
+                      "holder": ctx.me.to_string(), "holder_balance": holding.map(|h| h.1.to_string())}),
+            )
+        }
+        Some("init-holding") => {
+            a.check(&["definition"])?;
+            let def = a.account("definition")?;
+            let call = Call {
+                root: Actor::new(ctx.me, program),
+                declared: vec![Actor::new(ctx.me, program), Actor::new(def, program)],
+                message: borsh::to_vec(&TokenMessage::InitializeHolding { definition: def })?,
+            };
+            let (included, cycles) = ctx
+                .send_call(&call, &[], vec![], Some(&catalog), true, 500_000)
+                .await?;
+            Ok(json!({"tx": included.json(), "simulated_cycles": cycles}))
+        }
+        _ => bail!("token new --supply N | token init-holding --definition ID"),
+    }
 }
 
 fn kind_from(a: &Args, total: u128) -> Result<ScheduleKind> {
@@ -666,11 +829,25 @@ fn print_call(call: &Call) -> serde_json::Value {
 }
 
 async fn create(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
-    let program = program_id()?;
-    let d = Deployment {
-        program,
-        token_program: None,
-    };
+    a.check(&[
+        "beneficiary",
+        "total",
+        "linear",
+        "cliff",
+        "milestones",
+        "token",
+        "funding-holding",
+        "non-cancelable",
+        "transferable",
+        "cancel-authority",
+        "milestone-authority",
+        "refund-to",
+        "salt",
+        "fee",
+        "dry-run",
+        "no-precheck",
+    ])?;
+    let d = deployment()?;
     let total = a.u128("total")?;
     let salt = match a.get("salt") {
         Some(h) => hex::decode(h)?
@@ -678,14 +855,24 @@ async fn create(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
             .map_err(|_| anyhow!("--salt: 32 bytes hex"))?,
         None => random_bytes(),
     };
+    let asset = match a.opt_account("token")? {
+        Some(definition) => {
+            if d.token_program.is_none() {
+                bail!("--token needs ESCAPEMENT_TOKEN_PROGRAM");
+            }
+            Asset::Token { definition }
+        }
+        None => Asset::Native,
+    };
     let mut req = ScheduleRequest::new(
         salt,
-        Asset::Native,
+        asset,
         ctx.me,
         a.account("beneficiary")?,
         total,
         kind_from(a, total)?,
     );
+    req.funding_holding = a.opt_account("funding-holding")?;
     req.cancelable = !a.has("non-cancelable");
     req.transferable = a.has("transferable");
     req.refund_to = a.opt_account("refund-to")?;
@@ -693,36 +880,46 @@ async fn create(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
     req.milestone_authority = a.opt_account("milestone-authority")?;
     let params = req.params();
     let call = builders::create_schedule(&d, ctx.me, &params, a.has("fee"));
-    let schedule = schedule_pda(program, &ctx.me, &salt);
-    let escrow = single_escrow_pda(program, &schedule);
+    let schedule = schedule_pda(d.program, &ctx.me, &salt);
+    let escrow = single_escrow_pda(d.program, &schedule);
     if a.has("dry-run") {
         return Ok(
             json!({"dry_run": true, "schedule": schedule.to_string(), "call": print_call(&call)}),
         );
     }
-    let catalog = catalog_for(program)?;
+    let catalog = catalog_for(Some(d.program))?;
     let (included, cycles) = ctx
         .send_call(
             &call,
             &[],
             vec![],
-            catalog.as_ref(),
+            Some(&catalog),
             !a.has("no-precheck"),
             2_000_000,
         )
         .await?;
     Ok(
         json!({"tx": included.json(), "simulated_cycles": cycles, "schedule": schedule.to_string(),
-              "escrow": escrow.to_string(), "escrow_balance": ctx.balance(escrow).await?.to_string()}),
+              "escrow": escrow.to_string(), "escrow_balance": asset_balance(ctx, asset, escrow).await?.to_string()}),
     )
 }
 
 async fn show(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
+    a.check(&["schedule"])?;
     let program = program_id()?;
     let id = a.account("schedule")?;
     let s = ctx.schedule(program, id).await?;
     let now = ctx.clock_ms().await?;
     let (next, reason) = next_unlock(&s, now);
+    let tranches: Option<Vec<serde_json::Value>> = match &s.kind {
+        ScheduleKind::Milestone { tranches } => Some(
+            tranches
+                .iter()
+                .map(|t| json!({"amount": t.amount.to_string(), "unlocked": t.unlocked, "unlocked_at_ms": t.unlocked_at_ms}))
+                .collect(),
+        ),
+        _ => None,
+    };
     Ok(json!({
         "schedule": id.to_string(), "asset": format!("{:?}", s.asset),
         "beneficiary": s.beneficiary.to_string(), "creator": s.creator.to_string(),
@@ -732,9 +929,12 @@ async fn show(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         "next_unlock_ms": next, "next_unlock_utc": next.map(utc),
         "reason": if claimable_at(&s, now) > 0 { "tokens are claimable now".to_string() } else { reason.describe() },
         "cancelable": s.cancelable, "transferable": s.transferable,
+        "cancel_authority": s.cancel_authority.map(|x| x.to_string()),
+        "milestone_authority": s.milestone_authority.map(|x| x.to_string()),
+        "tranches": tranches,
         "cancelled": s.cancelled.map(|c| json!({"at_ms": c.cancelled_at_ms, "vested": c.vested_at_cancel.to_string(), "refunded": c.refunded_amount.to_string()})),
         "escrow": s.escrow_account.to_string(),
-        "escrow_balance": ctx.balance(s.escrow_account).await?.to_string(),
+        "escrow_balance": asset_balance(ctx, s.asset, s.escrow_account).await?.to_string(),
     }))
 }
 
@@ -742,13 +942,13 @@ async fn simple(ctx: &Ctx, a: &Args, call: Call, program: AccountId) -> Result<s
     if a.has("dry-run") {
         return Ok(json!({"dry_run": true, "call": print_call(&call)}));
     }
-    let catalog = catalog_for(program)?;
+    let catalog = catalog_for(Some(program))?;
     let (included, cycles) = ctx
         .send_call(
             &call,
             &[],
             vec![],
-            catalog.as_ref(),
+            Some(&catalog),
             !a.has("no-precheck"),
             1_000_000,
         )
@@ -768,129 +968,94 @@ fn dummy_output() -> DummyOutput {
     }
 }
 
-/// A regular private account's keys (LEZ's own derivations).
-struct PrivateKeys {
-    ask: AuthorizationSecretKey,
-    vpk: ViewingPublicKey,
+/// The SDK's view of the chain for the private-target check.
+struct KnownAccount {
+    id: AccountId,
+    public_exists: bool,
 }
 
-impl PrivateKeys {
-    fn random() -> Self {
-        Self {
-            ask: AuthorizationSecretKey(random_bytes()),
-            vpk: ViewingPublicKey::from_seed(&random_bytes(), &random_bytes()),
-        }
-    }
-    fn nsk(&self) -> NullifierSecretKey {
-        NullifierSecretKey::from(&self.ask)
-    }
-    fn npk(&self) -> NullifierPublicKey {
-        NullifierPublicKey::from(&self.nsk())
-    }
-    fn id(&self) -> AccountId {
-        AccountId::for_regular_private_account(&self.npk(), &self.vpk)
+impl AccountLookup for KnownAccount {
+    fn public_account_exists(&self, account_id: AccountId) -> bool {
+        account_id == self.id && self.public_exists
     }
 }
 
-async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
-    let program = program_id()?;
-    let d = Deployment {
-        program,
-        token_program: None,
-    };
-    let id = a.account("schedule")?;
-    let s = ctx.schedule(program, id).await?;
-    let now = ctx.clock_ms().await?;
-    let requested = a.get("amount").map(str::parse::<u128>).transpose()?;
-    let quote = ctx.quote().await?;
-    let precheck = !a.has("no-precheck");
-    if !a.has("private") {
-        let to = a.account("to")?;
-        let call = builders::claim_public(&d, id, &s, to, requested);
-        if precheck {
-            let ctx_claim = ClaimContext {
-                schedule_account: id,
-                schedule: &s,
-                signer: ctx.me,
-                asset_label: "LGO units".into(),
-                now_ms: now,
-                requested,
-                quote,
-                public_cycles: 110_000,
-            };
-            let prepared =
-                prepare_public_claim(&ctx_claim, to, ctx.me, ctx.balance(ctx.me).await?, 1_000)
-                    .map_err(|e| anyhow!("{e}"))?;
-            eprintln!("{}", prepared.summary.render());
-            if !prepared.summary.sufficient_gas {
-                bail!("the fee payer cannot cover the fee reserve; fund it first");
-            }
-        }
-        if a.has("dry-run") {
-            return Ok(json!({"dry_run": true, "call": print_call(&call)}));
-        }
-        let before = ctx.balance(to).await?;
-        let escrow_before = ctx.balance(s.escrow_account).await?;
-        let catalog = catalog_for(program)?;
-        let (included, cycles) = ctx
-            .send_call(&call, &[], vec![], catalog.as_ref(), precheck, 1_000_000)
-            .await?;
-        let after = ctx.balance(to).await?;
-        let escrow_after = ctx.balance(s.escrow_account).await?;
-        // `destination_delta` nets out the fee when the destination also pays it.
-        return Ok(json!({"tx": included.json(), "simulated_cycles": cycles,
-                         "escrow_debited": escrow_before.saturating_sub(escrow_after).to_string(),
-                         "destination_delta": (after as i128 - before as i128).to_string(),
-                         "claimed_total": ctx.schedule(program, id).await?.claimed_amount.to_string()}));
-    }
+fn sdk_err(e: SdkError) -> anyhow::Error {
+    anyhow!("{e}")
+}
 
-    // Private claim: a fresh private account receives the tokens under a one-time alias and pays
-    // the in-proof fee out of the claimed credit (native asset).
-    if s.asset != Asset::Native {
-        bail!("this CLI's private path covers native schedules; token claims are in the SDK tests");
-    }
-    let (elf, _) =
-        load_elf()?.context("a private claim proves the program locally: set ESCAPEMENT_ELF")?;
-    let amount = match requested {
-        Some(v) => v,
-        None => claimable_at(&s, now),
-    };
-    if precheck && amount == 0 {
-        let (next, reason) = next_unlock(&s, now);
-        bail!(
-            "Nothing is claimable yet: {}.{}",
-            reason.describe(),
-            next.map(|t| format!(" Next unlock at {}.", utc(t)))
-                .unwrap_or_default()
-        );
-    }
-    let keys = PrivateKeys::random();
-    let factor = random_bytes();
-    let alias = keys.id().blinded(&factor);
-    let fee_opening = random_bytes();
-    let payer_actor = Actor::native_balance(keys.id());
-    let call = builders::claim_exact(&d, id, &s, alias, amount, now);
-    let inbox = Actor::native_balance(system_accounts::fee_inbox_account_id());
-    let mut public_actors = call.declared.clone();
-    public_actors.push(inbox);
-    let (_, _, commitment_root) = ctx.client.get_proofs_and_root(vec![], vec![]).await?;
-    let witness = PrivateWitness {
-        vpk: keys.vpk.clone(),
-        random_seed: random_bytes(),
-        kind: WitnessKind::Regular(RegularKey::Authorized(keys.ask)),
-        nullifier: NullifierWitness::Init {
+/// One privacy-preserving transaction that touches exactly one private account: the user's
+/// (destination of any credit and payer of the fee, inside the proof).
+struct PrivatePlan {
+    root: Actor,
+    message: Vec<u8>,
+    public_actors: Vec<Actor>,
+    /// Whether `ESCAPEMENT_KEY`'s account signs (its nonce is bound): claims and shields do.
+    signed: bool,
+    /// The one-time alias whose credit is folded into the private account in this transaction.
+    promote_to: Option<AccountId>,
+    openings: BTreeSet<[u8; 32]>,
+    programs: ProgramCatalog,
+    /// Native credited to the private account within the transaction (a native claim or shield):
+    /// it lands before the fee transfer, so it can pay the fee.
+    native_credit_in_tx: u128,
+}
+
+/// What the confirmation step decides, given the exact fee reserve.
+enum Gate {
+    Proceed,
+    Stop(serde_json::Value),
+}
+
+#[allow(clippy::too_many_lines)]
+async fn run_private(
+    ctx: &Ctx,
+    file: &mut PrivateAccountFile,
+    plan: PrivatePlan,
+    gate: &mut dyn FnMut(u128, u64) -> Result<Gate>,
+) -> Result<serde_json::Value> {
+    let id = file.keys.id();
+    let query = file
+        .state
+        .as_ref()
+        .map(|s| vec![Commitment::new(&id, s)])
+        .unwrap_or_default();
+    let (proofs, _, commitment_root) = ctx.client.get_proofs_and_root(query, vec![]).await?;
+    let nullifier = match &file.state {
+        Some(state) => NullifierWitness::Update {
+            account: state.clone(),
+            membership_proof: proofs.into_iter().next().flatten().with_context(|| {
+                format!(
+                    "{}: its recorded state is not committed on this chain (stale file or another chain)",
+                    file.path.display()
+                )
+            })?,
+        },
+        None => NullifierWitness::Init {
             commitment_root: DUMMY_COMMITMENT_HASH,
         },
-        address_openings: BTreeSet::from([factor]),
     };
+    let witness = PrivateWitness {
+        vpk: file.keys.vpk(),
+        random_seed: random_bytes(),
+        kind: WitnessKind::Regular(RegularKey::Authorized(file.keys.ask())),
+        nullifier,
+        address_openings: plan.openings.clone(),
+    };
+    let fee_opening = random_bytes();
+    let payer_actor = Actor::native_balance(id);
+    let inbox = Actor::native_balance(system_accounts::fee_inbox_account_id());
+    let mut public_actors = plan.public_actors.clone();
+    public_actors.push(inbox);
+    let signers: Vec<AccountId> = if plan.signed { vec![ctx.me] } else { vec![] };
     let mut input = ProvingInput {
         root: TransactionEntry::Sync(RootCall {
-            to: call.root,
-            message: call.message.clone(),
+            to: plan.root,
+            message: plan.message.clone(),
         }),
         claims: Vec::new(),
         fee: None,
-        public_context: PublicExecutionContext::new(public_actors.clone(), [ctx.me]),
+        public_context: PublicExecutionContext::new(public_actors.clone(), signers.clone()),
         private_witnesses: vec![witness],
         dummy_inputs: std::iter::repeat_with(|| DummyInput {
             nullifier_seed: random_bytes(),
@@ -902,8 +1067,8 @@ async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         ciphertext_padding: Some(CIPHERTEXT_PAD_SIZE),
         recoveries: vec![RecipientEncryption {
             recipient: Recipient {
-                npk: keys.npk(),
-                vpk: keys.vpk.clone(),
+                npk: file.keys.npk(),
+                vpk: file.keys.vpk(),
                 kind: PrivateAccountKind::Regular,
                 opening: Some(fee_opening),
             },
@@ -915,8 +1080,6 @@ async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         public_actor_states: ctx.states(&public_actors).await?,
         admitted_accounts: None,
     };
-    let ours = Program::new(Cow::Owned(elf)).map_err(|e| anyhow!("{e}"))?;
-    let programs: ProgramCatalog = [(program, ours)].into_iter().collect();
     let present = move |actor: Actor| {
         if actor == payer_actor {
             SenderPresentation::Blinded(fee_opening)
@@ -924,47 +1087,32 @@ async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
             SenderPresentation::Blinded(random_bytes())
         }
     };
-    let select = move |_, body: &MessageBody| body.to.account_id == alias;
+    let promote_to = plan.promote_to;
+    let select = move |_, body: &MessageBody| promote_to == Some(body.to.account_id);
     let cycles = lee::simulate_privacy_preserving_transaction(
         &input,
         &simulation,
-        &programs,
+        &plan.programs,
         present,
         select,
     )
-    .map_err(|e| anyhow!("simulation (nothing proven or sent): {e}"))?;
-    // The fresh account holds nothing before the root: the claimed credit pays the fee at the head.
-    let reserve =
-        fee_core::assess::private_fee_required(cycles, quote.base_fee_exec, quote.base_fee_stor);
-    if precheck && reserve >= amount {
-        bail!(
-            "the claim ({amount}) does not cover its own private fee ({reserve}); claim more, or claim publicly"
-        );
-    }
-    // The disclosure names the exact reserve the proof will credit to the fee inbox.
-    let disclosure = PrivacyDisclosure {
-        schedule_account: id,
-        beneficiary: s.beneficiary,
-        amount,
-        asset: "LGO units".into(),
-        alias,
-        fee_reserve: reserve,
-    };
-    eprintln!("{}", disclosure.render());
-    if !a.has("accept-privacy-disclosure") {
-        return Ok(
-            json!({"needs_confirmation": true, "disclosure_token": disclosure.token().to_string(),
-                         "fee_reserve": reserve.to_string(), "public_cycles_simulated": cycles,
-                         "hint": "read the disclosure above; rerun with --accept-privacy-disclosure"}),
-        );
-    }
-    if a.has("dry-run") {
-        return Ok(
-            json!({"dry_run": true, "fee_reserve": reserve.to_string(), "call": print_call(&call)}),
-        );
+    .map_err(|e| anyhow!("simulation refused it, nothing proven or sent: {e}"))?;
+    // U4: the reserve is the fee at the current base fees (no headroom, so no refund has to be
+    // received later), and the payer must cover it before anything is proven.
+    let quote = ctx.quote().await?;
+    let estimate = estimate_private_fee(cycles, quote, 0);
+    check_private_gas(
+        &estimate,
+        file.native_balance()
+            .saturating_add(plan.native_credit_in_tx),
+    )
+    .map_err(sdk_err)?;
+    let reserve = estimate.reserve;
+    if let Gate::Stop(v) = gate(reserve, cycles)? {
+        return Ok(v);
     }
     input.fee = Some(FeeTransfer {
-        payer: keys.id(),
+        payer: id,
         recipient: system_accounts::fee_inbox_account_id(),
         amount: reserve,
         refund_to: None,
@@ -974,39 +1122,369 @@ async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
     };
     let started = Instant::now();
     let (output, proof) =
-        lee::execute_and_prove(input, &simulation, &programs, present, select, no_seal)
+        lee::execute_and_prove(input, &simulation, &plan.programs, present, select, no_seal)
             .map_err(|e| anyhow!("proving: {e}"))?;
     let prove_s = started.elapsed().as_secs_f64();
     let proof_bytes = proof.clone().into_inner().len();
-    let nonce = ctx.nonce(ctx.me).await?;
-    let message = PrivateMessage::from_circuit_output(BTreeMap::from([(ctx.me, nonce)]), output);
-    let witness_set = PrivateWitnessSet::for_message(&message, proof, &[&ctx.key]);
+    let nonces: BTreeMap<AccountId, Nonce> = if plan.signed {
+        BTreeMap::from([(ctx.me, ctx.nonce(ctx.me).await?)])
+    } else {
+        BTreeMap::new()
+    };
+    let signer_keys: Vec<&PrivateKey> = if plan.signed { vec![&ctx.key] } else { vec![] };
+    let message = PrivateMessage::from_circuit_output(nonces, output.clone());
+    let witness_set = PrivateWitnessSet::for_message(&message, proof, &signer_keys);
     let tx = PrivacyPreservingTransaction::new(message, witness_set);
-    let tx_bytes_all = borsh::to_vec(&tx)?;
-    let leaks_owner = tx_bytes_all
-        .windows(32)
-        .any(|w| w == keys.id().value().as_slice());
-    let escrow_before = ctx.balance(s.escrow_account).await?;
+    let tx_bytes = borsh::to_vec(&tx)?;
+    let leaks_owner = tx_bytes.windows(32).any(|w| w == id.value().as_slice());
     let included = ctx
         .send_and_wait(LeeTransaction::PrivacyPreserving(tx))
         .await?;
-    let escrow_after = ctx.balance(s.escrow_account).await?;
-    let mut expected = lee::Account::funded(amount - reserve);
-    expected.nonce = Nonce::default().private_account_nonce_increment(&keys.nsk());
-    let (proofs, _, _) = ctx
-        .client
-        .get_proofs_and_root(vec![Commitment::new(&keys.id(), &expected)], vec![])
-        .await?;
-    let committed = proofs.first().is_some_and(Option::is_some);
-    Ok(
-        json!({"tx": included.json(), "amount": amount.to_string(), "alias": alias.to_string(),
-              "fee_reserve": reserve.to_string(), "public_cycles_simulated": cycles,
-              "prove_s": prove_s, "proof_bytes": proof_bytes,
-              "escrow_debited": escrow_before.saturating_sub(escrow_after).to_string(),
-              "private_commitment_found": committed, "private_account_id_in_tx_bytes": leaks_owner,
-              "claimed_total": ctx.schedule(program, id).await?.claimed_amount.to_string(),
-              "dev_mode": std::env::var("RISC0_DEV_MODE").is_ok_and(|v| v == "1" || v == "true")}),
-    )
+    // The account's new state, from its own note (the regular one, or the fee fallback's if the
+    // public part failed), checked against the chain before it is recorded.
+    let mut candidates: Vec<_> = output.execution.private_actions.iter().collect();
+    if let Some(fallback) = output
+        .execution
+        .fee
+        .as_ref()
+        .and_then(|f| f.fallback.as_ref())
+    {
+        candidates.push(&fallback.action);
+    }
+    let mut recorded = None;
+    for action in candidates {
+        let Some(secret) = SharedSecretKey::decapsulate(
+            &action.encrypted_post_state.epk,
+            &file.keys.d,
+            &file.keys.z,
+        ) else {
+            continue;
+        };
+        let Some((_, state)) = EncryptionScheme::decrypt(
+            &action.encrypted_post_state.ciphertext,
+            &secret,
+            &action.nullifier,
+        ) else {
+            continue;
+        };
+        let (on_chain, _, _) = ctx
+            .client
+            .get_proofs_and_root(vec![Commitment::new(&id, &state)], vec![])
+            .await?;
+        if on_chain.first().is_some_and(Option::is_some) {
+            recorded = Some(state);
+            break;
+        }
+    }
+    let committed = recorded.is_some();
+    if let Some(state) = recorded {
+        file.save_state(state)?;
+    } else {
+        eprintln!(
+            "warning: no new state of {} found on chain; {} keeps its previous state",
+            id,
+            file.path.display()
+        );
+    }
+    Ok(json!({
+        "tx": included.json(), "fee_reserve": reserve.to_string(), "public_cycles_simulated": cycles,
+        "prove_s": prove_s, "proof_bytes": proof_bytes,
+        "private_commitment_found": committed, "private_account_id_in_tx_bytes": leaks_owner,
+        "account_state_saved": committed,
+        "account_native_balance_after": file.native_balance().to_string(),
+        "dev_mode": std::env::var("RISC0_DEV_MODE").is_ok_and(|v| v == "1" || v == "true"),
+    }))
+}
+
+fn holdings_json(file: &PrivateAccountFile) -> serde_json::Value {
+    let Some(state) = &file.state else {
+        return json!([]);
+    };
+    let token_program = token_program_id().ok().flatten();
+    let holdings: Vec<serde_json::Value> = state
+        .data
+        .actor_states
+        .iter()
+        .filter(|(program, _)| Some(**program) == token_program)
+        .filter_map(|(program, s)| {
+            token_holding(s).map(|(def, bal)| {
+                json!({"program": program.to_string(), "definition": def.to_string(), "balance": bal.to_string()})
+            })
+        })
+        .collect();
+    json!(holdings)
+}
+
+async fn private_account(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
+    match a.positional.first().map(String::as_str) {
+        Some("new") => {
+            a.check(&["out"])?;
+            let path = std::path::Path::new(a.need("out")?);
+            let file = PrivateAccountFile::create(
+                path,
+                PrivateKeys::from_seed_bytes(random_bytes(), random_bytes(), random_bytes()),
+            )?;
+            Ok(json!({"account": file.keys.id().to_string(), "key_file": path.display().to_string(),
+                      "note": "keep this file: it holds the account's secret keys (mode 0600)"}))
+        }
+        Some("show") => {
+            a.check(&["file"])?;
+            let file = PrivateAccountFile::load(std::path::Path::new(a.need("file")?))?;
+            let id = file.keys.id();
+            let committed = match &file.state {
+                Some(s) => ctx
+                    .client
+                    .get_proofs_and_root(vec![Commitment::new(&id, s)], vec![])
+                    .await?
+                    .0
+                    .first()
+                    .is_some_and(Option::is_some),
+                None => false,
+            };
+            Ok(json!({"account": id.to_string(), "native_balance": file.native_balance().to_string(),
+                      "token_holdings": holdings_json(&file), "state_committed_on_chain": committed,
+                      "new_account": file.state.is_none()}))
+        }
+        Some("shield") => {
+            a.check(&["file", "amount"])?;
+            let mut file = PrivateAccountFile::load(std::path::Path::new(a.need("file")?))?;
+            let amount = a.u128("amount")?;
+            let factor = random_bytes();
+            let dest = PrivateDestination::with_factor(&file.keys.sdk_keys(), factor);
+            let root = Actor::native_balance(ctx.me);
+            let plan = PrivatePlan {
+                root,
+                message: borsh::to_vec(&native_token::Message::Transfer {
+                    to: dest.alias(),
+                    amount,
+                })?,
+                public_actors: vec![root],
+                signed: true,
+                promote_to: Some(dest.alias()),
+                openings: BTreeSet::from([dest.opening()]),
+                programs: ProgramCatalog::default(),
+                native_credit_in_tx: amount,
+            };
+            let mut out = run_private(ctx, &mut file, plan, &mut |_, _| Ok(Gate::Proceed)).await?;
+            out["alias"] = json!(dest.alias().to_string());
+            Ok(out)
+        }
+        Some("init-holding") => {
+            a.check(&["file", "definition"])?;
+            let mut file = PrivateAccountFile::load(std::path::Path::new(a.need("file")?))?;
+            let def = a.account("definition")?;
+            let program = token_program_id()?.context("ESCAPEMENT_TOKEN_PROGRAM is required")?;
+            if file.state.is_none() {
+                bail!("the account has no native balance to pay the fee yet: run `private-account shield` first");
+            }
+            let plan = PrivatePlan {
+                root: Actor::new(file.keys.id(), program),
+                message: borsh::to_vec(&TokenMessage::InitializeHolding { definition: def })?,
+                public_actors: vec![Actor::new(def, program)],
+                signed: false,
+                promote_to: None,
+                openings: BTreeSet::new(),
+                programs: catalog_for(None)?,
+                native_credit_in_tx: 0,
+            };
+            let mut out = run_private(ctx, &mut file, plan, &mut |_, _| Ok(Gate::Proceed)).await?;
+            out["token_holdings_after"] = holdings_json(&file);
+            Ok(out)
+        }
+        _ => bail!("private-account new --out FILE | show --file FILE | shield --file FILE --amount N | init-holding --file FILE --definition ID"),
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+async fn claim(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
+    a.check(&[
+        "schedule",
+        "amount",
+        "to",
+        "to-private",
+        "confirm",
+        "dry-run",
+        "no-precheck",
+    ])?;
+    let d = deployment()?;
+    let program = d.program;
+    let id = a.account("schedule")?;
+    let s = ctx.schedule(program, id).await?;
+    let now = ctx.clock_ms().await?;
+    let requested = a.get("amount").map(str::parse::<u128>).transpose()?;
+    let quote = ctx.quote().await?;
+    let precheck = !a.has("no-precheck");
+    if let Some(to) = a.opt_account("to")? {
+        let call = builders::claim_public(&d, id, &s, to, requested);
+        if precheck {
+            let ctx_claim = ClaimContext {
+                schedule_account: id,
+                schedule: &s,
+                signer: ctx.me,
+                asset_label: asset_label(s.asset),
+                now_ms: now,
+                requested,
+                quote,
+                public_cycles: 110_000,
+            };
+            let prepared =
+                prepare_public_claim(&ctx_claim, to, ctx.me, ctx.balance(ctx.me).await?, 1_000)
+                    .map_err(sdk_err)?;
+            eprintln!("{}", prepared.summary.render());
+            if !prepared.summary.sufficient_gas {
+                bail!("the fee payer cannot cover the fee reserve; fund it first");
+            }
+        }
+        if a.has("dry-run") {
+            return Ok(json!({"dry_run": true, "call": print_call(&call)}));
+        }
+        let before = asset_balance(ctx, s.asset, to).await?;
+        let escrow_before = asset_balance(ctx, s.asset, s.escrow_account).await?;
+        let catalog = catalog_for(Some(program))?;
+        let (included, cycles) = ctx
+            .send_call(&call, &[], vec![], Some(&catalog), precheck, 1_000_000)
+            .await?;
+        let after = asset_balance(ctx, s.asset, to).await?;
+        let escrow_after = asset_balance(ctx, s.asset, s.escrow_account).await?;
+        // `destination_delta` nets out the fee when the destination also pays it (native).
+        return Ok(json!({"tx": included.json(), "simulated_cycles": cycles,
+                         "escrow_debited": escrow_before.saturating_sub(escrow_after).to_string(),
+                         "destination_delta": (after as i128 - before as i128).to_string(),
+                         "claimed_total": ctx.schedule(program, id).await?.claimed_amount.to_string()}));
+    }
+
+    // Private claim into a private account the user owns (its key file).
+    let path = a.get("to-private").context(
+        "a claim needs --to ID (public) or --to-private FILE (a private account you own)",
+    )?;
+    let mut file = PrivateAccountFile::load(std::path::Path::new(path))?;
+    let target = file.keys.id();
+    // +Privacy 3: the SDK accepts only a private account derived from the keys given.
+    let lookup = KnownAccount {
+        id: target,
+        public_exists: ctx.client.get_account(target).await?.is_some(),
+    };
+    validate_private_target(target, Some(&file.keys.sdk_keys()), s.beneficiary, &lookup)
+        .map_err(sdk_err)?;
+    let confirm = a.get("confirm").map(str::to_string);
+    let (factor, amount, effective_ts) = match &confirm {
+        Some(token) => {
+            let p = file.load_pending()?;
+            if p.schedule != id {
+                bail!(
+                    "the prepared claim is for schedule {}, not {id}",
+                    p.schedule
+                );
+            }
+            if &p.token_hex != token {
+                bail!("--confirm does not match the token of the disclosure that was shown; nothing proven or sent");
+            }
+            (p.factor, p.amount, p.effective_ts)
+        }
+        None => {
+            let now_claimable = claimable_at(&s, now);
+            if precheck && now_claimable == 0 {
+                let (next, reason) = next_unlock(&s, now);
+                return Err(sdk_err(SdkError::NothingClaimableYet {
+                    next_unlock_ms: next,
+                    reason,
+                }));
+            }
+            let amount = requested.unwrap_or(now_claimable);
+            if precheck && amount > now_claimable {
+                return Err(sdk_err(SdkError::ExceedsClaimable {
+                    requested: amount,
+                    claimable: now_claimable,
+                }));
+            }
+            (random_bytes(), amount, now)
+        }
+    };
+    if s.beneficiary != ctx.me && precheck {
+        return Err(sdk_err(SdkError::NotBeneficiary {
+            beneficiary: s.beneficiary,
+        }));
+    }
+    let dest = PrivateDestination::with_factor(&file.keys.sdk_keys(), factor);
+    let alias = dest.alias();
+    if let Asset::Token { definition } = s.asset {
+        let token_prog = token_program_id()?.context("ESCAPEMENT_TOKEN_PROGRAM is required")?;
+        let has_holding = file.state.as_ref().is_some_and(|st| {
+            token_holding(st.data.actor_state(token_prog)).is_some_and(|(def, _)| def == definition)
+        });
+        if !has_holding && precheck {
+            bail!("{target} has no private holding of {definition} yet: run `private-account init-holding --definition {definition}` first (its fee needs a native balance: `private-account shield`)");
+        }
+    }
+    let call = builders::claim_exact(&d, id, &s, alias, amount, effective_ts);
+    let plan = PrivatePlan {
+        root: call.root,
+        message: call.message.clone(),
+        public_actors: call.declared.clone(),
+        signed: true,
+        promote_to: Some(alias),
+        openings: BTreeSet::from([dest.opening()]),
+        programs: catalog_for(Some(program))?,
+        native_credit_in_tx: if s.asset == Asset::Native { amount } else { 0 },
+    };
+    let dry_run = a.has("dry-run");
+    let label = asset_label(s.asset);
+    let escrow_before = asset_balance(ctx, s.asset, s.escrow_account).await?;
+    let mut gate = |reserve: u128, cycles: u64| -> Result<Gate> {
+        // U5: the disclosure names this exact claim, alias and fee reserve; its token binds it.
+        let disclosure = PrivacyDisclosure {
+            schedule_account: id,
+            beneficiary: s.beneficiary,
+            amount,
+            asset: label.clone(),
+            alias,
+            fee_reserve: reserve,
+        };
+        eprintln!("{}", disclosure.render());
+        let token = disclosure.token().to_string();
+        if dry_run {
+            return Ok(Gate::Stop(
+                json!({"dry_run": true, "disclosure_token": token,
+                "fee_reserve": reserve.to_string(), "public_cycles_simulated": cycles, "call": print_call(&call)}),
+            ));
+        }
+        match &confirm {
+            Some(given) if *given == token => Ok(Gate::Proceed),
+            Some(_) => bail!(
+                "the disclosure changed since it was shown (state or fee moved); run the claim again without --confirm"
+            ),
+            None => {
+                file_pending_save(path, &PendingClaim {
+                    schedule: id,
+                    amount,
+                    effective_ts,
+                    factor,
+                    token_hex: token.clone(),
+                })?;
+                Ok(Gate::Stop(json!({"needs_confirmation": true, "disclosure_token": token,
+                    "fee_reserve": reserve.to_string(), "public_cycles_simulated": cycles,
+                    "amount": amount.to_string(), "alias": alias.to_string(),
+                    "hint": "read the disclosure above; rerun with --confirm <disclosure_token>"})))
+            }
+        }
+    };
+    let mut out = run_private(ctx, &mut file, plan, &mut gate).await?;
+    if out.get("tx").is_some() {
+        file.clear_pending();
+        let escrow_after = asset_balance(ctx, s.asset, s.escrow_account).await?;
+        out["amount"] = json!(amount.to_string());
+        out["alias"] = json!(alias.to_string());
+        out["escrow_debited"] = json!(escrow_before.saturating_sub(escrow_after).to_string());
+        out["claimed_total"] = json!(ctx.schedule(program, id).await?.claimed_amount.to_string());
+        out["token_holdings_after"] = holdings_json(&file);
+    }
+    Ok(out)
+}
+
+/// Stores a prepared claim beside the key file (a separate helper so the gate closure does not
+/// borrow the loaded file, which `run_private` holds mutably).
+fn file_pending_save(path: &str, pending: &PendingClaim) -> Result<()> {
+    PrivateAccountFile::load(std::path::Path::new(path))?.save_pending(pending)
 }
 
 #[tokio::main]
@@ -1015,6 +1493,7 @@ async fn main() -> Result<()> {
     let command = raw.get(1).cloned().unwrap_or_default();
     let a = Args::parse(raw.get(2..).unwrap_or_default());
     if command == "keygen" {
+        a.check(&[])?;
         let k = fresh_key();
         println!(
             "{}",
@@ -1030,19 +1509,37 @@ async fn main() -> Result<()> {
     let client = SequencerClientBuilder::default().build(&url)?;
     let ctx = Ctx { client, key, me };
     let out = match command.as_str() {
-        "probe" => probe(&ctx).await?,
-        "fund" => fund(&ctx, &a).await?,
-        "deploy" => deploy(&ctx, &a).await?,
-        "configure" => configure(&ctx, &a).await?,
+        "probe" => {
+            a.check(&[])?;
+            probe(&ctx).await?
+        }
+        "fund" => {
+            a.check(&["to-key", "amount"])?;
+            fund(&ctx, &a).await?
+        }
+        "deploy" => {
+            a.check(&["init-admin", "keys-out"])?;
+            deploy(&ctx, &a).await?
+        }
+        "configure" => {
+            a.check(&["admin-key", "fee-bps", "treasury", "token-program"])?;
+            configure(&ctx, &a).await?
+        }
+        "token" => token(&ctx, &a).await?,
+        "private-account" => private_account(&ctx, &a).await?,
         "create" => create(&ctx, &a).await?,
         "show" | "claimable" => show(&ctx, &a).await?,
         "claim" => claim(&ctx, &a).await?,
         "cancel" | "make-non-cancelable" | "signal" | "transfer-beneficiary" => {
-            let program = program_id()?;
-            let d = Deployment {
-                program,
-                token_program: None,
-            };
+            let mut allowed = vec!["schedule", "dry-run", "no-precheck"];
+            match command.as_str() {
+                "signal" => allowed.push("index"),
+                "transfer-beneficiary" => allowed.push("to"),
+                _ => {}
+            }
+            a.check(&allowed)?;
+            let d = deployment()?;
+            let program = d.program;
             let id = a.account("schedule")?;
             let s = ctx.schedule(program, id).await?;
             let call = match command.as_str() {
@@ -1071,11 +1568,8 @@ async fn main() -> Result<()> {
             simple(&ctx, &a, call, program).await?
         }
         "withdraw-fees" => {
-            let program = program_id()?;
-            let d = Deployment {
-                program,
-                token_program: None,
-            };
+            a.check(&["to", "amount", "dry-run", "no-precheck"])?;
+            let d = deployment()?;
             let call = builders::withdraw_fees(
                 &d,
                 ctx.me,
@@ -1083,15 +1577,15 @@ async fn main() -> Result<()> {
                 a.account("to")?,
                 a.u128("amount")?,
             );
-            simple(&ctx, &a, call, program).await?
+            simple(&ctx, &a, call, d.program).await?
         }
         _ => {
             eprintln!(
                 "{}",
                 include_str!("main.rs")
                     .lines()
-                    .skip(1)
-                    .take(22)
+                    .skip(2)
+                    .take(24)
                     .map(|l| l.trim_start_matches("//! ").trim_start_matches("//!"))
                     .collect::<Vec<_>>()
                     .join("\n")

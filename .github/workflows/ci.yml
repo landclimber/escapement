@@ -166,6 +166,9 @@ jobs:
           [ -x e2e/.run/bin/sequencer_service_standalone ] || bash e2e/sequencer.sh build-sequencer
           bash e2e/sequencer.sh build-cli
 
+      - name: CLI unit tests (key files 0600, no overwrite, tamper refused, prepared claims)
+        run: cd crates/escapement-cli && cargo test --release --locked
+
       - name: Build the guest (the binary the suite deploys)
         run: scripts/build-guest.sh --check
 

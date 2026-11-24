@@ -46,7 +46,7 @@ pub enum SdkError {
     /// The caller did not confirm the privacy disclosure shown for this exact claim.
     #[error(
         "The privacy disclosure for this claim was not confirmed. Show it to the user and pass the \
-         confirmation token of that disclosure (CLI: --accept-privacy-disclosure after reading it)."
+         confirmation token of that disclosure (CLI: run the claim again with --confirm <token>)."
     )]
     PrivacyDisclosureNotConfirmed,
 

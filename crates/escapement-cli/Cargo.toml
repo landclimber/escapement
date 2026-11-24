@@ -19,6 +19,7 @@ escapement-core = { path = "../escapement-core" }
 escapement-sdk = { path = "../escapement-sdk" }
 lez-admin-authority = { git = "https://github.com/mmlado/lez-admin-authority.git", tag = "v0.2.0" }
 lez-authority = { git = "https://github.com/mmlado/lez-authority.git", tag = "v0.2.0" }
+token_core = { git = "https://github.com/logos-blockchain/lez-programs.git", rev = "3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e" }
 # LEZ v0.4.0-rc3 (tag v0.4.0-rc3, commit bafd07be).
 lee = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
 lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["host"] }

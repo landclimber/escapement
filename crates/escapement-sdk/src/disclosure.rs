@@ -74,6 +74,9 @@ impl PrivacyDisclosure {
              \x20 time; wait, split, or keep the tokens private.\n\
              - The schedule's creator sees the claim amount and time like everyone else, but not the\n\
              \x20 destination.\n\
+             - If the receiving private account held nothing before, its balance afterwards is the\n\
+             \x20 claim amount less the fee reserve: the account is not identified, but that number can\n\
+             \x20 be inferred.\n\
              - Your RPC provider sees your network address when you send the transaction.\n"
         )
     }
