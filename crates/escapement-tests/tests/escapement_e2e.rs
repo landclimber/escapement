@@ -5157,7 +5157,7 @@ fn sec_pda_cpi_succeeds_and_inherited_seed_relay_refused() {
     );
     let as_pda = |call: PdaCall| {
         wire(VestingMessage::AsPda {
-            seed,
+            seed: *seed.as_bytes(),
             call: Box::new(call),
         })
     };
@@ -5273,7 +5273,7 @@ fn sec_pda_cpi_succeeds_and_inherited_seed_relay_refused() {
         &user_k,
         Actor::new(pda, chain.vesting),
         wire(VestingMessage::AsPda {
-            seed: PdaSeed::new([0x5f; 32]),
+            seed: [0x5f; 32],
             call: Box::new(PdaCall::SignalMilestone {
                 schedule_id: ms_sched,
                 milestone_index: 0,

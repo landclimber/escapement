@@ -1,0 +1,1355 @@
+{
+  "version": "2",
+  "name": "escapement",
+  "messages": [
+    {
+      "name": "Configure",
+      "tag": 0,
+      "docs": "Admin-only protocol setup / fee switch update. `token_program_id` is write-once.",
+      "fields": [
+        {
+          "name": "token_program_id",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "fee_treasury",
+          "type": {
+            "option": "account_id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WithdrawFees",
+      "tag": 1,
+      "docs": "Withdraw accrued creation fees from a per-asset fee vault PDA (authorized by `config.fee_treasury`).",
+      "fields": [
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "destination",
+          "type": "account_id"
+        },
+        {
+          "name": "amount",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "CreateSchedule",
+      "tag": 2,
+      "docs": "Create and atomically fund one vesting schedule (sent to creator's actor).",
+      "fields": [
+        {
+          "name": "0",
+          "type": {
+            "defined": "CreateScheduleParams"
+          }
+        }
+      ]
+    },
+    {
+      "name": "BatchCreate",
+      "tag": 3,
+      "docs": "Create and atomically fund multiple schedules over one shared batch escrow (sent to creator's actor).",
+      "fields": [
+        {
+          "name": "0",
+          "type": {
+            "defined": "BatchCreateParams"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ClaimPublic",
+      "tag": 4,
+      "docs": "Public claim reading live `clock_actor()` (sent to beneficiary's actor).",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "destination",
+          "type": "account_id"
+        },
+        {
+          "name": "amount",
+          "type": {
+            "option": "u128"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ClaimExact",
+      "tag": 5,
+      "docs": "Exact claim using `Response::timestamp_window(effective_ts..)` — safe for private PPTX claims.",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "destination",
+          "type": "account_id"
+        },
+        {
+          "name": "amount",
+          "type": "u128"
+        },
+        {
+          "name": "effective_ts",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "Cancel",
+      "tag": 6,
+      "docs": "Cancel a cancelable schedule using live `clock_actor()` (sent to cancel authority's actor).",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "MakeNonCancelable",
+      "tag": 7,
+      "docs": "Irreversibly convert a cancelable schedule to non-cancelable (sent to cancel authority's actor).",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "SignalMilestone",
+      "tag": 8,
+      "docs": "Unlock a discrete milestone tranche (sent to milestone authority's actor).",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "TransferBeneficiary",
+      "tag": 9,
+      "docs": "Transfer beneficiary rights when `transferable == true` (sent to beneficiary's actor).",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "new_beneficiary",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "ReadState",
+      "tag": 10,
+      "docs": "Read any actor's state via `StateReply`."
+    },
+    {
+      "name": "AsPda",
+      "tag": 11,
+      "docs": "A user transition sent by another program as one of its own PDAs (a multisig, DAO or\nlaunchpad vault). Accepted only when the immediate sender's program derives the receiving\naccount from `seed` (`for_public_pda(sender_program, seed) == receiver`), so neither a\nsigner's authority nor an inherited seed grant can be relayed by a third program.",
+      "fields": [
+        {
+          "name": "seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "call",
+          "type": {
+            "defined": "PdaCall"
+          }
+        }
+      ]
+    }
+  ],
+  "state": {
+    "defined": "VestingActorState"
+  },
+  "events": [
+    {
+      "name": "ScheduleCreated",
+      "selector": "19b9a1a1b4aa6bf0",
+      "type": {
+        "defined": "ScheduleCreated"
+      }
+    },
+    {
+      "name": "Claimed",
+      "selector": "b60e4b76d5a97ea4",
+      "type": {
+        "defined": "Claimed"
+      }
+    },
+    {
+      "name": "Cancelled",
+      "selector": "07845bd4d6cc2519",
+      "type": {
+        "defined": "Cancelled"
+      }
+    },
+    {
+      "name": "MilestoneSignaled",
+      "selector": "df390f1f9e9c7ad1",
+      "type": {
+        "defined": "MilestoneSignaled"
+      }
+    },
+    {
+      "name": "BeneficiaryTransferred",
+      "selector": "e036c24529f4bfe1",
+      "type": {
+        "defined": "BeneficiaryTransferred"
+      }
+    },
+    {
+      "name": "MadeNonCancelable",
+      "selector": "3ea301a9e70190c2",
+      "type": {
+        "defined": "MadeNonCancelable"
+      }
+    },
+    {
+      "name": "FeeConfigUpdated",
+      "selector": "276e3d2350da1865",
+      "type": {
+        "defined": "FeeConfigUpdated"
+      }
+    },
+    {
+      "name": "FeeWithdrawn",
+      "selector": "8eee04e4d493ecc4",
+      "type": {
+        "defined": "FeeWithdrawn"
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "Asset",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "Native"
+        },
+        {
+          "name": "Token",
+          "fields": [
+            {
+              "name": "definition",
+              "type": "account_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BatchCreateParams",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "batch_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "creator_holding",
+          "type": "account_id",
+          "docs": "Token holding funding the batch; for `Asset::Native` it must be the creator itself."
+        },
+        {
+          "name": "refund_holding",
+          "type": "account_id"
+        },
+        {
+          "name": "broker",
+          "type": {
+            "option": {
+              "defined": "BrokerFee"
+            }
+          }
+        },
+        {
+          "name": "items",
+          "type": {
+            "vec": {
+              "defined": "BatchRecipient"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "BatchRecipient",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "total_amount",
+          "type": "u128"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": "ScheduleKind"
+          }
+        },
+        {
+          "name": "cancelable",
+          "type": "bool"
+        },
+        {
+          "name": "transferable",
+          "type": "bool"
+        },
+        {
+          "name": "cancel_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "milestone_authority",
+          "type": {
+            "option": "account_id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "BeneficiaryTransferred",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "old_beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "new_beneficiary",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "BrokerFee",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "holding",
+          "type": "account_id"
+        },
+        {
+          "name": "bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "CancellationRecord",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "cancelled_at_ms",
+          "type": "u64"
+        },
+        {
+          "name": "vested_at_cancel",
+          "type": "u128"
+        },
+        {
+          "name": "refunded_amount",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "Cancelled",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "cancelled_by",
+          "type": "account_id"
+        },
+        {
+          "name": "cancelled_at_ms",
+          "type": "u64"
+        },
+        {
+          "name": "vested_at_cancel",
+          "type": "u128"
+        },
+        {
+          "name": "refunded_amount",
+          "type": "u128"
+        },
+        {
+          "name": "refund_holding",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "Claimed",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "amount",
+          "type": "u128"
+        },
+        {
+          "name": "total_claimed",
+          "type": "u128"
+        },
+        {
+          "name": "timestamp_ms",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "CreateScheduleParams",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "salt",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "creator_holding",
+          "type": "account_id",
+          "docs": "Token holding funding the schedule; for `Asset::Native` it must be the creator itself."
+        },
+        {
+          "name": "refund_holding",
+          "type": "account_id"
+        },
+        {
+          "name": "beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "total_amount",
+          "type": "u128"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": "ScheduleKind"
+          }
+        },
+        {
+          "name": "cancelable",
+          "type": "bool"
+        },
+        {
+          "name": "transferable",
+          "type": "bool"
+        },
+        {
+          "name": "cancel_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "milestone_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "broker",
+          "type": {
+            "option": {
+              "defined": "BrokerFee"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "FeeConfigUpdated",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "token_program_id",
+          "type": "account_id"
+        },
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "fee_treasury",
+          "type": {
+            "option": "account_id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "FeeWithdrawn",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u128"
+        },
+        {
+          "name": "withdrawn_by",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "MadeNonCancelable",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "by",
+          "type": "account_id"
+        }
+      ]
+    },
+    {
+      "name": "MilestoneSignaled",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        },
+        {
+          "name": "amount_unlocked",
+          "type": "u128"
+        },
+        {
+          "name": "signaled_by",
+          "type": "account_id"
+        },
+        {
+          "name": "unlocked_at_ms",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "MilestoneTranche",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "amount",
+          "type": "u128"
+        },
+        {
+          "name": "unlocked",
+          "type": "bool"
+        },
+        {
+          "name": "unlocked_at_ms",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PdaCall",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "WithdrawFees",
+          "fields": [
+            {
+              "name": "asset",
+              "type": {
+                "defined": "Asset"
+              }
+            },
+            {
+              "name": "destination",
+              "type": "account_id"
+            },
+            {
+              "name": "amount",
+              "type": "u128"
+            }
+          ]
+        },
+        {
+          "name": "CreateSchedule",
+          "fields": [
+            {
+              "name": "0",
+              "type": {
+                "defined": "CreateScheduleParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchCreate",
+          "fields": [
+            {
+              "name": "0",
+              "type": {
+                "defined": "BatchCreateParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ClaimPublic",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            },
+            {
+              "name": "destination",
+              "type": "account_id"
+            },
+            {
+              "name": "amount",
+              "type": {
+                "option": "u128"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ClaimExact",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            },
+            {
+              "name": "destination",
+              "type": "account_id"
+            },
+            {
+              "name": "amount",
+              "type": "u128"
+            },
+            {
+              "name": "effective_ts",
+              "type": "u64"
+            }
+          ]
+        },
+        {
+          "name": "Cancel",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            }
+          ]
+        },
+        {
+          "name": "MakeNonCancelable",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            }
+          ]
+        },
+        {
+          "name": "SignalMilestone",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            },
+            {
+              "name": "milestone_index",
+              "type": "u8"
+            }
+          ]
+        },
+        {
+          "name": "TransferBeneficiary",
+          "fields": [
+            {
+              "name": "schedule_id",
+              "type": "account_id"
+            },
+            {
+              "name": "new_beneficiary",
+              "type": "account_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PendingOp",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "CreateReadConfig",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "CreateScheduleParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CreateVerifyRefund",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "protocol_fee",
+              "type": "u128"
+            },
+            {
+              "name": "broker_fee",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "CreateScheduleParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CreateVerifyEscrowPre",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "escrow_seed",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "escrow_account",
+              "type": "account_id"
+            },
+            {
+              "name": "protocol_fee",
+              "type": "u128"
+            },
+            {
+              "name": "broker_fee",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "CreateScheduleParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CreateVerifyEscrowPost",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "escrow_seed",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "escrow_account",
+              "type": "account_id"
+            },
+            {
+              "name": "pre_balance",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "CreateScheduleParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchReadConfig",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "total_batch_amount",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "BatchCreateParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchVerifyRefund",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "total_batch_amount",
+              "type": "u128"
+            },
+            {
+              "name": "protocol_fee",
+              "type": "u128"
+            },
+            {
+              "name": "broker_fee",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "BatchCreateParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchVerifyEscrowPre",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "escrow_seed",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "escrow_account",
+              "type": "account_id"
+            },
+            {
+              "name": "total_batch_amount",
+              "type": "u128"
+            },
+            {
+              "name": "protocol_fee",
+              "type": "u128"
+            },
+            {
+              "name": "broker_fee",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "BatchCreateParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchVerifyEscrowPost",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "asset_program_id",
+              "type": "account_id"
+            },
+            {
+              "name": "escrow_seed",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "escrow_account",
+              "type": "account_id"
+            },
+            {
+              "name": "total_batch_amount",
+              "type": "u128"
+            },
+            {
+              "name": "pre_balance",
+              "type": "u128"
+            },
+            {
+              "name": "params",
+              "type": {
+                "defined": "BatchCreateParams"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ClaimPublicReadClock",
+          "fields": [
+            {
+              "name": "schedule",
+              "type": {
+                "defined": "ScheduleAccount"
+              }
+            },
+            {
+              "name": "destination",
+              "type": "account_id"
+            },
+            {
+              "name": "requested_amount",
+              "type": {
+                "option": "u128"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CancelReadClock",
+          "fields": [
+            {
+              "name": "schedule",
+              "type": {
+                "defined": "ScheduleAccount"
+              }
+            },
+            {
+              "name": "cancelled_by",
+              "type": "account_id"
+            }
+          ]
+        },
+        {
+          "name": "SignalMilestoneReadClock",
+          "fields": [
+            {
+              "name": "schedule",
+              "type": {
+                "defined": "ScheduleAccount"
+              }
+            },
+            {
+              "name": "milestone_index",
+              "type": "u8"
+            },
+            {
+              "name": "signaled_by",
+              "type": "account_id"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ScheduleAccount",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "version",
+          "type": "u8"
+        },
+        {
+          "name": "asset_program_id",
+          "type": "account_id",
+          "docs": "Program holding the escrowed balance: `NATIVE_PROGRAM_ID` for `Asset::Native`, else the\nconfigured token program at creation time."
+        },
+        {
+          "name": "creator",
+          "type": "account_id"
+        },
+        {
+          "name": "beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "escrow_seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "docs": "The escrow PDA's seed (`lee_core::program::PdaSeed` bytes; kept as bytes so SPEL can describe it)."
+        },
+        {
+          "name": "escrow_account",
+          "type": "account_id"
+        },
+        {
+          "name": "refund_holding",
+          "type": "account_id"
+        },
+        {
+          "name": "total_amount",
+          "type": "u128"
+        },
+        {
+          "name": "claimed_amount",
+          "type": "u128"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": "ScheduleKind"
+          }
+        },
+        {
+          "name": "cancelable",
+          "type": "bool"
+        },
+        {
+          "name": "transferable",
+          "type": "bool"
+        },
+        {
+          "name": "cancel_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "milestone_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "cancelled",
+          "type": {
+            "option": {
+              "defined": "CancellationRecord"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ScheduleCreated",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "schedule_id",
+          "type": "account_id"
+        },
+        {
+          "name": "batch_id",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "creator",
+          "type": "account_id"
+        },
+        {
+          "name": "beneficiary",
+          "type": "account_id"
+        },
+        {
+          "name": "asset",
+          "type": {
+            "defined": "Asset"
+          }
+        },
+        {
+          "name": "escrow_account",
+          "type": "account_id"
+        },
+        {
+          "name": "refund_holding",
+          "type": "account_id"
+        },
+        {
+          "name": "total_amount",
+          "type": "u128"
+        },
+        {
+          "name": "kind_tag",
+          "type": "u8"
+        },
+        {
+          "name": "cancelable",
+          "type": "bool"
+        },
+        {
+          "name": "transferable",
+          "type": "bool"
+        },
+        {
+          "name": "cancel_authority",
+          "type": {
+            "option": "account_id"
+          }
+        },
+        {
+          "name": "milestone_authority",
+          "type": {
+            "option": "account_id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ScheduleKind",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "CliffLinear",
+          "fields": [
+            {
+              "name": "start_ts",
+              "type": "u64"
+            },
+            {
+              "name": "cliff_ts",
+              "type": "u64"
+            },
+            {
+              "name": "end_ts",
+              "type": "u64"
+            },
+            {
+              "name": "cliff_amount",
+              "type": "u128"
+            }
+          ]
+        },
+        {
+          "name": "Linear",
+          "fields": [
+            {
+              "name": "start_ts",
+              "type": "u64"
+            },
+            {
+              "name": "end_ts",
+              "type": "u64"
+            }
+          ]
+        },
+        {
+          "name": "Milestone",
+          "fields": [
+            {
+              "name": "tranches",
+              "type": {
+                "vec": {
+                  "defined": "MilestoneTranche"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VestingActorState",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "Schedule",
+          "fields": [
+            {
+              "name": "0",
+              "type": {
+                "defined": "ScheduleAccount"
+              }
+            }
+          ]
+        },
+        {
+          "name": "BatchCommitted",
+          "fields": [
+            {
+              "name": "creator",
+              "type": "account_id"
+            },
+            {
+              "name": "batch_id",
+              "type": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            },
+            {
+              "name": "count",
+              "type": "u32"
+            },
+            {
+              "name": "total_amount",
+              "type": "u128"
+            }
+          ]
+        },
+        {
+          "name": "Pending",
+          "fields": [
+            {
+              "name": "0",
+              "type": {
+                "defined": "PendingOp"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -130,7 +130,8 @@ pub struct ScheduleAccount {
     pub creator: AccountId,
     pub beneficiary: AccountId,
     pub asset: Asset,
-    pub escrow_seed: PdaSeed,
+    /// The escrow PDA's seed (`lee_core::program::PdaSeed` bytes; kept as bytes so SPEL can describe it).
+    pub escrow_seed: [u8; 32],
     pub escrow_account: AccountId,
     pub refund_holding: AccountId,
     pub total_amount: u128,
@@ -211,7 +212,7 @@ pub enum PendingOp {
     CreateVerifyEscrowPre {
         creator: AccountId,
         asset_program_id: AccountId,
-        escrow_seed: PdaSeed,
+        escrow_seed: [u8; 32],
         escrow_account: AccountId,
         protocol_fee: u128,
         broker_fee: u128,
@@ -220,7 +221,7 @@ pub enum PendingOp {
     CreateVerifyEscrowPost {
         creator: AccountId,
         asset_program_id: AccountId,
-        escrow_seed: PdaSeed,
+        escrow_seed: [u8; 32],
         escrow_account: AccountId,
         pre_balance: u128,
         params: Box<CreateScheduleParams>,
@@ -241,7 +242,7 @@ pub enum PendingOp {
     BatchVerifyEscrowPre {
         creator: AccountId,
         asset_program_id: AccountId,
-        escrow_seed: PdaSeed,
+        escrow_seed: [u8; 32],
         escrow_account: AccountId,
         total_batch_amount: u128,
         protocol_fee: u128,
@@ -251,7 +252,7 @@ pub enum PendingOp {
     BatchVerifyEscrowPost {
         creator: AccountId,
         asset_program_id: AccountId,
-        escrow_seed: PdaSeed,
+        escrow_seed: [u8; 32],
         escrow_account: AccountId,
         total_batch_amount: u128,
         pre_balance: u128,
@@ -354,7 +355,7 @@ pub enum Message {
     /// launchpad vault). Accepted only when the immediate sender's program derives the receiving
     /// account from `seed` (`for_public_pda(sender_program, seed) == receiver`), so neither a
     /// signer's authority nor an inherited seed grant can be relayed by a third program.
-    AsPda { seed: PdaSeed, call: Box<PdaCall> },
+    AsPda { seed: [u8; 32], call: Box<PdaCall> },
 }
 
 /// User transitions a program may send as its own PDA through `Message::AsPda`.

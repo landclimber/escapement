@@ -297,7 +297,7 @@ pub fn split_on_cancel(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lee_core::{account::AccountId, program::PdaSeed};
+    use lee_core::account::AccountId;
     use proptest::prelude::*;
 
     fn dummy_schedule(
@@ -312,7 +312,7 @@ mod tests {
             creator: a,
             beneficiary: a,
             asset: crate::Asset::Token { definition: a },
-            escrow_seed: PdaSeed::new([2u8; 32]),
+            escrow_seed: [2u8; 32],
             escrow_account: a,
             refund_holding: a,
             total_amount,

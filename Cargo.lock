@@ -394,7 +394,7 @@ dependencies = [
  "maybe-async",
  "reqwest",
  "serde",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -530,7 +530,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -611,7 +611,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -889,7 +889,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
 dependencies = [
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -1222,6 +1222,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "escapement-idl"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "escapement-core",
+ "lee_core",
+ "serde_json",
+ "spel-framework-core",
+]
+
+[[package]]
 name = "escapement-methods"
 version = "0.1.0"
 dependencies = [
@@ -1240,6 +1251,21 @@ dependencies = [
  "lez-admin-authority",
  "lez-authority",
  "token_core",
+]
+
+[[package]]
+name = "escapement-sdk"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "clock_core",
+ "escapement-core",
+ "fee_core",
+ "hex",
+ "lee_core",
+ "lez-authority",
+ "sha2",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -1284,7 +1310,7 @@ source = "git+https://github.com/logos-blockchain/logos-execution-zone.git?tag=v
 dependencies = [
  "borsh",
  "lee_core",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2008,7 +2034,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sha2",
- "thiserror",
+ "thiserror 2.0.20",
  "zeroize",
 ]
 
@@ -2025,7 +2051,7 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_with",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2470,7 +2496,7 @@ dependencies = [
  "lee_core",
  "risc0-binfmt",
  "risc0-zkos-v1compat",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -2554,7 +2580,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
  "web-time",
@@ -2576,7 +2602,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror",
+ "thiserror 2.0.20",
  "tinyvec",
  "tracing",
  "web-time",
@@ -2719,7 +2745,7 @@ checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
 dependencies = [
  "getrandom 0.2.17",
  "libredox",
- "thiserror",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -3214,7 +3240,7 @@ dependencies = [
  "sha2",
  "strum",
  "tempfile",
- "thiserror",
+ "thiserror 2.0.20",
  "toml",
  "yaml-rust2",
 ]
@@ -3446,6 +3472,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "spel-attrs"
+version = "0.7.0"
+source = "git+https://github.com/logos-co/spel.git?rev=d7444f84cabee3371aca3bdee8ebc4c2fc45ebde#d7444f84cabee3371aca3bdee8ebc4c2fc45ebde"
+
+[[package]]
+name = "spel-framework-core"
+version = "0.7.0"
+source = "git+https://github.com/logos-co/spel.git?rev=c90ca0bc16c07c89d16425dd28a5f6a2d8428801#c90ca0bc16c07c89d16425dd28a5f6a2d8428801"
+dependencies = [
+ "base58",
+ "borsh",
+ "lee_core",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "sha2",
+ "syn 2.0.119",
+ "thiserror 1.0.69",
+ "toml",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3588,11 +3637,31 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+dependencies = [
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
 version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 2.0.20",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3664,7 +3733,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "token-methods"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=cad71fc67d75ec9f6a07fc908f687678de7f7ed6#cad71fc67d75ec9f6a07fc908f687678de7f7ed6"
+source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e#3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e"
 dependencies = [
  "risc0-build",
  "risc0-zkvm",
@@ -3674,12 +3743,13 @@ dependencies = [
 [[package]]
 name = "token_core"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=cad71fc67d75ec9f6a07fc908f687678de7f7ed6#cad71fc67d75ec9f6a07fc908f687678de7f7ed6"
+source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e#3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e"
 dependencies = [
  "borsh",
  "lee_core",
  "risc0-zkvm",
  "serde",
+ "spel-attrs",
 ]
 
 [[package]]

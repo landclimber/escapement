@@ -311,7 +311,7 @@ fn handle_public_message(input: &ReceiveInput, message: Message) -> Response {
             // may act for it. An inherited grant or a signer's propagated authority is not enough.
             let direct = input.from.is_some_and(|from| {
                 from.program_account_id != own_program
-                    && AccountId::for_public_pda(&from.program_account_id, &seed)
+                    && AccountId::for_public_pda(&from.program_account_id, &PdaSeed::new(seed))
                         == input.receiver.account_id
             });
             if !direct || !input.is_authorized {
@@ -610,7 +610,7 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
             let asset_program_id = schedule.asset_program_id;
             let asset = schedule.asset;
             let escrow_account = schedule.escrow_account;
-            let escrow_seed = schedule.escrow_seed;
+            let escrow_seed = PdaSeed::new(schedule.escrow_seed);
             let ev = Claimed {
                 schedule_id: input.receiver.account_id,
                 beneficiary: schedule.beneficiary,
@@ -752,7 +752,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let (protocol_fee, broker_fee) =
                 creation_fees(params.total_amount, &config, params.broker.as_ref());
             let sched_id = input.receiver.account_id;
-            let escrow_seed = single_escrow_seed(&sched_id);
+            let escrow_seed = *single_escrow_seed(&sched_id).as_bytes();
             let escrow_account = single_escrow_pda(own_program, &sched_id);
             match asset {
                 Asset::Token { .. } => {
@@ -793,7 +793,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                         asset_program_id,
                         asset,
                         escrow_account,
-                        Some(escrow_seed),
+                        Some(PdaSeed::new(escrow_seed)),
                     ))
                 }
             }
@@ -819,7 +819,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let Asset::Token { definition } = asset else {
                 VestingError::MalformedMessage.abort();
             };
-            let escrow_seed = single_escrow_seed(&input.receiver.account_id);
+            let escrow_seed = *single_escrow_seed(&input.receiver.account_id).as_bytes();
             let escrow_account = single_escrow_pda(own_program, &input.receiver.account_id);
             let next = PendingOp::CreateVerifyEscrowPre {
                 creator,
@@ -943,7 +943,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let asset_program_id = asset_program_for(asset, &config);
             let (protocol_fee, broker_fee) =
                 creation_fees(total_batch_amount, &config, params.broker.as_ref());
-            let escrow_seed = batch_escrow_seed(&creator, &params.batch_id);
+            let escrow_seed = *batch_escrow_seed(&creator, &params.batch_id).as_bytes();
             let escrow_account = batch_escrow_pda(own_program, &creator, &params.batch_id);
             match asset {
                 Asset::Token { .. } => {
@@ -985,7 +985,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                         asset_program_id,
                         asset,
                         escrow_account,
-                        Some(escrow_seed),
+                        Some(PdaSeed::new(escrow_seed)),
                     ))
                 }
             }
@@ -1011,7 +1011,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
             let Asset::Token { definition } = params.asset else {
                 VestingError::MalformedMessage.abort();
             };
-            let escrow_seed = batch_escrow_seed(&creator, &params.batch_id);
+            let escrow_seed = *batch_escrow_seed(&creator, &params.batch_id).as_bytes();
             let escrow_account = batch_escrow_pda(own_program, &creator, &params.batch_id);
             let next = PendingOp::BatchVerifyEscrowPre {
                 creator,
@@ -1182,7 +1182,7 @@ fn init_token_escrow_and_read(
     asset_program_id: AccountId,
     definition: AccountId,
     escrow_account: AccountId,
-    escrow_seed: PdaSeed,
+    escrow_seed: [u8; 32],
     protocol_fee: u128,
 ) -> Response {
     let own_program = input.receiver.program_account_id;
@@ -1190,7 +1190,7 @@ fn init_token_escrow_and_read(
         asset_program_id,
         escrow_account,
         &TokenMessage::InitializeHolding { definition },
-        Some(escrow_seed),
+        Some(PdaSeed::new(escrow_seed)),
     ));
     if protocol_fee > 0 {
         // Idempotent per-token fee vault PDA initialization: enables multi-token fee
@@ -1296,7 +1296,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             let asset_program_id = schedule.asset_program_id;
             let asset = schedule.asset;
             let escrow_account = schedule.escrow_account;
-            let escrow_seed = schedule.escrow_seed;
+            let escrow_seed = PdaSeed::new(schedule.escrow_seed);
             let ev = Claimed {
                 schedule_id: input.receiver.account_id,
                 beneficiary: schedule.beneficiary,
@@ -1331,7 +1331,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             let asset_program_id = schedule.asset_program_id;
             let asset = schedule.asset;
             let escrow_account = schedule.escrow_account;
-            let escrow_seed = schedule.escrow_seed;
+            let escrow_seed = PdaSeed::new(schedule.escrow_seed);
             let refund_holding = schedule.refund_holding;
             let ev = Cancelled {
                 schedule_id: input.receiver.account_id,

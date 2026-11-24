@@ -1840,6 +1840,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
+name = "spel-attrs"
+version = "0.7.0"
+source = "git+https://github.com/logos-co/spel.git?rev=d7444f84cabee3371aca3bdee8ebc4c2fc45ebde#d7444f84cabee3371aca3bdee8ebc4c2fc45ebde"
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1968,12 +1973,13 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "token_core"
 version = "0.1.0"
-source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=cad71fc67d75ec9f6a07fc908f687678de7f7ed6#cad71fc67d75ec9f6a07fc908f687678de7f7ed6"
+source = "git+https://github.com/logos-blockchain/lez-programs.git?rev=3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e#3f04cc37ec5f90358e606b0fe7d28baa6b1dbd7e"
 dependencies = [
  "borsh",
  "lee_core",
  "risc0-zkvm",
  "serde",
+ "spel-attrs",
 ]
 
 [[package]]
