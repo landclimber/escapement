@@ -1,0 +1,100 @@
+warning: unexpected `cfg` condition name: `kani`
+ --> staged/escapement-core/src/lib.rs:5:7
+  |
+5 | #[cfg(kani)]
+  |       ^^^^
+  |
+  = help: expected names are: `docsrs`, `feature`, and `test` and 32 more
+  = help: consider using a Cargo feature instead
+  = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+           [lints.rust]
+           unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+  = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+  = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+  = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: `escapement-core` (lib) generated 1 warning
+   Compiling escapement-module-calls v0.1.0 (/var/tmp/esc-before/escapement_core_module/rust-lib/calls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.27s
+     Running unittests src/lib.rs (/var/tmp/esc-before-target/debug/deps/escapement_module_calls-d567c22e4e1cdfeb)
+
+running 25 tests
+test lez::tests::bip340_vectors ... ok
+test lez::tests::key_files_are_small_regular_files ... ok
+test lez::tests::keys_from_text_and_urls ... ok
+test lez::tests::lez_rc3_pinned_message_layout ... ok
+test lez::tests::sequencer_addresses_are_read_strictly ... ok
+test review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves ... ok
+test review_r1::h1_status_does_not_reveal_the_pending_id ... ok
+test review_r1::l2_a_prepared_transaction_stays_on_its_network ... ok
+test review_r1::m1_units_are_fixed_and_prompts_show_base_units ... ok
+test review_r1::m3_other_callers_reach_only_version ... ok
+test review_r1_kimi::kimi_l2_flags_must_be_booleans ... ok
+test review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez ... ok
+test review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused ... ok
+test review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal ... ok
+test review_r1_kimi::kimi_reject_only_by_the_preparer ... ok
+test review_r1_more::nit_the_nonce_is_checked_before_anything_is_signed ... ok
+test review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert ... FAILED
+test review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed ... FAILED
+test review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status ... FAILED
+test review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to ... FAILED
+test review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer ... FAILED
+test review_r2::r2_l3_tx_status_reports_an_unread_outcome ... FAILED
+test tests::amounts_are_exact ... ok
+test tests::approvals_come_from_the_view_or_the_host ... ok
+test tests::nothing_is_sent_without_a_network_or_key ... ok
+
+failures:
+
+---- review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert stdout ----
+
+thread 'review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert' (22455) panicked at calls/src/review_r2.rs:58:5:
+assertion `left == right` failed: a failed read is not a revert: {"approved_by":"host","block":8,"ok":true,"op":"create","outcome":{"applied":false,"detail":"no schedule at the new id: the program refused it (reverted); nothing moved but the fee","schedule":"C4UrNGSHb1NhCH2pN4ev9pALfvTfuDzmv5dtV5Y3Qznp"},"signed_by":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","state":"in_block","summary":{"balance":{"base_units":"100000000000","display":"100","unit":"LEZ"},"decimals":9,"effects":["Moves 0.000001 LEZ (1000 base units) from your account into the schedule's escrow 9BHnSBTdbWFUG6Q8JEmpKwAK8tmHwxZVLUvAre1vaKEi.","Public on chain: the schedule's terms, the beneficiary and the amount."],"expires_in_s":300,"max_fee":{"base_units":"96000000","display":"0.096","unit":"LEZ"},"message_hash":"0d5c23df1b8ddca25ecde14998e62ce32864c3baa5129e1363babb1ff60ce0ed","network":{"program":"US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx","rpc_url":"http://127.0.0.1:40750"},"op":"create","pending_id":"3b8997e69442051b6a8f9fb7","rows":[["Beneficiary","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Total","0.000001 LEZ (1000 base units) (native)"],["Vesting","linear from 2026-11-25 09:46:40 UTC to 2026-11-26 13:33:20 UTC"],["Cancelable","yes, by you (the unvested part comes back)"],["New schedule id","C4UrNGSHb1NhCH2pN4ev9pALfvTfuDzmv5dtV5Y3Qznp"],["Signed by (and pays the fee)","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Fee, at most","0.096 LEZ (96000000 base units) (gas limit 400000; charged as used)"],["Network","http://127.0.0.1:40750 (program US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx)"]],"signed":false,"signer":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","title":"Create a schedule of 0.000001 LEZ (1000 base units) for B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","unit":"LEZ"},"tx_hash":"ff09b0cd7b2694470095b60531ec9a74b29e308e3312a00eaf3faf2dd86560a5"}
+  left: Bool(false)
+ right: Null
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed stdout ----
+
+thread 'review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed' (22479) panicked at calls/src/review_r2.rs:64:32:
+called `Option::unwrap()` on a `None` value
+
+---- review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status stdout ----
+
+thread 'review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status' (22511) panicked at calls/src/review_r2.rs:64:32:
+called `Option::unwrap()` on a `None` value
+
+---- review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to stdout ----
+
+thread 'review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to' (22537) panicked at calls/src/review_r2.rs:104:5:
+assertion `left == right` failed: {"error":"no Escapement schedule at LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY under program YMN9Qj5jPNp7j14VPcML1B6xGgcPWVZUGLFU3Mnyfaf (wrong id, wrong network, or not created yet)","ok":false}
+  left: Null
+ right: String("US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx")
+
+---- review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer stdout ----
+
+thread 'review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer' (22567) panicked at calls/src/review_r2.rs:22:5:
+assertion `left == right` failed: {"approved_by":"host","ok":true,"op":"claim","signed_by":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","state":"unknown","summary":{"balance":{"base_units":"100000000000","display":"100","unit":"LEZ"},"decimals":9,"effects":["Moves 0.25 LEZ (250000000 base units) from the schedule's escrow to B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd (public).","Public on chain: the schedule, the amount, the time and the destination (a private claim is not in this view yet)."],"expires_in_s":300,"max_fee":{"base_units":"86400000","display":"0.0864","unit":"LEZ"},"message_hash":"d6d66c2a29cce3f0b2dd09ff30263ba2bba5743feeb934af2ac96650ea3b7bb5","network":{"program":"US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx","rpc_url":"http://127.0.0.1:56345"},"op":"claim","pending_id":"a7814438db7e61f6e47e2f9e","rows":[["Schedule","LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY"],["Claim","0.25 LEZ (250000000 base units)"],["Claimable now","45 LEZ (45000000000 base units)"],["To (public account)","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Signed by (and pays the fee)","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Fee, at most","0.0864 LEZ (86400000 base units) (gas limit 250000; charged as used)"],["Network","http://127.0.0.1:56345 (program US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx)"]],"signed":false,"signer":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","title":"Claim 0.25 LEZ (250000000 base units) (public)","unit":"LEZ"},"tx_hash":"8e255821dc75487656720c593ff677c931377a4e22443d888f1d945363724d2a","warning":"signed and sent, but the sequencer's answer did not arrive (sendTransaction: nonce too low): it may or may not be in a block. Check it (tx_status 8e255821dc75487656720c593ff677c931377a4e22443d888f1d945363724d2a, or Refresh) before trying again."}
+  left: String("unknown")
+ right: String("refused_by_sequencer")
+
+---- review_r2::r2_l3_tx_status_reports_an_unread_outcome stdout ----
+
+thread 'review_r2::r2_l3_tx_status_reports_an_unread_outcome' (22593) panicked at calls/src/review_r2.rs:41:5:
+assertion `left == right` failed: {"error":"no Escapement schedule at LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY under program US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx (wrong id, wrong network, or not created yet)","ok":false}
+  left: Bool(false)
+ right: Bool(true)
+
+
+failures:
+    review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert
+    review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed
+    review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status
+    review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to
+    review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer
+    review_r2::r2_l3_tx_status_reports_an_unread_outcome
+
+test result: FAILED. 19 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+error: test failed, to rerun pass `-p escapement-module-calls --lib`

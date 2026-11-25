@@ -1,0 +1,6 @@
+# Written by basecamp/scripts/stage.py and the builder; never committed.
+escapement_core_module/rust-lib/staged/
+escapement_core_module/logos-rust-sdk-src
+# Nix result links.
+result
+result-*

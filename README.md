@@ -26,8 +26,12 @@ Built and tested (numbers and commands: [docs/EVIDENCE.md](docs/EVIDENCE.md)):
   proofs verified by the sequencer), and refusals sent on chain with the state compared before and
   after.
 
-Not built yet: the Logos Core module and the Basecamp mini-app, deployment on LEZ testnet 0.4 (not
-launched yet), reading events back through an indexer, an external audit.
+A first version of the Logos Core module and the Basecamp mini-app (Basecamp 0.4.0-rc.2, linux-amd64, signed with a
+test key): reads, public claim, create, cancel, each signed only after approval; not yet the private claim from the
+GUI or macOS. See [basecamp/README.md](basecamp/README.md).
+
+Not built yet: deployment on LEZ testnet 0.4 (not launched yet), reading events back through an indexer, an external
+audit.
 Requirement by requirement: [docs/traceability.md](docs/traceability.md).
 
 ## Quickstart
@@ -102,6 +106,7 @@ transfer-beneficiary and withdraw-fees; unknown flags are refused. Program addre
 | `crates/escapement-tests` | in-process integration suites; `crates/escapement-test-methods`: a test-only relay guest |
 | `e2e/` | standalone sequencer harness and the end-to-end suite |
 | `scripts/` | reproducible guest build |
+| `basecamp/` | the Logos Core module `escapement_core_module`, the Basecamp mini-app `escapement_ui`, their build, signing and install scripts ([basecamp/README.md](basecamp/README.md)) |
 | `docs/` | [EVIDENCE](docs/EVIDENCE.md), [traceability](docs/traceability.md), [DECISIONS](docs/DECISIONS.md), [events](docs/events.md), [gas-and-batch](docs/gas-and-batch.md), [SECURITY](docs/SECURITY.md), [CROPS](docs/CROPS.md) |
 
 ## Privacy, in short

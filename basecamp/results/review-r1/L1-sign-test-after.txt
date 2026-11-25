@@ -1,0 +1,6 @@
+PASS trusted (exit 0)
+PASS not-in-keyring (exit 1)
+PASS other-signer (exit 1)
+PASS keyring-cleaned (no directory left in TMPDIR)
+test-sign-test.sh: 0 failure(s)
+exit 0

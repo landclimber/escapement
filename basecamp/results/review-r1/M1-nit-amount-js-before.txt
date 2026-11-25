@@ -1,0 +1,15 @@
+<anonymous_script>:84
+; return { toBase, fromBase, isZero, parseWhen, utc, short, plain, promptProblem };
+                                                                   ^
+
+ReferenceError: promptProblem is not defined
+    at eval (eval at <anonymous> (file://<SPIKE>/tmp/escapement-miniapp/before/escapement_ui/tests/amount.test.mjs:5:11), <anonymous>:84:68)
+    at file://<SPIKE>/tmp/escapement-miniapp/before/escapement_ui/tests/amount.test.mjs:5:116
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.23.1
+exit 1
+parseWhen("2026-02-31 09:30") accepted: 2026-03-03T09:30:00.000Z (FAIL)
+toBase("1_000") accepted: 1000000000000 (FAIL)

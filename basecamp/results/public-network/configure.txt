@@ -1,0 +1,1 @@
+{"method":"configure","module":"escapement_core_module","result":"{\"asset_label\":\"LEZ\",\"clock_utc\":\"2026-11-25 18:16:10 UTC\",\"decimals\":9,\"fee_bps\":0,\"head\":20087,\"note\":null,\"ok\":true,\"program\":\"Be6eH1Ps2cr7zSmuV2XfwZDkF14naGcEG6h71ViszSXW\",\"program_configured\":true,\"read_only\":true,\"rpc_url\":\"https://54-156-116-24.sslip.io/rpc\"}","status":"ok"}

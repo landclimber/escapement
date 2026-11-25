@@ -1,0 +1,27 @@
+[package]
+name = "escapement-module-calls"
+description = "The methods of escapement_core_module as functions over JSON, without the module scaffold: escapement-sdk's checks and builders, LEZ v0.4.0-rc3's public transaction signed after approval, JSON-RPC to a sequencer"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Escapement's own crates, staged from crates/ by basecamp/scripts/stage.py (the builder copies only rust-lib/).
+escapement-core = { path = "../staged/escapement-core" }
+escapement-sdk = { path = "../staged/escapement-sdk" }
+# LEZ v0.4.0-rc3 (tag commit bafd07be), as the Escapement workspace pins it.
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3", features = ["host"] }
+clock_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", tag = "v0.4.0-rc3" }
+borsh = { version = "1.5", features = ["derive"] }
+serde_json = "1"
+# LEZ's public transaction: SHA-256, BIP-340 signatures over secp256k1 (k256), base58 ids, base64 wire form.
+sha2 = "0.10"
+k256 = { version = "0.13", default-features = false, features = ["std", "arithmetic", "schnorr"] }
+bs58 = "0.5"
+base64 = "0.22"
+getrandom = "0.2"
+zeroize = "1"
+hex = "0.4"
+# JSON-RPC to the sequencer: plain HTTP to this machine, HTTPS (rustls, Mozilla's roots) elsewhere; no redirects.
+ureq = { version = "3", default-features = false, features = ["rustls"] }

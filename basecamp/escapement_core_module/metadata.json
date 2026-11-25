@@ -1,0 +1,33 @@
+{
+  "name": "escapement_core_module",
+  "display_name": "Escapement vesting",
+  "version": "0.1.0",
+  "type": "core",
+  "interface": "cdylib",
+  "category": "finance",
+  "description": "Escapement (prototype, unaudited): token vesting on LEZ v0.4.0-rc3 through escapement-sdk. Reads a beneficiary's schedules (locked, claimable now, next unlock) and prepares public claims, schedule creation and cancellation, each signed only after it is approved.",
+  "main": "escapement_core_module_plugin",
+  "dependencies": [],
+
+  "codegen": {
+    "rust": { "crate": "rust-lib", "trait": "EscapementCoreModule" }
+  },
+
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "rust": {
+      "toolchain": "1.98.0",
+      "packages": { "build": [], "runtime": [] }
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}

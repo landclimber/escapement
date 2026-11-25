@@ -1,0 +1,126 @@
+warning: unexpected `cfg` condition name: `kani`
+ --> staged/escapement-core/src/lib.rs:5:7
+  |
+5 | #[cfg(kani)]
+  |       ^^^^
+  |
+  = help: expected names are: `docsrs`, `feature`, and `test` and 32 more
+  = help: consider using a Cargo feature instead
+  = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+           [lints.rust]
+           unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+  = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+  = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+  = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: `escapement-core` (lib) generated 1 warning
+   Compiling escapement-module-calls v0.1.0 (/var/tmp/esc-before/escapement_core_module/rust-lib/calls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.61s
+     Running unittests src/lib.rs (/var/tmp/esc-before-target/debug/deps/escapement_module_calls-d567c22e4e1cdfeb)
+
+running 17 tests
+test lez::r1_url::sequencer_addresses_are_read_strictly ... FAILED
+test lez::tests::bip340_vectors ... ok
+test lez::tests::keys_from_text_and_urls ... ok
+test lez::tests::lez_rc3_pinned_message_layout ... ok
+test review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves ... FAILED
+test review_r1::h1_status_does_not_reveal_the_pending_id ... FAILED
+test review_r1::l2_a_prepared_transaction_stays_on_its_network ... FAILED
+test review_r1::m1_units_are_fixed_and_prompts_show_base_units ... FAILED
+test review_r1::m3_other_callers_reach_only_version ... FAILED
+test review_r1_kimi::kimi_l2_flags_must_be_booleans ... FAILED
+test review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez ... FAILED
+test review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused ... FAILED
+test review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal ... FAILED
+test review_r1_kimi::kimi_reject_only_by_the_preparer ... FAILED
+test tests::amounts_are_exact ... ok
+test tests::approvals_come_from_the_view_or_the_host ... ok
+test tests::nothing_is_sent_without_a_network_or_key ... ok
+
+failures:
+
+---- lez::r1_url::sequencer_addresses_are_read_strictly stdout ----
+
+thread 'lez::r1_url::sequencer_addresses_are_read_strictly' (26437) panicked at calls/src/lez.rs:445:13:
+http://127.0.0.1:1@evil.example/ must be refused
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves stdout ----
+
+thread 'review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves' (26441) panicked at calls/src/review_r1.rs:96:9:
+prepare as "unknown": {"balance":{"base_units":"100000000000","display":"100","unit":"LEZ"},"effects":["Moves 0.25 LEZ from the schedule's escrow to B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd (public).","Public on chain: the schedule, the amount, the time and the destination (a private claim is not in this view yet)."],"expires_in_s":300,"max_fee":{"base_units":"86400000","display":"0.0864","unit":"LEZ"},"message_hash":"d6d66c2a29cce3f0b2dd09ff30263ba2bba5743feeb934af2ac96650ea3b7bb5","ok":true,"op":"claim","pending_id":"cc4bb8bdaec1797d7bdc3905","rows":[["Schedule","LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY"],["Claim","0.25 LEZ"],["Claimable now","45 LEZ"],["To (public account)","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Signed by (and pays the fee)","B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd"],["Fee, at most","0.0864 LEZ (gas limit 250000; charged as used)"],["Network","http://127.0.0.1:21298 (program US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx)"]],"signed":false,"signer":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","title":"Claim 0.25 LEZ (public)"}
+
+---- review_r1::h1_status_does_not_reveal_the_pending_id stdout ----
+
+thread 'review_r1::h1_status_does_not_reveal_the_pending_id' (26463) panicked at calls/src/review_r1.rs:119:5:
+status must not carry the pending id: {"account":"B1UN3hPgxacgHKBRoThcAmsPajGcUf6YXUhgB36x4DAd","balance":{"base_units":"100000000000","display":"100","unit":"LEZ"},"clock_utc":"2026-11-25 09:46:40 UTC","head":7,"key_source":"file <SPIKE>/tmp/escapement-wt-basecamp/escapement-module-test-26436/test.key","network":{"asset_label":"LEZ","decimals":9,"program":"US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx","read_only":false,"rpc_url":"http://127.0.0.1:41448"},"ok":true,"pending":{"age_s":0,"op":"claim","pending_id":"491bb8a32700b868f850bfd7"}}
+
+---- review_r1::l2_a_prepared_transaction_stays_on_its_network stdout ----
+
+thread 'review_r1::l2_a_prepared_transaction_stays_on_its_network' (26491) panicked at calls/src/review_r1.rs:175:5:
+assertion `left == right` failed
+  left: 1
+ right: 0
+
+---- review_r1::m1_units_are_fixed_and_prompts_show_base_units stdout ----
+
+thread 'review_r1::m1_units_are_fixed_and_prompts_show_base_units' (26521) panicked at calls/src/review_r1.rs:133:9:
+configure {"decimals":12}: {"asset_label":"LEZ","clock_utc":"2026-11-25 09:46:40 UTC","decimals":12,"fee_bps":0,"head":7,"note":null,"ok":true,"program":"US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx","program_configured":true,"read_only":false,"rpc_url":"http://127.0.0.1:60622"}
+
+---- review_r1::m3_other_callers_reach_only_version stdout ----
+
+thread 'review_r1::m3_other_callers_reach_only_version' (26535) panicked at calls/src/review_r1.rs:155:13:
+configure as module:other: {"asset_label":"LEZ","clock_utc":"2026-11-25 09:46:40 UTC","decimals":9,"fee_bps":null,"head":7,"note":"the program has no configuration yet (its admin has not initialised it)","ok":true,"program":"LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY","program_configured":false,"read_only":false,"rpc_url":"http://127.0.0.1:39663"}
+
+---- review_r1_kimi::kimi_l2_flags_must_be_booleans stdout ----
+
+thread 'review_r1_kimi::kimi_l2_flags_must_be_booleans' (26549) panicked at calls/src/review_r1_kimi.rs:107:5:
+assertion `left == right` failed: {"asset_label":"LEZ","clock_utc":"2026-11-25 09:46:40 UTC","decimals":9,"fee_bps":0,"head":7,"note":null,"ok":true,"program":"US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx","program_configured":true,"read_only":false,"rpc_url":"http://127.0.0.1:50160"}
+  left: Bool(true)
+ right: Bool(false)
+
+---- review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez stdout ----
+
+thread 'review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez' (26563) panicked at calls/src/review_r1_kimi.rs:48:5:
+assertion `left == right` failed
+  left: Null
+ right: Bool(false)
+
+---- review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused stdout ----
+
+thread 'review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused' (26575) panicked at calls/src/review_r1_kimi.rs:80:5:
+assertion `left == right` failed: {"error":"sendTransaction: the sequencer at http://127.0.0.1:49948 answered HTTP 500","ok":false}
+  left: Bool(false)
+ right: Bool(true)
+
+---- review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal stdout ----
+
+thread 'review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal' (26601) panicked at calls/src/review_r1_kimi.rs:96:5:
+assertion `left == right` failed: {"error":"no Escapement schedule at LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY under program US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx (wrong id, wrong network, or not created yet)","ok":false}
+  left: Bool(false)
+ right: Bool(true)
+
+---- review_r1_kimi::kimi_reject_only_by_the_preparer stdout ----
+
+thread 'review_r1_kimi::kimi_reject_only_by_the_preparer' (26631) panicked at calls/src/review_r1_kimi.rs:65:5:
+assertion `left == right` failed: another caller's reject must be refused: {"ok":true,"rejected":"d889df1d17b319d0c3cb5b48","signed":false}
+  left: Bool(true)
+ right: Bool(false)
+
+
+failures:
+    lez::r1_url::sequencer_addresses_are_read_strictly
+    review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves
+    review_r1::h1_status_does_not_reveal_the_pending_id
+    review_r1::l2_a_prepared_transaction_stays_on_its_network
+    review_r1::m1_units_are_fixed_and_prompts_show_base_units
+    review_r1::m3_other_callers_reach_only_version
+    review_r1_kimi::kimi_l2_flags_must_be_booleans
+    review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez
+    review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused
+    review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal
+    review_r1_kimi::kimi_reject_only_by_the_preparer
+
+test result: FAILED. 6 passed; 11 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+error: test failed, to rerun pass `-p escapement-module-calls --lib`

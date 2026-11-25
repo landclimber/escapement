@@ -1,0 +1,6 @@
+PASS trusted (exit 0)
+FAIL not-in-keyring (exit 0, expected nonzero): cc84d40988d931495695a0973d4aaec3a25470862e2483c39df77b9fdebb7601  escapement_core_module-0.1.0.lgx sign-test.sh: signed by did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6ImNIVmliR2xqY0hWaWJHbGpjSFZpYkdsamNIVmliR2xqY0hWaWJHbGpNREEifQ 
+FAIL other-signer (exit 0, expected nonzero): cc84d40988d931495695a0973d4aaec3a25470862e2483c39df77b9fdebb7601  escapement_core_module-0.1.0.lgx sign-test.sh: signed by did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6ImNIVmliR2xqY0hWaWJHbGpjSFZpYkdsamNIVmliR2xqY0hWaWJHbGpNREEifQ 
+PASS keyring-cleaned (no directory left in TMPDIR)
+test-sign-test.sh: 2 failure(s)
+exit 1

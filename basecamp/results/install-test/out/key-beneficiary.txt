@@ -1,0 +1,1 @@
+{"method":"key","module":"escapement_core_module","result":"{\"account\":\"8jSBzwxgenK31twqzstVpyWGVV3TDarmt8aLKdNSYF4k\",\"key_source\":\"file <RUNS>/devnet-keys-b3/beneficiary.json\",\"ok\":true,\"public_key\":\"609eec49d61d53bef2d4e27190a17a43408f5b7aa8756163a4c6b6d1d3fdaa2e\"}","status":"ok"}

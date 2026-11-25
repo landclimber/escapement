@@ -1,0 +1,1 @@
+{"method":"configure","module":"escapement_core_module","result":"{\"asset_label\":\"LEZ\",\"clock_utc\":\"2026-11-25 18:15:24 UTC\",\"decimals\":9,\"fee_bps\":0,\"head\":24,\"note\":null,\"ok\":true,\"program\":\"G6WUd8vhwsJJmuvQvuGCKZNBnTAtr9GV1MKchkS7CoXy\",\"program_configured\":true,\"read_only\":false,\"rpc_url\":\"http://127.0.0.1:3040\"}","status":"ok"}

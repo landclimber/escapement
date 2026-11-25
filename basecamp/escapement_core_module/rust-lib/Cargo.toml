@@ -1,0 +1,22 @@
+[package]
+name = "escapement_core_module"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# A workspace of its own, so that cargo adopts no parent workspace (the builder copies only this directory, with the
+# SDK source beside it). `calls` is the module's logic; `staged/` holds the copies of escapement-core and
+# escapement-sdk that basecamp/scripts/stage.py writes (ignored by git).
+[workspace]
+members = ["calls"]
+
+[lib]
+crate-type = ["staticlib"]
+
+# Cargo.lock is committed: the builder feeds it to buildRustPackage (git sources fetched by their locked commits).
+[dependencies]
+serde_json = "1"
+# Staged by the builder from the logos-rust-sdk revision its code generator comes from.
+logos-rust-sdk = { path = "../logos-rust-sdk-src" }
+escapement-module-calls = { path = "calls" }

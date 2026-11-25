@@ -1,0 +1,4 @@
+nix (Nix) 2.28.3
+Linux 4.19.0-gvisor x86_64
+source 2ddc57c46d9da677cf27cd190aecfd30a61d5f80
+lgx github:logos-co/logos-package/4bdd9041ebfbd06c2b22134afdcd27fce8a43f3c

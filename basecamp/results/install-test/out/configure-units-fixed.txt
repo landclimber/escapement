@@ -1,0 +1,1 @@
+{"method":"configure","module":"escapement_core_module","result":"{\"error\":\"the native asset's units are fixed in the module (9 decimals, LEZ); they cannot be configured\",\"ok\":false}","status":"ok"}

@@ -1,0 +1,1 @@
+{"method":"key","module":"escapement_core_module","result":"{\"account\":\"AkbJtdkPvaUGxFAtTw4ZVTwduYAG6nJP4hn1tWuCs2v7\",\"key_source\":\"file <RUNS>/devnet-keys-b3/creator.json\",\"ok\":true,\"public_key\":\"cd1765411b326223cb460af4f5fc1898dc4867a3c335bdf5ff48afb50e239f77\"}","status":"ok"}

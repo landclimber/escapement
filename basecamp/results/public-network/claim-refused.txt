@@ -1,0 +1,1 @@
+{"method":"prepare_claim","module":"escapement_core_module","result":"{\"error\":\"this network is set read-only in the module: nothing is signed or sent here\",\"ok\":false}","status":"ok"}
