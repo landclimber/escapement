@@ -1309,6 +1309,8 @@ def parse_cargo_list(text: str) -> dict[tuple, set[str]]:
     out: dict[tuple, set[str]] = {}
     cur = None
     for ln in text.splitlines():
+        # CI prints cargo's output in colour (CARGO_TERM_COLOR=always): drop the escape codes and a trailing CR first
+        ln = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", ln).rstrip("\r")
         m = re.match(r"^\s+Running (.+) \((?:.*/)?deps/([A-Za-z0-9_]+)-[0-9a-f]+(?:\.exe)?\)$", ln)
         if m:
             cur = out.setdefault((m.group(1), m.group(2)), set())
@@ -1694,6 +1696,9 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
         return "\n".join(out)
     one = sorted(blocks)[0]
     expect_ok("complete listing", cargo_list=[listing()], cargo_job="core-and-guest")
+    coloured = "\n".join(("\x1b[1m\x1b[92m" + l.replace("Running", "Running\x1b[0m", 1)) if "Running" in l else l
+                          for l in listing().splitlines())
+    expect_ok("complete listing in colour, as CI prints it", cargo_list=[coloured], cargo_job="core-and-guest")
     expect("a whole test binary missing", "missing from the listing", cargo_list=[listing(drop_target="escapement_e2e")], cargo_job="core-and-guest")
     expect("a test missing from its binary", "is not in the compiled", cargo_list=[listing(drop_test=sorted(blocks[one])[0])], cargo_job="core-and-guest")
     expect("empty listing", "missing from the listing", cargo_list=[""], cargo_job="core-and-guest")
