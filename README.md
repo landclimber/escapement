@@ -24,7 +24,14 @@ Built and tested (numbers and commands: [docs/EVIDENCE.md](docs/EVIDENCE.md)):
 - an end-to-end suite on a standalone LEZ v0.4.0-rc3 sequencer: immutable deployment, admin init,
   every lifecycle, native and token private claims into the beneficiary's own private account (real
   proofs verified by the sequencer), and refusals sent on chain with the state compared before and
-  after.
+  after;
+- **on a public LEZ v0.4.0-rc3 network** (the Ferrata LEZ test network, 25 Nov 2026): deployed
+  immutably at `Be6eH1Ps2cr7zSmuV2XfwZDkF14naGcEG6h71ViszSXW` with the image id of `image-ids.tsv`, then
+  66 transactions over every lifecycle, both assets, batches, nine refusals read back, and a
+  native private claim with a real proof (a Succinct receipt), made on the network's host. Each
+  transaction's inclusion, position, outcome, call and signer, and each account's final state, are
+  re-checked by `scripts/verify-public.sh`, reading the operator's RPC:
+  [docs/PUBLIC-NETWORK.md](docs/PUBLIC-NETWORK.md).
 
 Not built yet: the Logos Core module and the Basecamp mini-app, deployment on LEZ testnet 0.4 (not
 launched yet), reading events back through an indexer, an external audit.
@@ -86,8 +93,9 @@ balance for fees (`private-account shield --file F --amount N`) and a private ho
 sequence, as run in CI, is `e2e/run_e2e.sh`.
 
 `--dry-run` is available on create, claim, cancel, make-non-cancelable, signal,
-transfer-beneficiary and withdraw-fees; unknown flags are refused. Program addresses on LEZ testnet
-0.4 will be listed here once it launches.
+transfer-beneficiary, withdraw-fees and batch; unknown flags are refused. `batch` creates several schedules
+on one escrow in one transaction. Program addresses on LEZ testnet 0.4 will be listed here once it
+launches; on the public network above: [docs/PUBLIC-NETWORK.md](docs/PUBLIC-NETWORK.md).
 
 ## Layout
 
