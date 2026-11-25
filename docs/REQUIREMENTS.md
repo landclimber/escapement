@@ -49,12 +49,12 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | [F4](#f4) | Transferability set at creation, immutable | shown | 6 | 2 |
 | [F5](#f5) | Batch creation; maximum per transaction documented | shown | 3 | 2 |
 | [F6](#f6) | An event per state transition; schema documented | in part | 6 | 2 |
-| [U1](#u1) | SDK for Logos modules: full lifecycle, public and private claims | in part | 8 | 3 |
+| [U1](#u1) | SDK for Logos modules: full lifecycle, public and private claims | in part | 10 | 3 |
 | [U2a](#u2a) | Basecamp mini-app: build, assets, loadable via git | in part (code differs from the proposal) | 0 | 3 |
-| [U2b](#u2b) | Mini-app recipient view | in part (code differs from the proposal) | 0 | 2 |
-| [U2c](#u2c) | Mini-app creator view | in part (code differs from the proposal) | 0 | 3 |
+| [U2b](#u2b) | Mini-app recipient view | in part (code differs from the proposal) | 2 | 2 |
+| [U2c](#u2c) | Mini-app creator view | in part (code differs from the proposal) | 2 | 3 |
 | [U3](#u3) | CLI: create, claim, cancel, signal, query claimable | in part | 12 | 3 |
-| [U4a](#u4a) | Mini-app pre-claim summary: claimable and fee | in part | 3 | 3 |
+| [U4a](#u4a) | Mini-app pre-claim summary: claimable and fee | in part | 4 | 3 |
 | [U4b](#u4b) | Private path: gas check with an actionable error | in part | 6 | 2 |
 | [U5](#u5) | Privacy disclosure before each private claim | in part | 7 | 2 |
 | [U6](#u6) | IDL with SPEL | shown | 2 | 2 |
@@ -420,12 +420,14 @@ Records:
 
 **Status: in part.** Proposal row `U1`: in part.
 
-**Remaining:** The module has no signal-milestone, transfer-beneficiary or private-claim method yet and creates linear and cliff schedules only; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+**Remaining:** The module has no signal-milestone, transfer-beneficiary or private-claim method yet and creates linear and cliff schedules only.
 
 **Note:** The Rust SDK has builders for every operation and both assets, and every step of the sequencer suite goes through it. `escapement_core_module` (basecamp/) wraps it as a Logos Core module: configure, schedules (claimable now, next unlock), prepare_create (linear, cliff), prepare_claim (public), prepare_cancel, approve and reject; it ran in headless Logos Core (31 of 31 steps) and under Basecamp 0.4.0-rc.2, both on a local v0.4.0-rc3 sequencer.
 
 Tests:
 
+- `review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves` (escapement-module-calls, [basecamp/ci/calls/src/review_r1.rs](../basecamp/ci/calls/src/review_r1.rs)); CI: basecamp (every push and pull request)
+- `review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert` (escapement-module-calls, [basecamp/ci/calls/src/review_r2.rs](../basecamp/ci/calls/src/review_r2.rs)); CI: basecamp (every push and pull request)
 - `builders::tests::create_declares_asset_specific_actors_and_encodes_the_wire` (escapement-sdk, [crates/escapement-sdk/src/builders.rs](../crates/escapement-sdk/src/builders.rs)); CI: core-and-guest (every push and pull request)
 - `claim::tests::only_the_beneficiary_may_claim_and_overclaims_are_refused` (escapement-sdk, [crates/escapement-sdk/src/claim.rs](../crates/escapement-sdk/src/claim.rs)); CI: core-and-guest (every push and pull request)
 - `unlock::tests::before_the_cliff_names_the_cliff_and_the_exact_unlock` (escapement-sdk, [crates/escapement-sdk/src/unlock.rs](../crates/escapement-sdk/src/unlock.rs)); CI: core-and-guest (every push and pull request)
@@ -439,7 +441,7 @@ Records:
 
 - [docs/EVIDENCE.md E-11](EVIDENCE.md)
 - [basecamp/RESULTS.md Headless Logos Core: 31 of 31](../basecamp/RESULTS.md): the module in headless Logos Core on a local sequencer; outside CI
-- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)
+- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (escapement-module-calls; run by CI's `basecamp` job)
 
 ### U2a
 
@@ -451,7 +453,7 @@ Records:
 
 **The code says otherwise:** The mini-app now exists (basecamp/, merged after the proposal was filed): build instructions in basecamp/README.md; both packages built with Nix, signed with a test key, and installed and used in Logos Basecamp 0.4.0-rc.2 from local .lgx files.
 
-**Remaining:** Release .lgx assets to download, and loading in Basecamp from the git repository (installed from local files so far, signed with a test key); the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+**Remaining:** Release .lgx assets to download, and loading in Basecamp from the git repository (installed from local files so far, signed with a test key). CI's `basecamp` job runs the module's and the view's tests without Nix; the .lgx packages are built with Nix on the build box, not in CI.
 
 Records:
 
@@ -469,12 +471,17 @@ Records:
 
 **The code says otherwise:** The recipient view exists: in Basecamp 0.4.0-rc.2 on a local sequencer it showed claimable now, locked, next unlock and claimed, and made a public claim (basecamp/RESULTS.md shots 07-11, 15-16).
 
-**Remaining:** A test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`). The claim action is public only (no private claim from the view).
+**Remaining:** A test that CI runs of what the position shows: CI's `basecamp` job claims publicly through the module (prepared, approved by its preparer, sent once), lists a token schedule in its own units with its claim refused, and runs the view's tests (plain text, prompts, reject, unknown outcomes), but no test asserts the locked, claimable-now and next-unlock values the view shows (the Basecamp run shows them, shots 07-11). The claim action is public only (no private claim from the view).
+
+Tests:
+
+- `review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves` (escapement-module-calls, [basecamp/ci/calls/src/review_r1.rs](../basecamp/ci/calls/src/review_r1.rs)); CI: basecamp (every push and pull request)
+- `review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez` (escapement-module-calls, [basecamp/ci/calls/src/review_r1_kimi.rs](../basecamp/ci/calls/src/review_r1_kimi.rs)); CI: basecamp (every push and pull request)
 
 Records:
 
 - [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
-- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (run with qmltestrunner, not by CI)
+- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (qmltestrunner, offscreen; run by CI's `basecamp` job, every test function required to pass)
 
 ### U2c
 
@@ -486,13 +493,18 @@ Records:
 
 **The code says otherwise:** The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).
 
-**Remaining:** Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+**Remaining:** Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job creates a schedule through the module (prepared, approved, in a block) and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).
+
+Tests:
+
+- `review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert` (escapement-module-calls, [basecamp/ci/calls/src/review_r2.rs](../basecamp/ci/calls/src/review_r2.rs)); CI: basecamp (every push and pull request)
+- `review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez` (escapement-module-calls, [basecamp/ci/calls/src/review_r1_kimi.rs](../basecamp/ci/calls/src/review_r1_kimi.rs)); CI: basecamp (every push and pull request)
 
 Records:
 
 - [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
-- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (run with qmltestrunner, not by CI)
-- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)
+- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (qmltestrunner, offscreen; run by CI's `basecamp` job, every test function required to pass)
+- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (escapement-module-calls; run by CI's `basecamp` job)
 
 ### U3
 
@@ -535,12 +547,13 @@ Records:
 
 **Status: in part.** Proposal row `U4`: in part.
 
-**Remaining:** A test that CI runs. The module's `prepare_claim` returns the prompt the view shows before approval, with the claim's rows and the maximum fee, and the Basecamp run shows that prompt (shots 08-10), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+**Remaining:** A test that CI runs of the prompt's claimable amount and fee. The module's `prepare_claim` returns the prompt the view shows before approval, with the claim's rows and the maximum fee, and the Basecamp run shows that prompt (shots 08-10); CI's `basecamp` job checks that the prompt names the amount in LEZ and in base units and that the view shows no prompt in other units than it converted with, but no test asserts the prompt's claimable-now and fee rows.
 
 **Note:** The SDK builds the summary the mini-app will show (`PreClaimSummary`: claimable now, estimated gas and fee, the payer's reserve).
 
 Tests:
 
+- `review_r1::m1_units_are_fixed_and_prompts_show_base_units` (escapement-module-calls, [basecamp/ci/calls/src/review_r1.rs](../basecamp/ci/calls/src/review_r1.rs)); CI: basecamp (every push and pull request)
 - `fees::tests::matches_the_spike_measurement_at_genesis_fees` (escapement-sdk, [crates/escapement-sdk/src/fees.rs](../crates/escapement-sdk/src/fees.rs)); CI: core-and-guest (every push and pull request)
 - `fees::tests::public_fee_uses_the_wallet_margin` (escapement-sdk, [crates/escapement-sdk/src/fees.rs](../crates/escapement-sdk/src/fees.rs)); CI: core-and-guest (every push and pull request)
 - `claim::tests::u5_a_private_claim_needs_the_confirmation_of_its_own_disclosure` (escapement-sdk, [crates/escapement-sdk/src/claim.rs](../crates/escapement-sdk/src/claim.rs)); CI: core-and-guest (every push and pull request)
@@ -632,7 +645,7 @@ Records:
 
 **Status: in part.** Proposal row `U7`: in part.
 
-**Remaining:** A test that CI runs of the view's messages: in Basecamp it refused an over-claim naming the claimable amount (shot 11) and showed the next unlock (shot 07), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+**Remaining:** A test that CI runs of the view's messages: in Basecamp it refused an over-claim naming the claimable amount (shot 11) and showed the next unlock (shot 07), but none of the module's and view's tests that CI's `basecamp` job runs asserts either message.
 
 **Note:** Exit codes 1..=35, each with an SDK message; "nothing claimable" carries the exact next unlock time; the CLI refuses before sending and `show` prints the next unlock.
 
@@ -851,7 +864,7 @@ Records:
 
 Tests:
 
-- check `reqmap:s3-coverage`: every hard Functionality, Usability, Reliability and Performance clause names a test, or S3 is not `shown`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
+- check `reqmap:s3-coverage`: every hard Functionality, Usability, Reliability and Performance clause names a test, or S3 is not `shown`; CI: basecamp (every push and pull request), core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
 
 Records:
 
@@ -1106,7 +1119,7 @@ Records:
 
 Tests:
 
-- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the repository, the guest crates included, says `license = "MIT OR Apache-2.0"`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
+- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the repository, the guest crates included, says `license = "MIT OR Apache-2.0"`; CI: basecamp (every push and pull request), core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
 
 Records:
 
@@ -1124,6 +1137,6 @@ Records:
 
 ## Tests not cited by any clause
 
-Listed so that nothing is hidden. Rust (17, all run by CI): `a_batch_above_the_ceiling_is_refused_and_a_dry_run_shows_the_irreversible_terms` (escapement-cli), `a_cliff_batch_signs_each_recipients_own_total_and_cliff` (escapement-cli), `a_linear_batch_signs_linear_terms` (escapement-cli), `a_token_batch_dry_run_shows_its_asset_and_holdings` (escapement-cli), `ambiguous_or_malformed_batches_are_refused_before_anything_is_built` (escapement-cli), `batchargs::tests::a_cliff_batch_gives_each_recipient_its_own_cliff` (escapement-cli), `batchargs::tests::duplicates_pass_only_when_meant` (escapement-cli), `batchargs::tests::linear_recipients_are_trimmed_and_read_in_order` (escapement-cli), `batchargs::tests::malformed_recipients_are_refused_with_the_part_named` (escapement-cli), `batchargs::tests::zero_totals_are_a_precheck` (escapement-cli), `create_takes_exactly_one_shape_and_a_u128_cliff_amount` (escapement-cli), `tests::the_unknown_command_help_lists_every_command` (escapement-cli), `math::tests::mul_div_extremes_never_overflow` (escapement-core), `math::tests::mul_div_rem_identity` (escapement-core), `math::tests::split_on_cancel_preserves_vested_high_water_when_clock_regresses` (escapement-core), `unlock::tests::utc_formats_known_dates` (escapement-sdk), `audit_lagged_cancel_preserves_previously_vested_unclaimed_tokens` (escapement-tests).
+Listed so that nothing is hidden. Rust (38, all run by CI): `a_batch_above_the_ceiling_is_refused_and_a_dry_run_shows_the_irreversible_terms` (escapement-cli), `a_cliff_batch_signs_each_recipients_own_total_and_cliff` (escapement-cli), `a_linear_batch_signs_linear_terms` (escapement-cli), `a_token_batch_dry_run_shows_its_asset_and_holdings` (escapement-cli), `ambiguous_or_malformed_batches_are_refused_before_anything_is_built` (escapement-cli), `batchargs::tests::a_cliff_batch_gives_each_recipient_its_own_cliff` (escapement-cli), `batchargs::tests::duplicates_pass_only_when_meant` (escapement-cli), `batchargs::tests::linear_recipients_are_trimmed_and_read_in_order` (escapement-cli), `batchargs::tests::malformed_recipients_are_refused_with_the_part_named` (escapement-cli), `batchargs::tests::zero_totals_are_a_precheck` (escapement-cli), `create_takes_exactly_one_shape_and_a_u128_cliff_amount` (escapement-cli), `tests::the_unknown_command_help_lists_every_command` (escapement-cli), `math::tests::mul_div_extremes_never_overflow` (escapement-core), `math::tests::mul_div_rem_identity` (escapement-core), `math::tests::split_on_cancel_preserves_vested_high_water_when_clock_regresses` (escapement-core), `lez::tests::bip340_vectors` (escapement-module-calls), `lez::tests::key_files_are_small_regular_files` (escapement-module-calls), `lez::tests::keys_from_text_and_urls` (escapement-module-calls), `lez::tests::lez_rc3_pinned_message_layout` (escapement-module-calls), `lez::tests::sequencer_addresses_are_read_strictly` (escapement-module-calls), `review_r1::h1_status_does_not_reveal_the_pending_id` (escapement-module-calls), `review_r1::l2_a_prepared_transaction_stays_on_its_network` (escapement-module-calls), `review_r1::m3_other_callers_reach_only_version` (escapement-module-calls), `review_r1_kimi::kimi_l2_flags_must_be_booleans` (escapement-module-calls), `review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused` (escapement-module-calls), `review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal` (escapement-module-calls), `review_r1_kimi::kimi_reject_only_by_the_preparer` (escapement-module-calls), `review_r1_more::nit_the_nonce_is_checked_before_anything_is_signed` (escapement-module-calls), `review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed` (escapement-module-calls), `review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status` (escapement-module-calls), `review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to` (escapement-module-calls), `review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer` (escapement-module-calls), `review_r2::r2_l3_tx_status_reports_an_unread_outcome` (escapement-module-calls), `tests::amounts_are_exact` (escapement-module-calls), `tests::approvals_come_from_the_view_or_the_host` (escapement-module-calls), `tests::nothing_is_sent_without_a_network_or_key` (escapement-module-calls), `unlock::tests::utc_formats_known_dates` (escapement-sdk), `audit_lagged_cancel_preserves_previously_vested_unclaimed_tokens` (escapement-tests).
 
 End-to-end checks (52 of 91): `probe`, `fund-beneficiary`, `fund-second`, `dry-run-create`, `refusal-overclaim-sent-on-chain`, `private-account-new`, `key-file-written-0600`, `claim-private-new-account-prepare`, `claim-private-prepare-again`, `claim-private-same-account-confirm`, `private-account-show`, `private-account-state-on-chain`, `claim-vested-after-cancel`, `refusal-creator-signal-sent-on-chain`, `refusal-double-signal-sent-on-chain`, `claim-milestone-tranche`, `create-transferable`, `transfer-beneficiary`, `refusal-old-beneficiary-sent-on-chain`, `claim-by-new-beneficiary`, `create-for-noncancelable`, `make-non-cancelable`, `refusal-cancel-after-noncancelable-sent-on-chain`, `refusal-beneficiary-cancels-sent-on-chain`, `deploy-token-program`, `configure-token-program`, `token-program-configured`, `token-definition`, `token-supply-at-creator`, `beneficiary-public-token-holding`, `claim-token-public`, `shield-native-for-fees`, `shield-applied`, `private-token-holding`, `claim-private-token-prepare`, `claim-private-token-confirm`, `batch-dry-run`, `batch-dry-run-shows-each-recipients-terms`, `batch-dry-run-created-nothing`, `batch-duplicate-recipient-refused`, `batch-absolute-cliff-refused`, `batch-create-native-cliff`, `batch-native-escrow-holds-the-sum`, `batch-native-recipient-0-terms`, `batch-native-recipient-1-terms`, `claim-from-batch`, `claim-from-batch-at-least-its-cliff`, `batch-create-token`, `batch-token-escrow-holds-the-sum`, `batch-zero-total-sent-without-checks`, `batch-zero-total-reverted`, `batch-zero-total-created-nothing`.

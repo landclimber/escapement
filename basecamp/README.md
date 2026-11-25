@@ -121,9 +121,13 @@ QT_QPA_PLATFORM=offscreen qmltestrunner -input basecamp/escapement_ui/tests/qml 
 basecamp/scripts/tests/test-sign-test.sh WORK            # sign-test.sh against a stand-in lgx
 basecamp/scripts/tests/test-keyscan.sh WORK              # keyscan.py on fake keys
 cd basecamp/escapement_core_module/rust-lib && cargo +1.98.1 test --locked -p escapement-module-calls
+# The same tests without Nix (CI's `basecamp` job): basecamp/ci/ holds only the calls crate, locked as rust-lib/ is
+python3 -I basecamp/scripts/ci-workspace.py && cargo test --manifest-path basecamp/ci/Cargo.toml --locked -p escapement-module-calls
 cargo run --release -p escapement-module-calls --example call -- --script SESSION.txt   # lines: [@CALLER ]METHOD JSON
 ```
 
+CI's `basecamp` job runs the module's calls tests that way, `tests/amount.test.mjs`, and `tests/qml` with Ubuntu
+24.04's Qt 6.4 (`qmltestrunner`, offscreen; every test function must pass); it does not build the `.lgx` packages.
 The Nix build compiles the module with Rust 1.98.0 (`metadata.json`, the builder's rust-overlay has no 1.98.1); the
 native tests above use 1.98.1, the workspace's `rust-toolchain.toml`. `scripts/keyscan.py DIR --jwk K --keyfile K`
 searches what leaves a machine for a private key in its usual forms; the build and the Basecamp session record its

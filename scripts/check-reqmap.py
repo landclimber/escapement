@@ -48,6 +48,9 @@ MAP = Path("docs/requirements-map.json")
 DOC = Path("docs/REQUIREMENTS.md")
 WORKFLOW = Path(".github/workflows/ci.yml")
 E2E_SUITE = Path("e2e/run_e2e.sh")
+# Workspaces besides the root one whose members' tests the map may name: the Basecamp module's calls crate, tested
+# without Nix in a workspace of its own (basecamp/ci/: links into the module's rust-lib/).
+OTHER_WORKSPACES = ["basecamp/ci"]
 STATUSES = ("shown", "in part", "not yet", "waits on Logos")
 DEFAULT_BRANCH = "main"
 
@@ -389,7 +392,8 @@ def scan_target(target: Target) -> list[RustTest]:
 
 
 def discover_packages() -> list[Package]:
-    """Every package of the root workspace, plus standalone packages under crates/."""
+    """Every package of the root workspace, the members of the other workspaces CI tests
+    (OTHER_WORKSPACES), plus standalone packages under crates/."""
     root_manifest = tomllib.loads((ROOT / "Cargo.toml").read_text())
     ws = root_manifest.get("workspace", {})
     dirs = list(ws.get("members", []))
@@ -397,6 +401,9 @@ def discover_packages() -> list[Package]:
     pkgs: list[Package] = []
     for d in dirs:
         pkgs.append(_package(d, "."))
+    for root in OTHER_WORKSPACES:
+        for m in tomllib.loads((ROOT / root / "Cargo.toml").read_text())["workspace"]["members"]:
+            pkgs.append(_package(os.path.normpath(os.path.join(root, m)), root))
     for manifest in sorted((ROOT / "crates").glob("*/Cargo.toml")):
         d = str(manifest.parent.relative_to(ROOT))
         if d in dirs or d in excluded:
@@ -924,17 +931,20 @@ def cargo_selects(run: CargoRun, pkgs: list[Package], test: RustTest) -> bool:
     if probe in by_dir and by_dir[probe].workspace_root == probe:
         # A package that is its own workspace (the CLI): only it.
         selected = {by_dir[probe].name} if not named or any(fnmatch.fnmatchcase(by_dir[probe].name, n) for n in named) else set()
-    elif probe == "." or (probe in by_dir and by_dir[probe].workspace_root == "."):
-        members = {p.name for p in pkgs if p.workspace_root == "."}
+    else:
+        # The root workspace, or another one CI tests (OTHER_WORKSPACES): from its root or a member.
+        ws = probe if probe == "." or probe in OTHER_WORKSPACES else \
+            (by_dir[probe].workspace_root if probe in by_dir else None)
+        if ws is None:
+            return False
+        members = {p.name for p in pkgs if p.workspace_root == ws}
         if named:
             selected = {m for m in members if any(fnmatch.fnmatchcase(m, n) for n in named)}
-        elif {"--workspace", "--all"} & flags or probe == ".":
-            # The root manifest is virtual: with no -p, cargo tests every member.
+        elif {"--workspace", "--all"} & flags or probe == ws:
+            # Both root manifests are virtual: with no -p, cargo tests every member.
             selected = {m for m in members if not any(fnmatch.fnmatchcase(m, x) for x in opts.get("--exclude", []))}
         else:
             selected = {by_dir[probe].name}
-    else:
-        return False
     if test.package not in selected:
         return False
     req = test.tgt.required_features if test.tgt else []
@@ -1551,8 +1561,10 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
     for rel in ("Cargo.toml", "README.md", "LICENSE-MIT", "LICENSE-APACHE", str(WORKFLOW), str(E2E_SUITE)):
         (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, sandbox / rel)
-    for d in ("crates", "docs", "idl"):
-        shutil.copytree(ROOT / d, sandbox / d, ignore=shutil.ignore_patterns("target", ".run"))
+    for d in ("crates", "docs", "idl", *OTHER_WORKSPACES):
+        # The links of basecamp/ci/ are followed (the copy holds the crate); staged/ (which may not exist yet) is not
+        # read by this script.
+        shutil.copytree(ROOT / d, sandbox / d, ignore=shutil.ignore_patterns("target", ".run", "staged"))
 
     def attempt(label, rmap_mut=None, workflow=None, files=None, **extra):
         global ROOT
@@ -1703,6 +1715,35 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
     expect("a test missing from its binary", "is not in the compiled", cargo_list=[listing(drop_test=sorted(blocks[one])[0])], cargo_job="core-and-guest")
     expect("empty listing", "missing from the listing", cargo_list=[""], cargo_job="core-and-guest")
     expect("listing without its job", "needs --cargo-job", cargo_list=[listing()])
+    # The Basecamp module's workspace (basecamp/ci/): its tests are run only through its own manifest, and its
+    # job's listing is checked like the others.
+    bc_cmd = "cargo test --manifest-path basecamp/ci/Cargo.toml --locked -p escapement-module-calls"
+    bc_list = "python3 scripts/check-reqmap.py --cargo-job basecamp --cargo-list target/reqmap/basecamp-tests.txt"
+    if f"run: {bc_cmd}\n" not in wf or bc_list not in wf:
+        failures.append("self-test: the workflow no longer has the basecamp job's lines the injections edit")
+    else:
+        expect("module tests run from the root workspace", "no `cargo test`",
+               workflow=wf.replace(f"run: {bc_cmd}\n", "run: cargo test --locked -p escapement-module-calls\n"))
+        expect("module tests filtered away", "no `cargo test`", workflow=wf.replace(f"run: {bc_cmd}\n", f"run: {bc_cmd} -- lez::\n"))
+        expect_ok("module workspace without -p (every member)", workflow=wf.replace(f"run: {bc_cmd}\n",
+                  "run: cargo test --manifest-path basecamp/ci/Cargo.toml --locked\n"))
+        expect("module listing check removed", "--cargo-list ...", workflow=wf.replace(bc_list, "true"))
+        bc_blocks: dict[tuple, set[str]] = {}
+        for r in base_res.values():
+            if r.ok and r.rust is not None and "basecamp" in r.jobs:
+                bc_blocks.setdefault(r.rust.tgt.list_key, set()).add(r.rust.path)
+        if not bc_blocks:
+            failures.append("self-test: the map names no test the basecamp job runs")
+        else:
+            def bc_listing(drop=None):
+                return "\n".join(f"     Running {src} (basecamp/ci/target/debug/deps/{stem}-0123456789abcdef)\n"
+                                 + "\n".join(f"{n}: test" for n in sorted(ns) if n != drop)
+                                 for (src, stem), ns in sorted(bc_blocks.items()))
+            expect_ok("complete module listing", cargo_list=[bc_listing()], cargo_job="basecamp")
+            expect("a module test missing from its binary", "is not in the compiled",
+                   cargo_list=[bc_listing(drop=sorted(next(iter(bc_blocks.values())))[0])], cargo_job="basecamp")
+            expect("the workspace listing given as the module's", "missing from the listing",
+                   cargo_list=[listing()], cargo_job="basecamp")
     names = list(dict.fromkeys(ctx.e2e_names))
     rec = lambda n, ok=True: json.dumps({"step": n, "ok": ok, "out": None})  # noqa: E731
     named = sorted({r.ref["e2e"] for r in base_res.values() if "e2e" in r.ref})

@@ -324,9 +324,11 @@
       "text": "Provide an SDK that can be used to build Logos modules interacting with the vesting program. The SDK must expose the full lifecycle: create schedule, query claimable amount, claim, cancel, signal milestone, and transfer beneficiary. The SDK must support claiming to both public and private accounts.",
       "status": "in part",
       "proposal": {"row": "U1", "status": "in part"},
-      "remaining": "The module has no signal-milestone, transfer-beneficiary or private-claim method yet and creates linear and cliff schedules only; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).",
+      "remaining": "The module has no signal-milestone, transfer-beneficiary or private-claim method yet and creates linear and cliff schedules only.",
       "note": "The Rust SDK has builders for every operation and both assets, and every step of the sequencer suite goes through it. `escapement_core_module` (basecamp/) wraps it as a Logos Core module: configure, schedules (claimable now, next unlock), prepare_create (linear, cliff), prepare_claim (public), prepare_cancel, approve and reject; it ran in headless Logos Core (31 of 31 steps) and under Basecamp 0.4.0-rc.2, both on a local v0.4.0-rc3 sequencer.",
       "tests": [
+        {"crate": "escapement-module-calls", "rust": "review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves"},
+        {"crate": "escapement-module-calls", "rust": "review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert"},
         {"crate": "escapement-sdk", "rust": "builders::tests::create_declares_asset_specific_actors_and_encodes_the_wire"},
         {"crate": "escapement-sdk", "rust": "claim::tests::only_the_beneficiary_may_claim_and_overclaims_are_refused"},
         {"crate": "escapement-sdk", "rust": "unlock::tests::before_the_cliff_names_the_cliff_and_the_exact_unlock"},
@@ -339,7 +341,7 @@
       "records": [
         {"file": "docs/EVIDENCE.md", "anchor": "E-11"},
         {"file": "basecamp/RESULTS.md", "anchor": "Headless Logos Core: 31 of 31", "what": "the module in headless Logos Core on a local sequencer; outside CI"},
-        {"file": "basecamp/escapement_core_module/rust-lib/calls/src/lib.rs", "what": "the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)"}
+        {"file": "basecamp/escapement_core_module/rust-lib/calls/src/lib.rs", "what": "the module's methods and tests (escapement-module-calls; run by CI's `basecamp` job)"}
       ]
     },
     {
@@ -350,7 +352,7 @@
       "text": "Provide a Logos mini-app GUI with local build instructions, downloadable assets, and loadable in Logos app (Basecamp) via git repo. The mini-app must cover at minimum:",
       "status": "in part",
       "proposal": {"row": "U2", "status": "not yet"},
-      "remaining": "Release .lgx assets to download, and loading in Basecamp from the git repository (installed from local files so far, signed with a test key); the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).",
+      "remaining": "Release .lgx assets to download, and loading in Basecamp from the git repository (installed from local files so far, signed with a test key). CI's `basecamp` job runs the module's and the view's tests without Nix; the .lgx packages are built with Nix on the build box, not in CI.",
       "code_says": "The mini-app now exists (basecamp/, merged after the proposal was filed): build instructions in basecamp/README.md; both packages built with Nix, signed with a test key, and installed and used in Logos Basecamp 0.4.0-rc.2 from local .lgx files.",
       "records": [
         {"file": "basecamp/RESULTS.md", "anchor": "Logos Basecamp 0.4.0-rc.2", "what": "the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI"},
@@ -366,11 +368,15 @@
       "text": "Recipient view: current vesting position, total locked, amount claimable now, next unlock event, claim action.",
       "status": "in part",
       "proposal": {"row": "U2", "status": "not yet"},
-      "remaining": "A test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`). The claim action is public only (no private claim from the view).",
+      "remaining": "A test that CI runs of what the position shows: CI's `basecamp` job claims publicly through the module (prepared, approved by its preparer, sent once), lists a token schedule in its own units with its claim refused, and runs the view's tests (plain text, prompts, reject, unknown outcomes), but no test asserts the locked, claimable-now and next-unlock values the view shows (the Basecamp run shows them, shots 07-11). The claim action is public only (no private claim from the view).",
       "code_says": "The recipient view exists: in Basecamp 0.4.0-rc.2 on a local sequencer it showed claimable now, locked, next unlock and claimed, and made a public claim (basecamp/RESULTS.md shots 07-11, 15-16).",
+      "tests": [
+        {"crate": "escapement-module-calls", "rust": "review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves"},
+        {"crate": "escapement-module-calls", "rust": "review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez"}
+      ],
       "records": [
         {"file": "basecamp/RESULTS.md", "anchor": "Logos Basecamp 0.4.0-rc.2", "what": "the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI"},
-        {"file": "basecamp/escapement_ui/tests/qml/tst_view.qml", "what": "the view's Qt Quick tests (run with qmltestrunner, not by CI)"}
+        {"file": "basecamp/escapement_ui/tests/qml/tst_view.qml", "what": "the view's Qt Quick tests (qmltestrunner, offscreen; run by CI's `basecamp` job, every test function required to pass)"}
       ]
     },
     {
@@ -381,12 +387,16 @@
       "text": "Creator view: create a new schedule (all parameters), list active schedules, cancel a schedule, signal a milestone.",
       "status": "in part",
       "proposal": {"row": "U2", "status": "not yet"},
-      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).",
+      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job creates a schedule through the module (prepared, approved, in a block) and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).",
       "code_says": "The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).",
+      "tests": [
+        {"crate": "escapement-module-calls", "rust": "review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert"},
+        {"crate": "escapement-module-calls", "rust": "review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez"}
+      ],
       "records": [
         {"file": "basecamp/RESULTS.md", "anchor": "Logos Basecamp 0.4.0-rc.2", "what": "the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI"},
-        {"file": "basecamp/escapement_ui/tests/qml/tst_view.qml", "what": "the view's Qt Quick tests (run with qmltestrunner, not by CI)"},
-        {"file": "basecamp/escapement_core_module/rust-lib/calls/src/lib.rs", "what": "the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)"}
+        {"file": "basecamp/escapement_ui/tests/qml/tst_view.qml", "what": "the view's Qt Quick tests (qmltestrunner, offscreen; run by CI's `basecamp` job, every test function required to pass)"},
+        {"file": "basecamp/escapement_core_module/rust-lib/calls/src/lib.rs", "what": "the module's methods and tests (escapement-module-calls; run by CI's `basecamp` job)"}
       ]
     },
     {
@@ -427,9 +437,10 @@
       "text": "The mini-app must display a pre-claim confirmation summary: claimable amount and estimated transaction fee.",
       "status": "in part",
       "proposal": {"row": "U4", "status": "in part"},
-      "remaining": "A test that CI runs. The module's `prepare_claim` returns the prompt the view shows before approval, with the claim's rows and the maximum fee, and the Basecamp run shows that prompt (shots 08-10), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).",
+      "remaining": "A test that CI runs of the prompt's claimable amount and fee. The module's `prepare_claim` returns the prompt the view shows before approval, with the claim's rows and the maximum fee, and the Basecamp run shows that prompt (shots 08-10); CI's `basecamp` job checks that the prompt names the amount in LEZ and in base units and that the view shows no prompt in other units than it converted with, but no test asserts the prompt's claimable-now and fee rows.",
       "note": "The SDK builds the summary the mini-app will show (`PreClaimSummary`: claimable now, estimated gas and fee, the payer's reserve).",
       "tests": [
+        {"crate": "escapement-module-calls", "rust": "review_r1::m1_units_are_fixed_and_prompts_show_base_units"},
         {"crate": "escapement-sdk", "rust": "fees::tests::matches_the_spike_measurement_at_genesis_fees"},
         {"crate": "escapement-sdk", "rust": "fees::tests::public_fee_uses_the_wallet_margin"},
         {"crate": "escapement-sdk", "rust": "claim::tests::u5_a_private_claim_needs_the_confirmation_of_its_own_disclosure"}
@@ -513,7 +524,7 @@
       "text": "Failed claims must return clear, actionable error messages, including the case where nothing is yet claimable (with the next unlock time displayed).",
       "status": "in part",
       "proposal": {"row": "U7", "status": "in part"},
-      "remaining": "A test that CI runs of the view's messages: in Basecamp it refused an over-claim naming the claimable amount (shot 11) and showed the next unlock (shot 07), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).",
+      "remaining": "A test that CI runs of the view's messages: in Basecamp it refused an over-claim naming the claimable amount (shot 11) and showed the next unlock (shot 07), but none of the module's and view's tests that CI's `basecamp` job runs asserts either message.",
       "note": "Exit codes 1..=35, each with an SDK message; \"nothing claimable\" carries the exact next unlock time; the CLI refuses before sending and `show` prints the next unlock.",
       "tests": [
         {"crate": "escapement-sdk", "rust": "codes::tests::every_program_code_has_an_actionable_message"},

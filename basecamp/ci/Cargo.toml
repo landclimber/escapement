@@ -1,0 +1,8 @@
+# The module's calls crate in a workspace of its own, for tests without Nix (CI's `basecamp` job).
+# rust-lib/'s workspace cannot be loaded here: its scaffold crate depends on the Logos Rust SDK source that only
+# the module builder (`nix build`) fetches. `calls` and `staged` are links into rust-lib/, so the crate tested is
+# the one the module is built from; Cargo.lock is rust-lib/Cargo.lock without the scaffold's entries, written and
+# checked by basecamp/scripts/ci-workspace.py (ignored by git).
+[workspace]
+members = ["calls"]
+resolver = "2"
