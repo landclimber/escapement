@@ -6,7 +6,7 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 
 **Status** is the one the filed proposal gives (section 9, "Strict Requirement Status Table (24 Nov 2026)", filed for repository commit 2ddc57c) unless a row says the code disagrees. **shown**: every clause asserted by a named test that CI runs on every push to main, on real compiled code (LEZ v0.4.0-rc3's state machine in-process with the real guest, and/or an unmodified standalone v0.4.0-rc3 sequencer). **in part**: some of the clause shown as above; what remains is named. **not yet**: not built; the milestone that builds it is named. **waits on Logos**: needs LEZ testnet 0.4, which has not launched (latest LEZ tag v0.4.0-rc3).
 
-**45 clauses: 27 shown, 13 in part, 3 not yet, 2 waits on Logos.** Rows where the code contradicts the proposal: F3c, P1. 
+**45 clauses: 27 shown, 16 in part, 0 not yet, 2 waits on Logos.** Rows where the code contradicts the proposal: F3c, U2a, U2b, U2c, P1. 
 
 ## What CI enforces
 
@@ -49,16 +49,16 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | [F4](#f4) | Transferability set at creation, immutable | shown | 6 | 2 |
 | [F5](#f5) | Batch creation; maximum per transaction documented | shown | 3 | 2 |
 | [F6](#f6) | An event per state transition; schema documented | in part | 6 | 2 |
-| [U1](#u1) | SDK for Logos modules: full lifecycle, public and private claims | in part | 8 | 1 |
-| [U2a](#u2a) | Basecamp mini-app: build, assets, loadable via git | not yet | 0 | 0 |
-| [U2b](#u2b) | Mini-app recipient view | not yet | 0 | 0 |
-| [U2c](#u2c) | Mini-app creator view | not yet | 0 | 0 |
+| [U1](#u1) | SDK for Logos modules: full lifecycle, public and private claims | in part | 8 | 3 |
+| [U2a](#u2a) | Basecamp mini-app: build, assets, loadable via git | in part (code differs from the proposal) | 0 | 3 |
+| [U2b](#u2b) | Mini-app recipient view | in part (code differs from the proposal) | 0 | 2 |
+| [U2c](#u2c) | Mini-app creator view | in part (code differs from the proposal) | 0 | 3 |
 | [U3](#u3) | CLI: create, claim, cancel, signal, query claimable | in part | 12 | 3 |
-| [U4a](#u4a) | Mini-app pre-claim summary: claimable and fee | in part | 3 | 2 |
+| [U4a](#u4a) | Mini-app pre-claim summary: claimable and fee | in part | 3 | 3 |
 | [U4b](#u4b) | Private path: gas check with an actionable error | in part | 6 | 2 |
 | [U5](#u5) | Privacy disclosure before each private claim | in part | 7 | 2 |
 | [U6](#u6) | IDL with SPEL | shown | 2 | 2 |
-| [U7](#u7) | Actionable errors, next unlock when nothing is claimable | in part | 7 | 2 |
+| [U7](#u7) | Actionable errors, next unlock when nothing is claimable | in part | 7 | 3 |
 | [R1](#r1) | Atomic claim; retry without loss | shown | 6 | 2 |
 | [R2](#r2) | Atomic cancellation | shown | 5 | 2 |
 | [R3](#r3) | Concurrent claims on independent schedules | shown | 3 | 1 |
@@ -68,7 +68,7 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | [S1](#s1) | Deployed and tested on testnet 0.4 | waits on Logos | 2 | 1 |
 | [S2](#s2) | E2E against a standalone sequencer, in CI, green on main | shown | 7 | 4 |
 | [S3](#s3) | A test for every hard F/U/R/P requirement | in part | 1 | 1 |
-| [S4](#s4) | README: deployment, addresses, CLI and mini-app usage | in part | 0 | 1 |
+| [S4](#s4) | README: deployment, addresses, CLI and mini-app usage | in part | 0 | 2 |
 | [Pr1](#pr1) | Mini-app and SDK: public and private claims | in part | 5 | 2 |
 | [Pr2](#pr2) | Mini-app disclosure before each private claim | in part | 4 | 1 |
 | [Pr3](#pr3) | SDK refuses a non-private target on the private path | shown | 2 | 2 |
@@ -420,9 +420,9 @@ Records:
 
 **Status: in part.** Proposal row `U1`: in part.
 
-**Remaining:** The Logos Core module wrapper (`escapement_core_module`) over the Rust SDK is not built (M2).
+**Remaining:** The module has no signal-milestone, transfer-beneficiary or private-claim method yet and creates linear and cliff schedules only; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
 
-**Note:** The Rust SDK (`crates/escapement-sdk`) has builders for every operation and both assets, the claim gates and the error messages; every step of the sequencer suite goes through it.
+**Note:** The Rust SDK has builders for every operation and both assets, and every step of the sequencer suite goes through it. `escapement_core_module` (basecamp/) wraps it as a Logos Core module: configure, schedules (claimable now, next unlock), prepare_create (linear, cliff), prepare_claim (public), prepare_cancel, approve and reject; it ran in headless Logos Core (31 of 31 steps) and under Basecamp 0.4.0-rc.2, both on a local v0.4.0-rc3 sequencer.
 
 Tests:
 
@@ -438,6 +438,8 @@ Tests:
 Records:
 
 - [docs/EVIDENCE.md E-11](EVIDENCE.md)
+- [basecamp/RESULTS.md Headless Logos Core: 31 of 31](../basecamp/RESULTS.md): the module in headless Logos Core on a local sequencer; outside CI
+- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)
 
 ### U2a
 
@@ -445,9 +447,17 @@ Records:
 
 *RFP: Hard Requirements / Usability 2, first sentence.*
 
-**Status: not yet.** Proposal row `U2`: not yet.
+**Status: in part.** Proposal row `U2`: not yet.
 
-**Remaining:** The Basecamp mini-app is built in M3, over M2's `escapement_core_module`.
+**The code says otherwise:** The mini-app now exists (basecamp/, merged after the proposal was filed): build instructions in basecamp/README.md; both packages built with Nix, signed with a test key, and installed and used in Logos Basecamp 0.4.0-rc.2 from local .lgx files.
+
+**Remaining:** Release .lgx assets to download, and loading in Basecamp from the git repository (installed from local files so far, signed with a test key); the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+
+Records:
+
+- [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
+- [basecamp/README.md](../basecamp/README.md): build, install and method reference
+- [basecamp/RESULTS.md Packages (linux-amd64)](../basecamp/RESULTS.md): package hashes, build and signing
 
 ### U2b
 
@@ -455,9 +465,16 @@ Records:
 
 *RFP: Hard Requirements / Usability 2, first bullet.*
 
-**Status: not yet.** Proposal row `U2`: not yet.
+**Status: in part.** Proposal row `U2`: not yet.
 
-**Remaining:** Built in M3 with the mini-app; the SDK already computes claimable now and the next unlock (U7).
+**The code says otherwise:** The recipient view exists: in Basecamp 0.4.0-rc.2 on a local sequencer it showed claimable now, locked, next unlock and claimed, and made a public claim (basecamp/RESULTS.md shots 07-11, 15-16).
+
+**Remaining:** A test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`). The claim action is public only (no private claim from the view).
+
+Records:
+
+- [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
+- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (run with qmltestrunner, not by CI)
 
 ### U2c
 
@@ -465,9 +482,17 @@ Records:
 
 *RFP: Hard Requirements / Usability 2, second bullet.*
 
-**Status: not yet.** Proposal row `U2`: not yet.
+**Status: in part.** Proposal row `U2`: not yet.
 
-**Remaining:** Built in M3 with the mini-app.
+**The code says otherwise:** The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).
+
+**Remaining:** Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs; the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
+
+Records:
+
+- [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
+- [basecamp/escapement_ui/tests/qml/tst_view.qml](../basecamp/escapement_ui/tests/qml/tst_view.qml): the view's Qt Quick tests (run with qmltestrunner, not by CI)
+- [basecamp/escapement_core_module/rust-lib/calls/src/lib.rs](../basecamp/escapement_core_module/rust-lib/calls/src/lib.rs): the module's methods and tests (`cargo test -p escapement-module-calls`, not by CI)
 
 ### U3
 
@@ -510,7 +535,7 @@ Records:
 
 **Status: in part.** Proposal row `U4`: in part.
 
-**Remaining:** The mini-app that displays it (M3).
+**Remaining:** A test that CI runs. The module's `prepare_claim` returns the prompt the view shows before approval, with the claim's rows and the maximum fee, and the Basecamp run shows that prompt (shots 08-10), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
 
 **Note:** The SDK builds the summary the mini-app will show (`PreClaimSummary`: claimable now, estimated gas and fee, the payer's reserve).
 
@@ -524,6 +549,7 @@ Records:
 
 - [crates/escapement-sdk/src/summary.rs](../crates/escapement-sdk/src/summary.rs)
 - [crates/escapement-sdk/src/fees.rs](../crates/escapement-sdk/src/fees.rs)
+- [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
 
 ### U4b
 
@@ -533,7 +559,7 @@ Records:
 
 **Status: in part.** Proposal row `U4`: in part.
 
-**Remaining:** The mini-app's display (M3); a separate private fee-payer account (M2).
+**Remaining:** The mini-app has no private claim yet (public claims only); a separate private fee-payer account (M2).
 
 **Note:** The SDK refuses an under-funded private payer with the shortfall; the CLI checks the private account's balance against the exact fee reserve before proving, and the suite checks each balance after equals the credit less that reserve.
 
@@ -559,7 +585,7 @@ Records:
 
 **Status: in part.** Proposal row `U5`: in part.
 
-**Remaining:** The mini-app's disclosure screen (M3).
+**Remaining:** The mini-app has no private claim yet (public claims only), so no disclosure screen (M3).
 
 **Note:** The SDK's disclosure (PR 235's wording) is bound to a confirmation token for the exact claim; the CLI prints it with its token and sends only with `--confirm <token>`; a wrong token is refused before anything is proven.
 
@@ -606,7 +632,7 @@ Records:
 
 **Status: in part.** Proposal row `U7`: in part.
 
-**Remaining:** The mini-app's display (M3).
+**Remaining:** A test that CI runs of the view's messages: in Basecamp it refused an over-claim naming the claimable amount (shot 11) and showed the next unlock (shot 07), but the mini-app's and module's tests are not in CI yet, since the module's workspace needs the Logos Rust SDK source that `nix build` fetches, and the view's tests need Qt (`qmltestrunner`).
 
 **Note:** Exit codes 1..=35, each with an SDK message; "nothing claimable" carries the exact next unlock time; the CLI refuses before sending and `show` prints the next unlock.
 
@@ -624,6 +650,7 @@ Records:
 
 - [crates/escapement-sdk/src/codes.rs](../crates/escapement-sdk/src/codes.rs)
 - [crates/escapement-sdk/src/unlock.rs](../crates/escapement-sdk/src/unlock.rs)
+- [basecamp/RESULTS.md Logos Basecamp 0.4.0-rc.2](../basecamp/RESULTS.md): the mini-app used in Basecamp's window on a local sequencer (screenshots); outside CI
 
 ## Hard requirements: Reliability
 
@@ -818,7 +845,7 @@ Records:
 
 **Status: in part.** Proposal row `S3`: in part.
 
-**Remaining:** The mini-app clauses (U2a, U2b, U2c) have no test until the mini-app exists (M3); the testnet halves of F6 and P2 get theirs in M4.
+**Remaining:** U2a, U2b and U2c have tests (the view's Qt Quick tests, the module's Rust tests) that CI does not run yet (they need Qt and Nix); the testnet halves of F6 and P2 get theirs in M4.
 
 **Note:** This map is the traceability matrix; CI computes S3 from it.
 
@@ -838,13 +865,14 @@ Records:
 
 **Status: in part.** Proposal row `S4`: in part.
 
-**Remaining:** Mini-app instructions (M3) and LEZ testnet 0.4 program addresses (M4).
+**Remaining:** LEZ testnet 0.4 program addresses (M4). The README links basecamp/README.md for the mini-app's build, install and module calls; a step-by-step walk through creating, claiming and cancelling in the mini-app is in basecamp/RESULTS.md (the Basecamp run), not yet in a README.
 
 **Note:** The README has the quickstart, the deployment and the CLI usage.
 
 Records:
 
 - [README.md](../README.md)
+- [basecamp/README.md](../basecamp/README.md): build, install and method reference
 
 ## Hard requirements: + Privacy
 
@@ -856,7 +884,7 @@ Records:
 
 **Status: in part.** Proposal row `Pr1–Pr2`: in part.
 
-**Remaining:** The mini-app (M3).
+**Remaining:** Private claims from the mini-app (it claims to public accounts only, M3).
 
 **Note:** The SDK (and the CLI through it) claims to public accounts and into the beneficiary's own private account.
 
@@ -881,7 +909,7 @@ Records:
 
 **Status: in part.** Proposal row `Pr1–Pr2`: in part.
 
-**Remaining:** The mini-app's disclosure screen (M3).
+**Remaining:** The mini-app has no private claim yet, so no disclosure screen (M3).
 
 **Note:** As U5: the SDK's disclosure names these items and is bound to a confirmation token; the CLI shows it and sends only with that token.
 

@@ -1607,7 +1607,8 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
     expect("unknown E2E check", "is not a check of", rmap_mut=lambda m: first(m, "shown")["tests"].append({"e2e": "no-such-step"}))
     expect("shown without tests", "names no test", rmap_mut=lambda m: first(m, "shown").update(tests=[]))
     expect("in part without remaining", "does not say what is missing", rmap_mut=lambda m: first(m, "in part").update(remaining=""))
-    expect("not yet without milestone", "names no milestone", rmap_mut=lambda m: clause(m, "U2a").update(remaining="later"))
+    expect("not yet without milestone", "names no milestone", rmap_mut=lambda m: (
+        clause(m, "U2a").pop("code_says", None), clause(m, "U2a").update(status="not yet", remaining="later")))
     expect("waits on Logos without testnet", "does not name LEZ testnet 0.4", rmap_mut=lambda m: clause(m, "P2").update(remaining="later"))
     expect("status differs silently", "differs from the proposal", rmap_mut=lambda m: clause(m, "U1").update(status="shown"))
     expect("code_says on an equal status", "`code_says` is set but", rmap_mut=lambda m: clause(m, "F1").update(code_says="x"))
