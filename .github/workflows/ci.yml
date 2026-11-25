@@ -187,6 +187,21 @@ jobs:
             e2e/.run/out/
             !e2e/.run/out/keys/
 
+  # The run records in docs/records/: each record's raw files hashed, its figures re-derived from
+  # them, its commits and quoted docs checked, and every proposal figure in docs/records/claims.json
+  # compared with the record it cites. Python 3 standard library only.
+  records:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # The records name the commits they ran on (9d35262, 2ddc57c) and compare their trees.
+          fetch-depth: 0
+
+      - name: Re-check the run records against their raw files
+        run: python3 scripts/verify-records.py --require-history
+
   # Optional, manual-only (`workflow_dispatch`): reproduces the in-process real STARK
   # proof (RISC0_DEV_MODE=0) end to end. Too slow to gate every push, but kept
   # in CI so the non-dev-mode claim can never silently rot.

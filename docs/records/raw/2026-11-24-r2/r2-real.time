@@ -1,0 +1,98 @@
+PASS probe
+PASS deploy-immutable-and-init-admin
+PASS header-immutable-and-image-id
+PASS fund-beneficiary
+PASS fund-second
+PASS unknown-flag-refused
+PASS dry-run-create
+PASS dry-run-created-nothing
+PASS create-linear
+PASS escrow-holds-total
+PASS claim-public-partial
+PASS claim-public-applied
+PASS refusal-overclaim-sent-on-chain
+PASS refusal-overclaim-reverted-state-unchanged
+PASS private-account-new
+PASS key-file-written-0600
+PASS claim-private-new-account-prepare
+PASS claim-private-new-account-disclosure-shown-and-nothing-sent
+PASS claim-private-new-account-confirm
+PASS claim-private-new-account-applied
+PASS claim-private-prepare-again
+PASS claim-private-wrong-token-refused
+PASS claim-private-wrong-token-changed-nothing
+PASS claim-private-same-account-confirm
+PASS claim-private-same-account-applied
+PASS private-account-show
+PASS private-account-state-on-chain
+PASS cancel-by-creator
+PASS cancel-applied
+PASS cancel-froze-vesting
+PASS claim-vested-after-cancel
+PASS vested-remainder-claimed
+PASS escrow-empty-after-cancel-and-claim
+PASS create-milestone
+PASS refusal-creator-signal-sent-on-chain
+PASS refusal-creator-signal-reverted-state-unchanged
+PASS signal-by-authority
+PASS signal-applied
+PASS refusal-double-signal-sent-on-chain
+PASS refusal-double-signal-reverted-state-unchanged
+PASS claim-milestone-tranche
+PASS milestone-tranche-received
+PASS create-transferable
+PASS transfer-beneficiary
+PASS transfer-applied
+PASS refusal-old-beneficiary-sent-on-chain
+PASS refusal-old-beneficiary-reverted-state-unchanged
+PASS claim-by-new-beneficiary
+PASS new-beneficiary-received
+PASS create-for-noncancelable
+PASS make-non-cancelable
+PASS non-cancelable-applied
+PASS refusal-cancel-after-noncancelable-sent-on-chain
+PASS refusal-cancel-after-noncancelable-reverted-state-unchanged
+PASS refusal-beneficiary-cancels-sent-on-chain
+PASS refusal-beneficiary-cancels-reverted-state-unchanged
+PASS deploy-token-program
+PASS configure-token-program
+PASS token-program-configured
+PASS token-definition
+PASS token-supply-at-creator
+PASS beneficiary-public-token-holding
+PASS create-token-linear
+PASS token-escrow-holds-total
+PASS claim-token-public
+PASS claim-token-public-applied
+PASS shield-native-for-fees
+PASS shield-applied
+PASS private-token-holding
+PASS private-token-holding-applied
+PASS claim-private-token-prepare
+PASS claim-private-token-disclosure-shown-and-nothing-sent
+PASS claim-private-token-confirm
+PASS claim-private-token-applied
+PASS getEvents-is-not-a-sequencer-rpc-on-rc3
+	Command being timed: "env E2E_DEV_MODE=0 E2E_OUT=<workdir>/e2e/.run/out-r2-real bash e2e/run_e2e.sh"
+	User time (seconds): 37763.51
+	System time (seconds): 984.94
+	Percent of CPU this job got: 2484%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 25:59.61
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 9710956
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 0
+	Voluntary context switches: 17277910
+	Involuntary context switches: 0
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

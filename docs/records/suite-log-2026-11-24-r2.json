@@ -1,0 +1,245 @@
+{
+ "schema": "escapement-record/1",
+ "id": "suite-log-2026-11-24-r2",
+ "kind": "suite-log",
+ "title": "The 24 Nov round's driver log: format check, guest check, signer-authority tests with their printed cycles, SDK tests, token guest cold build, then the two suite runs above",
+ "evidence_row": "docs/EVIDENCE.md E-03, E-04, E-11",
+ "date": "2026-11-24",
+ "rerun": "RISC0_DEV_MODE=1 cargo test -p escapement-tests --test escapement_e2e sec_ -- --nocapture; cargo test -p escapement-sdk --locked",
+ "source_tree": {
+  "commit": "9d352621b421174b3ac5fbe780e1896f24eac973",
+  "how_known": "inferred, not logged: the round's log (r2-t4.log) starts at 2026-11-24T22:53:22Z from an uncommitted working tree, which was committed as 0e8a142 and 9d35262 at 22:58:47Z; no log line names a commit. The deployed guest is pinned independently by its image id (record guest-adc8b81f).",
+  "differences_through_2ddc57c": "crates/escapement-tests/tests/escapement_e2e.rs: one line, a type annotation removed for clippy (7a593e1); no test logic changed"
+ },
+ "hardware": {
+  "text": "Linux x86-64 cloud container (gVisor), CPU only, 32 vCPUs visible, 64 GiB RAM; the container requests 2 cores and bursts",
+  "source": "docs/EVIDENCE.md at 2ddc57c (prose; the run's own files do not record the machine)"
+ },
+ "artifacts": {
+  "log": {
+   "path": "docs/records/raw/2026-11-24-r2/r2-t4.log",
+   "sha256": "18502e9bf9ae1902aeab0c924841517494bbc623fc69f8e420d2dadb483ccbc1",
+   "bytes": 13384,
+   "original_path": "e2e/.run/r2-t4.log",
+   "original_sha256": "af58b8fd3ee58c759c40e8531bbcd2c72c95257da883344d2d65b2b769004266",
+   "original_bytes": 13854,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "the round's driver output, each step filtered by the driver (e.g. grep): only the lines it kept are here (test result lines, not every test line); the commands and filters are not logged"
+  }
+ },
+ "notes": [
+  "The commands the driver ran are not in the log; only its section headers and markers are.",
+  "The clippy section shows the two guest build scripts failing (exit status 101) and no clippy exit status, so this log does not show a clean clippy run (CI's clippy step sets RISC0_SKIP_BUILD=1 for that reason).",
+  "The sec_ filter ran 3 tests and filtered out 12, so the test binary held 15 tests; the other in-process suites are not in this log."
+ ],
+ "provenance": {
+  "checks": [
+   {
+    "type": "git-numstat",
+    "from": "9d352621b421174b3ac5fbe780e1896f24eac973",
+    "to": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "paths": [
+     "crates/escapement-tests",
+     "crates/escapement-test-methods",
+     "crates/escapement-sdk",
+     "crates/escapement-program",
+     "crates/escapement-core",
+     "crates/escapement-methods"
+    ],
+    "expect": [
+     "1\t1\tcrates/escapement-tests/tests/escapement_e2e.rs"
+    ]
+   },
+   {
+    "type": "doc-contains",
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "32 vCPUs visible, 64 GiB RAM"
+   }
+  ]
+ },
+ "measured": {
+  "start": "2026-11-24T22:53:22+00:00",
+  "all_done": "2026-11-24T23:24:21+00:00",
+  "markers": [
+   "FMT_OK",
+   "CLIPPY_DONE",
+   "SEC_EXIT=0",
+   "SDK_EXIT=0",
+   "TOKEN_COLD_BUILD_OK same=yes",
+   "DEV_E2E_EXIT=0 136s",
+   "REAL_EXIT=0",
+   "ALL_DONE 2026-11-24T23:24:21+00:00"
+  ],
+  "sections": [
+   "== SDK",
+   "== token program guest from a cold target (as CI's e2e job builds it)",
+   "== dev E2E with the final script",
+   "== real-proof suite 2026-11-24T22:58:22+00:00",
+   "== real records",
+   "== proofs"
+  ],
+  "guest_check": true,
+  "clippy": {
+   "build_script_failures": 2,
+   "exit_status_logged": false
+  },
+  "sec_relay": [
+   {
+    "op": "ClaimPublic",
+    "code": 35,
+    "cycles": 12715
+   },
+   {
+    "op": "ClaimExact",
+    "code": 35,
+    "cycles": 13110
+   },
+   {
+    "op": "TransferBeneficiary",
+    "code": 35,
+    "cycles": 12643
+   },
+   {
+    "op": "Cancel",
+    "code": 35,
+    "cycles": 12115
+   },
+   {
+    "op": "MakeNonCancelable",
+    "code": 35,
+    "cycles": 12115
+   },
+   {
+    "op": "SignalMilestone",
+    "code": 35,
+    "cycles": 12191
+   },
+   {
+    "op": "CreateSchedule",
+    "code": 35,
+    "cycles": 16650
+   },
+   {
+    "op": "BatchCreate",
+    "code": 35,
+    "cycles": 16640
+   },
+   {
+    "op": "WithdrawFees",
+    "code": 35,
+    "cycles": 12989
+   }
+  ],
+  "sec_pda_neg": [
+   {
+    "op": "ClaimPublic",
+    "code": 35
+   },
+   {
+    "op": "ClaimExact",
+    "code": 35
+   },
+   {
+    "op": "TransferBeneficiary",
+    "code": 35
+   },
+   {
+    "op": "Cancel",
+    "code": 35
+   },
+   {
+    "op": "MakeNonCancelable",
+    "code": 35
+   },
+   {
+    "op": "SignalMilestone",
+    "code": 35
+   },
+   {
+    "op": "CreateSchedule",
+    "code": 35
+   },
+   {
+    "op": "BatchCreate",
+    "code": 35
+   },
+   {
+    "op": "WithdrawFees",
+    "code": 35
+   }
+  ],
+  "sec_admin_relay": [
+   {
+    "op": "Configure",
+    "error": "E120"
+   },
+   {
+    "op": "Renounce",
+    "error": "E120"
+   }
+  ],
+  "sec_forged": [
+   {
+    "message": "Internal::ClaimPublic",
+    "code": 32,
+    "cycles": 15686
+   },
+   {
+    "message": "StateReply",
+    "code": 32,
+    "cycles": 15663
+   },
+   {
+    "message": "clock Reply::Timestamp",
+    "code": 32,
+    "cycles": 15350
+   }
+  ],
+  "sec_async": [
+   {
+    "case": "ClaimPublic, the beneficiary signing, as an async message from another program",
+    "code": 35
+   },
+   {
+    "case": "CreateSchedule, the creator signing, as an async message from another program",
+    "code": 35
+   },
+   {
+    "case": "AsPda Cancel from the PDA's own program, as an async message from another program",
+    "code": 35
+   }
+  ],
+  "tests_ok": [
+   "sec_pda_cpi_succeeds_and_inherited_seed_relay_refused",
+   "sec_relay_eoa_refused",
+   "sec_signer_authority_review_gaps"
+  ],
+  "test_results": [
+   {
+    "section": "start",
+    "result": "ok",
+    "passed": 3,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 12
+   },
+   {
+    "section": "SDK",
+    "result": "ok",
+    "passed": 20,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0
+   },
+   {
+    "section": "SDK",
+    "result": "ok",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0
+   }
+  ]
+ }
+}

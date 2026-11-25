@@ -1,0 +1,1407 @@
+{
+ "schema": "escapement-record/1",
+ "id": "e2e-sequencer-real-proof-2026-11-24",
+ "kind": "e2e-sequencer-run",
+ "title": "Standalone-sequencer suite with real proofs (E2E_DEV_MODE=0): 75/75 checks; five privacy-preserving transactions proven with real RISC Zero proofs and verified by the sequencer",
+ "evidence_row": "docs/EVIDENCE.md E-13",
+ "date": "2026-11-24",
+ "rerun": "e2e/sequencer.sh build && E2E_DEV_MODE=0 e2e/run_e2e.sh",
+ "source_tree": {
+  "commit": "9d352621b421174b3ac5fbe780e1896f24eac973",
+  "how_known": "inferred, not logged: the round's log (r2-t4.log) starts at 2026-11-24T22:53:22Z from an uncommitted working tree, which was committed as 0e8a142 and 9d35262 at 22:58:47Z; no log line names a commit. The deployed guest is pinned independently by its image id (record guest-adc8b81f).",
+  "unchanged_through": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+  "unchanged_paths": [
+   "e2e",
+   "crates/escapement-core",
+   "crates/escapement-program",
+   "crates/escapement-methods",
+   "crates/escapement-cli",
+   "crates/escapement-sdk",
+   "Cargo.toml",
+   "Cargo.lock",
+   "image-ids.tsv",
+   "rust-toolchain.toml"
+  ]
+ },
+ "environment": {
+  "text": "unmodified standalone LEZ v0.4.0-rc3 sequencer (sequencer_service --features standalone, mock Bedrock, commit bafd07be asserted by e2e/sequencer.sh), loopback only, driven by escapement-cli",
+  "source": "e2e/sequencer.sh and docs/EVIDENCE.md at 2ddc57c"
+ },
+ "hardware": {
+  "text": "Linux x86-64 cloud container (gVisor), CPU only, 32 vCPUs visible, 64 GiB RAM; the container requests 2 cores and bursts",
+  "source": "docs/EVIDENCE.md at 2ddc57c (prose; the run's own files do not record the machine)"
+ },
+ "artifacts": {
+  "jsonl": {
+   "path": "docs/records/raw/2026-11-24-r2/out-r2-real/e2e.jsonl",
+   "sha256": "98f9a37e9e697cf4f99fd41ffd2260b4505b958b12663a7d3b2303bbb4917e05",
+   "bytes": 31328,
+   "original_path": "e2e/.run/out-r2-real/e2e.jsonl",
+   "original_sha256": "c6124ab39b2446a160c541b8443349157baa3aa3ce2d8806ec1ef9d6c27853ba",
+   "original_bytes": 31536,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "the suite's records: one JSON line per check (e2e/run_e2e.sh `record`)"
+  },
+  "time": {
+   "path": "docs/records/raw/2026-11-24-r2/r2-real.time",
+   "sha256": "a70052eef5bcf3e21fe4123e55cb46c9cb7288c02149f05f508be0538f929a44",
+   "bytes": 3301,
+   "original_path": "e2e/.run/r2-real.time",
+   "original_sha256": "07aba2215b2b56b86a3ec7e783f2cfd99667e270fe857ca3ccc5250af004f6eb",
+   "original_bytes": 3353,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "the suite's stdout (one PASS line per check) followed by GNU `time -v` of the whole suite"
+  },
+  "log": {
+   "path": "docs/records/raw/2026-11-24-r2/r2-t4.log",
+   "sha256": "18502e9bf9ae1902aeab0c924841517494bbc623fc69f8e420d2dadb483ccbc1",
+   "bytes": 13384,
+   "original_path": "e2e/.run/r2-t4.log",
+   "original_sha256": "af58b8fd3ee58c759c40e8531bbcd2c72c95257da883344d2d65b2b769004266",
+   "original_bytes": 13854,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "the round's driver log; this record reads its real-proof section",
+   "section": {
+    "from": "== real-proof suite",
+    "to": "== real records"
+   }
+  }
+ },
+ "notes": [
+  "start is the log's section timestamp (1 s resolution, printed just before GNU time started); end is start + GNU time's elapsed, so it is good to about 1 s (the log's ALL_DONE, printed after the records were summarised, is 2026-11-24T23:24:21+00:00).",
+  "\"Verified by the sequencer\" is inferred, not logged: the raw files hold the CLI's dev_mode false, ~238 KB proofs and the transactions included and not reverted; the sequencer's own RISC0_DEV_MODE is not in them. It follows from GNU time's command line (E2E_DEV_MODE=0, measured.time.e2e_dev_mode_in_command) and e2e/sequencer.sh, which starts the sequencer with RISC0_DEV_MODE unset unless E2E_DEV_MODE=1 (provenance check below).",
+  "cpu_percent is GNU time's (user + system) / elapsed: 2484% = about 24.8 cores busy on average over the whole suite; user time alone / elapsed = 24.2.",
+  "max_rss_kib is GNU time's maximum resident set size of the largest single process in the tree, in KiB: 9,710,956 KiB = 9.94 GB = 9.26 GiB, as reported by the gVisor sandbox's getrusage (several other rusage fields are 0 in this file); GNU time's version is not recorded.",
+  "prove_s is escapement-cli's wall-clock time around lee::execute_and_prove for that transaction (crates/escapement-cli/src/main.rs), on the machine above.",
+  "native_credit is derived, not logged: the private account's native balance after the transaction, less the balance after the previous one, plus the fee reserve it paid.",
+  "private_account_id_in_tx_bytes and private_commitment_found are escapement-cli's own checks (the transaction's bytes searched for the private account id; getProofsAndRoot for the new commitment). The transaction bytes themselves were not saved.",
+  "Requests and answers: the suite writes one JSON line per check holding the CLI command's JSON answer (measured.answers hashes each line; the full answers are in the raw file). The JSON-RPC requests the CLI sent are not logged; the getEvents line is the sequencer's raw JSON-RPC answer."
+ ],
+ "provenance": {
+  "checks": [
+   {
+    "type": "git-unchanged",
+    "from": "9d352621b421174b3ac5fbe780e1896f24eac973",
+    "to": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "paths": [
+     "e2e",
+     "crates/escapement-core",
+     "crates/escapement-program",
+     "crates/escapement-methods",
+     "crates/escapement-cli",
+     "crates/escapement-sdk",
+     "Cargo.toml",
+     "Cargo.lock",
+     "image-ids.tsv",
+     "rust-toolchain.toml"
+    ],
+    "expect": []
+   },
+   {
+    "type": "doc-contains",
+    "file": "e2e/sequencer.sh",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "bafd07be"
+   },
+   {
+    "type": "doc-contains",
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "32 vCPUs visible, 64 GiB RAM"
+   },
+   {
+    "type": "doc-contains",
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "container requests 2 cores and bursts"
+   },
+   {
+    "type": "doc-contains",
+    "file": "e2e/sequencer.sh",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "local devenv=(env -u RISC0_DEV_MODE)"
+   }
+  ]
+ },
+ "measured": {
+  "checks": {
+   "total": 75,
+   "passed": 75,
+   "failed": 0,
+   "distinct_steps": 75
+  },
+  "answers": [
+   {
+    "line": 1,
+    "step": "probe",
+    "ok": true,
+    "command": "probe",
+    "sha256": "41a9c8e916e2967886588920c122155b08802a1a9c6850e1cc8df092a1751153"
+   },
+   {
+    "line": 2,
+    "step": "deploy-immutable-and-init-admin",
+    "ok": true,
+    "command": "deploy",
+    "sha256": "856047003fef3e17b24e90b78bd8953cba0b9303b6800eaca93bc6ed79cb3664"
+   },
+   {
+    "line": 3,
+    "step": "header-immutable-and-image-id",
+    "ok": true,
+    "command": "deploy",
+    "sha256": "7aa31956136c3cbd6a0b6674d18046c613af49e152a16a63cc688ac3f9b38930"
+   },
+   {
+    "line": 4,
+    "step": "fund-beneficiary",
+    "ok": true,
+    "command": "fund",
+    "sha256": "14f611c54230130f67f113d4b756a875a3009f743289cc6758302ba0f4efb0f7"
+   },
+   {
+    "line": 5,
+    "step": "fund-second",
+    "ok": true,
+    "command": "fund",
+    "sha256": "5b559cd155fa109f86235a2e89975a7abdd39349e66518e3e992fc13211cf95a"
+   },
+   {
+    "line": 6,
+    "step": "unknown-flag-refused",
+    "ok": true,
+    "command": null,
+    "sha256": "dd0e79f3e6a4b8cc2ad133ffaac38bbc23a9104e751bc0c568e25be0b2c949f9"
+   },
+   {
+    "line": 7,
+    "step": "dry-run-create",
+    "ok": true,
+    "command": "create",
+    "sha256": "31d4b83a1291197d50d462607e7d1f782953b9e6a3551763481cddecc9d9317f"
+   },
+   {
+    "line": 8,
+    "step": "dry-run-created-nothing",
+    "ok": true,
+    "command": null,
+    "sha256": "64c906509e9e26ccea49e5cffaba505a29dea0f9e42c6b89494c4af0962e8613"
+   },
+   {
+    "line": 9,
+    "step": "create-linear",
+    "ok": true,
+    "command": "create",
+    "sha256": "8a170f73a6e1243f196feabdf7cf423cc7339894f5efb6514869707bab7a41c1"
+   },
+   {
+    "line": 10,
+    "step": "escrow-holds-total",
+    "ok": true,
+    "command": "create",
+    "sha256": "c572de9f83a532c14b553865b6d2ad72a4239d389fb38f1d6830456724a63dc7"
+   },
+   {
+    "line": 11,
+    "step": "claim-public-partial",
+    "ok": true,
+    "command": "claim",
+    "sha256": "0e882ed1d395ada3a4630ac9b85431996692f28f167dd9989d30695691ae7f12"
+   },
+   {
+    "line": 12,
+    "step": "claim-public-applied",
+    "ok": true,
+    "command": "claim",
+    "sha256": "fd61325c8d6431c44fbc3ab96a4e1d9c38a3d87300c99796a91f57d25fbacd4f"
+   },
+   {
+    "line": 13,
+    "step": "refusal-overclaim-sent-on-chain",
+    "ok": true,
+    "command": "claim",
+    "sha256": "c540da0c69fbb89b1148396498cc4fd6de75f50951d558f2d0b8d9811400a599"
+   },
+   {
+    "line": 14,
+    "step": "refusal-overclaim-reverted-state-unchanged",
+    "ok": true,
+    "command": "claim",
+    "sha256": "50f9128f0fd8b163c27af0b5a36f985244737bbcf6d5a81842579df30f7d1fd7"
+   },
+   {
+    "line": 15,
+    "step": "private-account-new",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "796126a5735bbe81f7c62d102503f96f3856535b61dc0045cbf1a30b5f196c83"
+   },
+   {
+    "line": 16,
+    "step": "key-file-written-0600",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "ba5381e6a90dcc6f82738336b5b05d7183cafdaf8668cdbe51f89ae37a85088e"
+   },
+   {
+    "line": 17,
+    "step": "claim-private-new-account-prepare",
+    "ok": true,
+    "command": "claim",
+    "sha256": "28a8d1f13c617b69c48a7dd106345aaebab30fe50a6d591b01b3c65d607e3727"
+   },
+   {
+    "line": 18,
+    "step": "claim-private-new-account-disclosure-shown-and-nothing-sent",
+    "ok": true,
+    "command": "claim",
+    "sha256": "c212214fcb0ae03da0c192311d2f5cb76853884a62ee959f71899f8a2514a227"
+   },
+   {
+    "line": 19,
+    "step": "claim-private-new-account-confirm",
+    "ok": true,
+    "command": "claim",
+    "sha256": "0dd00cc618e997a2fa4207071a660d198bea96c6f1c4ab256568a510dee5f8b3"
+   },
+   {
+    "line": 20,
+    "step": "claim-private-new-account-applied",
+    "ok": true,
+    "command": "claim",
+    "sha256": "d6f71ad43615e0c5900f7515f9e3597595b6f1b1d857c376faa8d7fd669d7db6"
+   },
+   {
+    "line": 21,
+    "step": "claim-private-prepare-again",
+    "ok": true,
+    "command": "claim",
+    "sha256": "f0a33723a33abc796e4d6939e919440d0698ee70f9bddffdb41f34cf988e7c65"
+   },
+   {
+    "line": 22,
+    "step": "claim-private-wrong-token-refused",
+    "ok": true,
+    "command": null,
+    "sha256": "943831526c4286fca9f52a92097c26db679298af7542586ba5d3e370240aeccb"
+   },
+   {
+    "line": 23,
+    "step": "claim-private-wrong-token-changed-nothing",
+    "ok": true,
+    "command": null,
+    "sha256": "6231f5898e13fcc7444af1da4754cdf33543a7fd8c6f9f895d94ba06adb872df"
+   },
+   {
+    "line": 24,
+    "step": "claim-private-same-account-confirm",
+    "ok": true,
+    "command": "claim",
+    "sha256": "d71d4dfb97ebdf7e1bde1248bf7b8c57faf8064069f68da9b29a46b8fe3462a7"
+   },
+   {
+    "line": 25,
+    "step": "claim-private-same-account-applied",
+    "ok": true,
+    "command": "claim",
+    "sha256": "7c720d22ae558ef3336f689f42bffe4defe2cddbfecc9d6707429e41676b28c4"
+   },
+   {
+    "line": 26,
+    "step": "private-account-show",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "cede80252a33270154b1cadd19ba0b817bde490a381526ecb72bd871c1516bfb"
+   },
+   {
+    "line": 27,
+    "step": "private-account-state-on-chain",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "5537af55bc271cab9d36df5be1c0d4068cca15a8bad76f48c15f569b92e9032a"
+   },
+   {
+    "line": 28,
+    "step": "cancel-by-creator",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "718bd3c4ef80a5c130dc448296d37b58cbd6892a5f3d5bca507b59455f5c1b0d"
+   },
+   {
+    "line": 29,
+    "step": "cancel-applied",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "c895f9ecb720446567558921de57a447aec34489a9eaca248092a901f7ecd7b8"
+   },
+   {
+    "line": 30,
+    "step": "cancel-froze-vesting",
+    "ok": true,
+    "command": "show",
+    "sha256": "0b3eba96d3f785b087101f6bdaf63201cd1a9c1f1078aef084f995616a937ab8"
+   },
+   {
+    "line": 31,
+    "step": "claim-vested-after-cancel",
+    "ok": true,
+    "command": "claim",
+    "sha256": "42e5cb9c6dc546fac3bc9cc1170dacb4bb24475ac9ec30761268c9ef76d1aa90"
+   },
+   {
+    "line": 32,
+    "step": "vested-remainder-claimed",
+    "ok": true,
+    "command": "claim",
+    "sha256": "3d98a2a81300ae30e02689eabe937c74b33ac9fb73f9c78b226bb4297115a4b5"
+   },
+   {
+    "line": 33,
+    "step": "escrow-empty-after-cancel-and-claim",
+    "ok": true,
+    "command": "show",
+    "sha256": "56d6b27f2e860d68050b7a4af65fbc11d7958fe7de3456c623ae92f082e7fa09"
+   },
+   {
+    "line": 34,
+    "step": "create-milestone",
+    "ok": true,
+    "command": "create",
+    "sha256": "c4192b53e234eed20790e0fb3b423f877ada10816fb69e625dbc4e11514b0e96"
+   },
+   {
+    "line": 35,
+    "step": "refusal-creator-signal-sent-on-chain",
+    "ok": true,
+    "command": "signal",
+    "sha256": "4040d33d288d18db06f4d3e6f04ad5cf1e9718e3c375c85095deb3f014caf494"
+   },
+   {
+    "line": 36,
+    "step": "refusal-creator-signal-reverted-state-unchanged",
+    "ok": true,
+    "command": "signal",
+    "sha256": "ebdaa9dc91ae56029a41184f2facd5da1a6abc4212c1085adae8cf6059372ce2"
+   },
+   {
+    "line": 37,
+    "step": "signal-by-authority",
+    "ok": true,
+    "command": "signal",
+    "sha256": "d7cfe85c6c1b13eee533b533939c90a9dc3fb10144f9ace99a91aeddff60a304"
+   },
+   {
+    "line": 38,
+    "step": "signal-applied",
+    "ok": true,
+    "command": "signal",
+    "sha256": "804573da37f41329e23263c8f9e31cba5e65d476dfe1d05e8747e5713788f62e"
+   },
+   {
+    "line": 39,
+    "step": "refusal-double-signal-sent-on-chain",
+    "ok": true,
+    "command": "signal",
+    "sha256": "ec717f1847ae451c8d9ec7a922535937574cdc7bb9372e63d4ace19ff67de9be"
+   },
+   {
+    "line": 40,
+    "step": "refusal-double-signal-reverted-state-unchanged",
+    "ok": true,
+    "command": "signal",
+    "sha256": "458b95fd456076abec989b4d3a7294bdca6e26762cdfb0eb605531940099e1c2"
+   },
+   {
+    "line": 41,
+    "step": "claim-milestone-tranche",
+    "ok": true,
+    "command": "claim",
+    "sha256": "1c587f46725b49ecb917df00d7a042a0713bce6446a33fe6510060bf279b057d"
+   },
+   {
+    "line": 42,
+    "step": "milestone-tranche-received",
+    "ok": true,
+    "command": "claim",
+    "sha256": "18d440df259f7f5c97929814585b28ad622095d374e2611244091b02295c24ef"
+   },
+   {
+    "line": 43,
+    "step": "create-transferable",
+    "ok": true,
+    "command": "create",
+    "sha256": "8b9bd272ede856069851c4dd02bfc047d1367d2c47f60d5e7566b030343bc9a3"
+   },
+   {
+    "line": 44,
+    "step": "transfer-beneficiary",
+    "ok": true,
+    "command": "transfer-beneficiary",
+    "sha256": "871eea8487ce23905ca3741c306a4340daa0401176d4cadb9b74cc58cfa72bee"
+   },
+   {
+    "line": 45,
+    "step": "transfer-applied",
+    "ok": true,
+    "command": "transfer-beneficiary",
+    "sha256": "3debb51d50e80f2b06b59b29fa139de2006b4458bdca56337d9957ab7097e903"
+   },
+   {
+    "line": 46,
+    "step": "refusal-old-beneficiary-sent-on-chain",
+    "ok": true,
+    "command": "claim",
+    "sha256": "840edba0b4dd9847576de6406cd39f14a28f8c645130b846a5ec075032f0815c"
+   },
+   {
+    "line": 47,
+    "step": "refusal-old-beneficiary-reverted-state-unchanged",
+    "ok": true,
+    "command": "claim",
+    "sha256": "3165ca09f6f3acd2d4c0114a58b9456ced5e2add560809f17d06a754b68524cc"
+   },
+   {
+    "line": 48,
+    "step": "claim-by-new-beneficiary",
+    "ok": true,
+    "command": "claim",
+    "sha256": "5684053007504da94c7ba50b7e6b1486829157f85a51d32a5ec0c49269f51084"
+   },
+   {
+    "line": 49,
+    "step": "new-beneficiary-received",
+    "ok": true,
+    "command": "claim",
+    "sha256": "213eaa4fcf3b00c45c601480ec8ce40e26dcb9af63ca59c72c061fc333361c4e"
+   },
+   {
+    "line": 50,
+    "step": "create-for-noncancelable",
+    "ok": true,
+    "command": "create",
+    "sha256": "18caab8a44c87aee027f57ea7d5990e2928e2474cf4441c5a0c297b5ad23341d"
+   },
+   {
+    "line": 51,
+    "step": "make-non-cancelable",
+    "ok": true,
+    "command": "make-non-cancelable",
+    "sha256": "4baaa85fda823d0b24df86282daf08cdbd092c19b251069f401c9c210328c7fc"
+   },
+   {
+    "line": 52,
+    "step": "non-cancelable-applied",
+    "ok": true,
+    "command": "make-non-cancelable",
+    "sha256": "2e608529a72d4503dbe7374713c683d739a8b20b0e694ed280bdf1118c8857ec"
+   },
+   {
+    "line": 53,
+    "step": "refusal-cancel-after-noncancelable-sent-on-chain",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "89bdbb2f450c36d080599186e188572a30ece8dbd5dbe39de266f2918e452a0e"
+   },
+   {
+    "line": 54,
+    "step": "refusal-cancel-after-noncancelable-reverted-state-unchanged",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "6936f3dcdc4c794be0cf39377c9ed6ba5334bd3672b81f40e561d4fe090ce3bb"
+   },
+   {
+    "line": 55,
+    "step": "refusal-beneficiary-cancels-sent-on-chain",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "8f65c4b2da5b1729fb2f5836cfcdf3b060e7cc10ae6736cb7c30e1d9f1720c4f"
+   },
+   {
+    "line": 56,
+    "step": "refusal-beneficiary-cancels-reverted-state-unchanged",
+    "ok": true,
+    "command": "cancel",
+    "sha256": "67d8c6771de3f4fab0230ebcd9ad0fa9b9499b78fd2dff8f89a242cf5883c0f2"
+   },
+   {
+    "line": 57,
+    "step": "deploy-token-program",
+    "ok": true,
+    "command": "deploy",
+    "sha256": "7ad4807822616ed45212d9b57a31982018a29ef2cef19678efd968bf49579678"
+   },
+   {
+    "line": 58,
+    "step": "configure-token-program",
+    "ok": true,
+    "command": "configure",
+    "sha256": "5422095d72af9b7ae54f9548e5d718715126ea6abd5c0eb1f1b229fc18192922"
+   },
+   {
+    "line": 59,
+    "step": "token-program-configured",
+    "ok": true,
+    "command": "configure",
+    "sha256": "b7245c3653c2df9f4e0dc1eeadb1e4c3ea6d03cd3f83f5eb2db0779c25a82881"
+   },
+   {
+    "line": 60,
+    "step": "token-definition",
+    "ok": true,
+    "command": "token",
+    "sha256": "ec066b01a9cb7c4522369832bf2b1acbbd8466b01048a382bb7b07f8b8057b30"
+   },
+   {
+    "line": 61,
+    "step": "token-supply-at-creator",
+    "ok": true,
+    "command": "token",
+    "sha256": "8c9b31b699b9f97ac998ae31d0af8967b36b025f0c9867fb2ee00ba2420ba7b3"
+   },
+   {
+    "line": 62,
+    "step": "beneficiary-public-token-holding",
+    "ok": true,
+    "command": "token",
+    "sha256": "b8e441b60beb442bc6de4be1838d01b441b7617148c3130ac06c1aa77ebc6128"
+   },
+   {
+    "line": 63,
+    "step": "create-token-linear",
+    "ok": true,
+    "command": "create",
+    "sha256": "789c14d31a93ed2bba11d99b0fd3bdda18a84352ddc740b0ccff9abb6ea1eb0e"
+   },
+   {
+    "line": 64,
+    "step": "token-escrow-holds-total",
+    "ok": true,
+    "command": "create",
+    "sha256": "2271260a334e53f79720d920129f672a1ca99a1b3e325e15dd1edcdb806a55b2"
+   },
+   {
+    "line": 65,
+    "step": "claim-token-public",
+    "ok": true,
+    "command": "claim",
+    "sha256": "42fbed96213f9472a9857e0e8b5dd2fcdb047d99437181f5d81893942c6a641f"
+   },
+   {
+    "line": 66,
+    "step": "claim-token-public-applied",
+    "ok": true,
+    "command": "claim",
+    "sha256": "9ea3998809e9c039bb90ebca0193bd78de0cecbd9cd356e6520fae0d635b869e"
+   },
+   {
+    "line": 67,
+    "step": "shield-native-for-fees",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "bca041a2ddd8dacb8b7da4b1d49db95f7b30484525b1b299d7157d8a53b2c6c3"
+   },
+   {
+    "line": 68,
+    "step": "shield-applied",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "1de746e09568bf0e144efffd780ba85f118f76153a21b887f12bc19ed4fe9b17"
+   },
+   {
+    "line": 69,
+    "step": "private-token-holding",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "6df4db1c743b285f4b24a31982757941d18f6741ef480d9c375411dda8ad67b1"
+   },
+   {
+    "line": 70,
+    "step": "private-token-holding-applied",
+    "ok": true,
+    "command": "private-account",
+    "sha256": "cb0ec09ea826f88dc1dd8c5432b8acd3185698e49f0650db38922ef254705830"
+   },
+   {
+    "line": 71,
+    "step": "claim-private-token-prepare",
+    "ok": true,
+    "command": "claim",
+    "sha256": "d19a638e2edb85b94a8d96521ae95f21978acebd8b52a7a0e4126e87dce48e17"
+   },
+   {
+    "line": 72,
+    "step": "claim-private-token-disclosure-shown-and-nothing-sent",
+    "ok": true,
+    "command": "claim",
+    "sha256": "11a37212f2296bf8643cf4e933add31734dfff62a53f961c4e7df3747fe26e31"
+   },
+   {
+    "line": 73,
+    "step": "claim-private-token-confirm",
+    "ok": true,
+    "command": "claim",
+    "sha256": "9d23093de5aaeb66c1e4f3c57ccc17d5ebe613d31ba20226a5421e9ab5688f37"
+   },
+   {
+    "line": 74,
+    "step": "claim-private-token-applied",
+    "ok": true,
+    "command": "claim",
+    "sha256": "97ca0ae516047ae0f556d4d815eaf47bdc0f7d88d631972d413f723e763bf016"
+   },
+   {
+    "line": 75,
+    "step": "getEvents-is-not-a-sequencer-rpc-on-rc3",
+    "ok": true,
+    "command": null,
+    "sha256": "7f42c054ec0bcc4786b8f9ce59a73f2040d2a60ec12241abd9197f58f4c5ca87"
+   }
+  ],
+  "dev_mode_reported": [
+   false
+  ],
+  "probe": {
+   "base_fee_exec": 8,
+   "base_fee_stor": 8,
+   "head": 1
+  },
+  "deploy": {
+   "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+   "elf_bytes": 495452,
+   "segments": 5,
+   "immutable": true,
+   "program_address": "my64CoYqQupQ7WfCJvPsS13QrCQiRPxfWvGJbXmY7wC",
+   "transactions": [
+    {
+     "block": 2,
+     "index": 0,
+     "hash": "dd8b7801eb5841eb798fbc834fe0e9dd632a2b6e8caecf0ac817e02282e3d132",
+     "bytes": 70392,
+     "reverted": false
+    },
+    {
+     "block": 3,
+     "index": 0,
+     "hash": "288d9fbbe05061639d068f2785c73b1ad70b40b31f51f3dc8b1090ef3ff613a1",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 4,
+     "index": 0,
+     "hash": "5cd032bb9f4e8540e09e8fb2291260d76bed92e5222aa6246718342457610c67",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 5,
+     "index": 0,
+     "hash": "78d18f35ba74badcb7ea6d5274e5ad0a76d922d1b7c7dc4b99a5974dc41b7965",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 6,
+     "index": 0,
+     "hash": "9472a9ad4c24b8e26be8bb088f6441906bd1ed8944ba36dabbc15a890158a7a6",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 7,
+     "index": 0,
+     "hash": "a7c041436801a86c7ffba46ed7a6c5e2ad09be23357c654d7d53c1772899981e",
+     "bytes": 608,
+     "reverted": false
+    }
+   ],
+   "admin_init": {
+    "block": 8,
+    "index": 0,
+    "hash": "24078d8bb5cfda16ffaf33d68bd8f8e9e841da2f7268c338d5b5a32f6860c039",
+    "bytes": 650,
+    "reverted": false
+   }
+  },
+  "deploy_token_program": {
+   "image_id": "62f542e9fe5d7e740cafd920ce2866bfb4b0394bc3a5427ec480c89b7e057e5a",
+   "elf_bytes": 230428,
+   "segments": 3,
+   "immutable": true,
+   "program_address": "7edrCzF3mftJCQTtEwvXZpDrU9a4yNCgMSGcKarhNrC6",
+   "transactions": [
+    {
+     "block": 296,
+     "index": 0,
+     "hash": "39ad05080535f0f95f467c3a3bfc322c219fb70d9731d19354b5b209c9d02dee",
+     "bytes": 1976,
+     "reverted": false
+    },
+    {
+     "block": 297,
+     "index": 0,
+     "hash": "ab8106bd7170d82978c2bd8ec46832841476886268974eaeb0ced86418806f01",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 298,
+     "index": 0,
+     "hash": "bb5ea2f6728559e567e60a39da578ad89556b4a0afe92c07d73ecbdb03489cd7",
+     "bytes": 98916,
+     "reverted": false
+    },
+    {
+     "block": 299,
+     "index": 0,
+     "hash": "4d827f6b4024969d1819761f355fe94907bbc56f6878361e84e9264eeced3d0e",
+     "bytes": 608,
+     "reverted": false
+    }
+   ]
+  },
+  "transactions": [
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 2,
+    "index": 0,
+    "hash": "dd8b7801eb5841eb798fbc834fe0e9dd632a2b6e8caecf0ac817e02282e3d132",
+    "bytes": 70392,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 3,
+    "index": 0,
+    "hash": "288d9fbbe05061639d068f2785c73b1ad70b40b31f51f3dc8b1090ef3ff613a1",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 4,
+    "index": 0,
+    "hash": "5cd032bb9f4e8540e09e8fb2291260d76bed92e5222aa6246718342457610c67",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 5,
+    "index": 0,
+    "hash": "78d18f35ba74badcb7ea6d5274e5ad0a76d922d1b7c7dc4b99a5974dc41b7965",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 6,
+    "index": 0,
+    "hash": "9472a9ad4c24b8e26be8bb088f6441906bd1ed8944ba36dabbc15a890158a7a6",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "deploy",
+    "block": 7,
+    "index": 0,
+    "hash": "a7c041436801a86c7ffba46ed7a6c5e2ad09be23357c654d7d53c1772899981e",
+    "bytes": 608,
+    "reverted": false
+   },
+   {
+    "step": "deploy-immutable-and-init-admin",
+    "role": "admin-init",
+    "block": 8,
+    "index": 0,
+    "hash": "24078d8bb5cfda16ffaf33d68bd8f8e9e841da2f7268c338d5b5a32f6860c039",
+    "bytes": 650,
+    "reverted": false
+   },
+   {
+    "step": "fund-beneficiary",
+    "role": "fund",
+    "block": 9,
+    "index": 0,
+    "hash": "3f62706935bacbbfb4fe1d7187d93e339117c2bcc6cbd5f8ce5f49e64e18c035",
+    "bytes": 544,
+    "reverted": false
+   },
+   {
+    "step": "fund-second",
+    "role": "fund",
+    "block": 10,
+    "index": 0,
+    "hash": "4293f2ffec4f4caf841fbd8539ba6d84ca57d339b8c92b6022bbb8d98843a0a7",
+    "bytes": 544,
+    "reverted": false
+   },
+   {
+    "step": "create-linear",
+    "role": "create",
+    "block": 11,
+    "index": 0,
+    "hash": "4d2814a852ea4f11f214495866bd50adc9fb55b38f4afea15fda4a0bbf292f22",
+    "bytes": 822,
+    "reverted": false
+   },
+   {
+    "step": "claim-public-partial",
+    "role": "claim",
+    "block": 22,
+    "index": 0,
+    "hash": "d4559e02e645bda418c4c98228de328ccc7a8b4b1f22164a4751d6dbc4478da8",
+    "bytes": 736,
+    "reverted": false
+   },
+   {
+    "step": "refusal-overclaim-sent-on-chain",
+    "role": "claim",
+    "block": 23,
+    "index": 0,
+    "hash": "2443e98de2c916aebbad74fd2cfa8de132ffd18a1642e39067f96acf78747e6d",
+    "bytes": 736,
+    "reverted": true
+   },
+   {
+    "step": "claim-private-new-account-confirm",
+    "role": "claim",
+    "block": 127,
+    "index": 0,
+    "hash": "0c5beabd3ff101460437883394a4536aeb13cbe4336ece12d0abd02348206d97",
+    "bytes": 251302,
+    "reverted": false
+   },
+   {
+    "step": "claim-private-same-account-confirm",
+    "role": "claim",
+    "block": 274,
+    "index": 0,
+    "hash": "636147ea0af6ef420ebf8649e0bfeea9d27e856ac735362b883f1701ad2fbbc3",
+    "bytes": 255038,
+    "reverted": false
+   },
+   {
+    "step": "cancel-by-creator",
+    "role": "cancel",
+    "block": 275,
+    "index": 0,
+    "hash": "f0cda2c5b3847dad3907a156aad5a2258380a868e339115796a719a3a5357a5f",
+    "bytes": 687,
+    "reverted": false
+   },
+   {
+    "step": "claim-vested-after-cancel",
+    "role": "claim",
+    "block": 276,
+    "index": 0,
+    "hash": "3992d44970e0e9dffa2450973f7b876d6fbe29d466db307eaf26e42f71c798d7",
+    "bytes": 720,
+    "reverted": false
+   },
+   {
+    "step": "create-milestone",
+    "role": "create",
+    "block": 278,
+    "index": 0,
+    "hash": "99f50e695e6971f80c357a57e5708c8c975bcc11477fd3c1c6b5efd816fa1754",
+    "bytes": 878,
+    "reverted": false
+   },
+   {
+    "step": "refusal-creator-signal-sent-on-chain",
+    "role": "signal",
+    "block": 280,
+    "index": 0,
+    "hash": "58f25288781fc6de8d80db3631d41fb131820044148b9be727833eb3bb18795a",
+    "bytes": 560,
+    "reverted": true
+   },
+   {
+    "step": "signal-by-authority",
+    "role": "signal",
+    "block": 281,
+    "index": 0,
+    "hash": "fcd7c053173fd5e9b3dd5057b5bec143fc0cf19f1af683c4a04f256e9ab7dfc2",
+    "bytes": 560,
+    "reverted": false
+   },
+   {
+    "step": "refusal-double-signal-sent-on-chain",
+    "role": "signal",
+    "block": 282,
+    "index": 0,
+    "hash": "f205b411c7d74735a210646a1d9d7245f193992ea9ec653188be5d6c963116c1",
+    "bytes": 560,
+    "reverted": true
+   },
+   {
+    "step": "claim-milestone-tranche",
+    "role": "claim",
+    "block": 283,
+    "index": 0,
+    "hash": "e07a6c154f94b79533533eddfefd87f7098cf09507e14055386c30572d408e35",
+    "bytes": 720,
+    "reverted": false
+   },
+   {
+    "step": "create-transferable",
+    "role": "create",
+    "block": 285,
+    "index": 0,
+    "hash": "cd84354a0e47a12a0bb336612a7741523a1e9011afad1198f5e3e1477e3e836a",
+    "bytes": 822,
+    "reverted": false
+   },
+   {
+    "step": "transfer-beneficiary",
+    "role": "transfer-beneficiary",
+    "block": 287,
+    "index": 0,
+    "hash": "50abb7cd6a9c62fca3fffca2d205826609d265334f1b33e0cd869cca0c974842",
+    "bytes": 527,
+    "reverted": false
+   },
+   {
+    "step": "refusal-old-beneficiary-sent-on-chain",
+    "role": "claim",
+    "block": 288,
+    "index": 0,
+    "hash": "229d4b2d62afc6b37286019aa0de35a247518834aa85bcb0c1436c09c2ced934",
+    "bytes": 720,
+    "reverted": true
+   },
+   {
+    "step": "claim-by-new-beneficiary",
+    "role": "claim",
+    "block": 289,
+    "index": 0,
+    "hash": "70a8b1f7eb67a6f3e5ac07c329bb999ccc71883ba10594ed1755285331fff7e5",
+    "bytes": 720,
+    "reverted": false
+   },
+   {
+    "step": "create-for-noncancelable",
+    "role": "create",
+    "block": 291,
+    "index": 0,
+    "hash": "c7f528f9391412a3563d886dd8416f44f6b17f41b4dd8ef8e0bef402410f01fd",
+    "bytes": 822,
+    "reverted": false
+   },
+   {
+    "step": "make-non-cancelable",
+    "role": "make-non-cancelable",
+    "block": 293,
+    "index": 0,
+    "hash": "a4dee101606ad24f2504a553f9df0edce4d174de9b8eddcb74504bd27e141bc2",
+    "bytes": 495,
+    "reverted": false
+   },
+   {
+    "step": "refusal-cancel-after-noncancelable-sent-on-chain",
+    "role": "cancel",
+    "block": 294,
+    "index": 0,
+    "hash": "f017d940115070eae16c311213a9c5ba6055ebea96183ad24dd9fe25d709de10",
+    "bytes": 687,
+    "reverted": true
+   },
+   {
+    "step": "refusal-beneficiary-cancels-sent-on-chain",
+    "role": "cancel",
+    "block": 295,
+    "index": 0,
+    "hash": "22b71068c1a071cdc30127915c1a0ffce66371d9f87936f3fb63c0986cb91876",
+    "bytes": 687,
+    "reverted": true
+   },
+   {
+    "step": "deploy-token-program",
+    "role": "deploy",
+    "block": 296,
+    "index": 0,
+    "hash": "39ad05080535f0f95f467c3a3bfc322c219fb70d9731d19354b5b209c9d02dee",
+    "bytes": 1976,
+    "reverted": false
+   },
+   {
+    "step": "deploy-token-program",
+    "role": "deploy",
+    "block": 297,
+    "index": 0,
+    "hash": "ab8106bd7170d82978c2bd8ec46832841476886268974eaeb0ced86418806f01",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-token-program",
+    "role": "deploy",
+    "block": 298,
+    "index": 0,
+    "hash": "bb5ea2f6728559e567e60a39da578ad89556b4a0afe92c07d73ecbdb03489cd7",
+    "bytes": 98916,
+    "reverted": false
+   },
+   {
+    "step": "deploy-token-program",
+    "role": "deploy",
+    "block": 299,
+    "index": 0,
+    "hash": "4d827f6b4024969d1819761f355fe94907bbc56f6878361e84e9264eeced3d0e",
+    "bytes": 608,
+    "reverted": false
+   },
+   {
+    "step": "configure-token-program",
+    "role": "configure",
+    "block": 300,
+    "index": 0,
+    "hash": "77c1a7304223cff037c03a861ffd1557a83c5c36707fdd71a35be7edf252f455",
+    "bytes": 675,
+    "reverted": false
+   },
+   {
+    "step": "token-definition",
+    "role": "token",
+    "block": 301,
+    "index": 0,
+    "hash": "5a7f767f8bbc97abe5c4e1bc47164469b47f09a19997a7ee4f4287ee85f3e0ec",
+    "bytes": 734,
+    "reverted": false
+   },
+   {
+    "step": "beneficiary-public-token-holding",
+    "role": "token",
+    "block": 302,
+    "index": 0,
+    "hash": "1327e922ef4337a86d5ba5f7a20bfc168f4913150e8660cba07d8308cecb2148",
+    "bytes": 495,
+    "reverted": false
+   },
+   {
+    "step": "create-token-linear",
+    "role": "create",
+    "block": 304,
+    "index": 0,
+    "hash": "83d81d3fac69efb944cc5cd12ae0034d070cac1db5aeaf3c5402daa914e2bf67",
+    "bytes": 918,
+    "reverted": false
+   },
+   {
+    "step": "claim-token-public",
+    "role": "claim",
+    "block": 314,
+    "index": 0,
+    "hash": "06a80621c07fbbe78e10698397d35b651a88be527266071a16cdc2a3a94fc93f",
+    "bytes": 736,
+    "reverted": false
+   },
+   {
+    "step": "shield-native-for-fees",
+    "role": "private-account",
+    "block": 458,
+    "index": 0,
+    "hash": "fbca967ad7e07269fd277ae669ee6931ea1c11c85fa80d4bb0a8bea1d2f0de65",
+    "bytes": 254702,
+    "reverted": false
+   },
+   {
+    "step": "private-token-holding",
+    "role": "private-account",
+    "block": 624,
+    "index": 0,
+    "hash": "b49cd6631189a74353f2da985b8dd0f5120b7e5b8002627951eee2be6b2a2f9e",
+    "bytes": 254726,
+    "reverted": false
+   },
+   {
+    "step": "claim-private-token-confirm",
+    "role": "claim",
+    "block": 779,
+    "index": 0,
+    "hash": "f2fd1bb969b8bc6ff0a3ad83eff806245a88cf985b3bae10d7e4b7f50f8af2a9",
+    "bytes": 255232,
+    "reverted": false
+   }
+  ],
+  "transactions_total": 41,
+  "transactions_reverted": 6,
+  "refusals": [
+   {
+    "name": "refusal-overclaim",
+    "block": 23,
+    "hash": "2443e98de2c916aebbad74fd2cfa8de132ffd18a1642e39067f96acf78747e6d",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   },
+   {
+    "name": "refusal-creator-signal",
+    "block": 280,
+    "hash": "58f25288781fc6de8d80db3631d41fb131820044148b9be727833eb3bb18795a",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   },
+   {
+    "name": "refusal-double-signal",
+    "block": 282,
+    "hash": "f205b411c7d74735a210646a1d9d7245f193992ea9ec653188be5d6c963116c1",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   },
+   {
+    "name": "refusal-old-beneficiary",
+    "block": 288,
+    "hash": "229d4b2d62afc6b37286019aa0de35a247518834aa85bcb0c1436c09c2ced934",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   },
+   {
+    "name": "refusal-cancel-after-noncancelable",
+    "block": 294,
+    "hash": "f017d940115070eae16c311213a9c5ba6055ebea96183ad24dd9fe25d709de10",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   },
+   {
+    "name": "refusal-beneficiary-cancels",
+    "block": 295,
+    "hash": "22b71068c1a071cdc30127915c1a0ffce66371d9f87936f3fb63c0986cb91876",
+    "reverted": true,
+    "state_unchanged_check_ok": true
+   }
+  ],
+  "private_transactions": [
+   {
+    "step": "claim-private-new-account-confirm",
+    "command": "claim",
+    "dev_mode": false,
+    "prove_s": 205.64648904,
+    "proof_bytes": 237142,
+    "tx_bytes": 251302,
+    "block": 127,
+    "hash": "0c5beabd3ff101460437883394a4536aeb13cbe4336ece12d0abd02348206d97",
+    "reverted": false,
+    "public_cycles": 48312,
+    "fee_reserve": 5457112,
+    "amount": 50000000,
+    "escrow_debited": 50000000,
+    "account_native_balance_after": 44542888,
+    "native_credit": 50000000,
+    "token_holdings_after": [],
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true
+   },
+   {
+    "step": "claim-private-same-account-confirm",
+    "command": "claim",
+    "dev_mode": false,
+    "prove_s": 290.512531476,
+    "proof_bytes": 239010,
+    "tx_bytes": 255038,
+    "block": 274,
+    "hash": "636147ea0af6ef420ebf8649e0bfeea9d27e856ac735362b883f1701ad2fbbc3",
+    "reverted": false,
+    "public_cycles": 48400,
+    "fee_reserve": 5457816,
+    "amount": 10000000,
+    "escrow_debited": 10000000,
+    "account_native_balance_after": 49085072,
+    "native_credit": 10000000,
+    "token_holdings_after": [],
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true
+   },
+   {
+    "step": "shield-native-for-fees",
+    "command": "private-account",
+    "dev_mode": false,
+    "prove_s": 285.200613677,
+    "proof_bytes": 238842,
+    "tx_bytes": 254702,
+    "block": 458,
+    "hash": "fbca967ad7e07269fd277ae669ee6931ea1c11c85fa80d4bb0a8bea1d2f0de65",
+    "reverted": false,
+    "public_cycles": 0,
+    "fee_reserve": 5070616,
+    "amount": null,
+    "escrow_debited": null,
+    "account_native_balance_after": 74014456,
+    "native_credit": 30000000,
+    "token_holdings_after": null,
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true
+   },
+   {
+    "step": "private-token-holding",
+    "command": "private-account",
+    "dev_mode": false,
+    "prove_s": 330.093621547,
+    "proof_bytes": 238926,
+    "tx_bytes": 254726,
+    "block": 624,
+    "hash": "b49cd6631189a74353f2da985b8dd0f5120b7e5b8002627951eee2be6b2a2f9e",
+    "reverted": false,
+    "public_cycles": 11663,
+    "fee_reserve": 5163920,
+    "amount": null,
+    "escrow_debited": null,
+    "account_native_balance_after": 68850536,
+    "native_credit": 0,
+    "token_holdings_after": [
+     {
+      "balance": "0",
+      "definition": "CLhngkrS3Cc6Cy52NpoR5Lce7Myhj1fow6Q9ckR7KTgy",
+      "program": "7edrCzF3mftJCQTtEwvXZpDrU9a4yNCgMSGcKarhNrC6"
+     }
+    ],
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true
+   },
+   {
+    "step": "claim-private-token-confirm",
+    "command": "claim",
+    "dev_mode": false,
+    "prove_s": 307.655973651,
+    "proof_bytes": 239107,
+    "tx_bytes": 255232,
+    "block": 779,
+    "hash": "f2fd1bb969b8bc6ff0a3ad83eff806245a88cf985b3bae10d7e4b7f50f8af2a9",
+    "reverted": false,
+    "public_cycles": 61653,
+    "fee_reserve": 5563840,
+    "amount": 60000000,
+    "escrow_debited": 60000000,
+    "account_native_balance_after": 63286696,
+    "native_credit": 0,
+    "token_holdings_after": [
+     {
+      "balance": "60000000",
+      "definition": "CLhngkrS3Cc6Cy52NpoR5Lce7Myhj1fow6Q9ckR7KTgy",
+      "program": "7edrCzF3mftJCQTtEwvXZpDrU9a4yNCgMSGcKarhNrC6"
+     }
+    ],
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true
+   }
+  ],
+  "public_cycles": [
+   {
+    "step": "create-linear",
+    "command": "create",
+    "cycles": 140554
+   },
+   {
+    "step": "claim-public-partial",
+    "command": "claim",
+    "cycles": 79551
+   },
+   {
+    "step": "cancel-by-creator",
+    "command": "cancel",
+    "cycles": 77553
+   },
+   {
+    "step": "claim-vested-after-cancel",
+    "command": "claim",
+    "cycles": 79752
+   },
+   {
+    "step": "create-milestone",
+    "command": "create",
+    "cycles": 147631
+   },
+   {
+    "step": "signal-by-authority",
+    "command": "signal",
+    "cycles": 77407
+   },
+   {
+    "step": "claim-milestone-tranche",
+    "command": "claim",
+    "cycles": 81672
+   },
+   {
+    "step": "create-transferable",
+    "command": "create",
+    "cycles": 140548
+   },
+   {
+    "step": "transfer-beneficiary",
+    "command": "transfer-beneficiary",
+    "cycles": 44477
+   },
+   {
+    "step": "claim-by-new-beneficiary",
+    "command": "claim",
+    "cycles": 78461
+   },
+   {
+    "step": "create-for-noncancelable",
+    "command": "create",
+    "cycles": 140553
+   },
+   {
+    "step": "make-non-cancelable",
+    "command": "make-non-cancelable",
+    "cycles": 42740
+   },
+   {
+    "step": "token-definition",
+    "command": "token",
+    "cycles": 23200
+   },
+   {
+    "step": "beneficiary-public-token-holding",
+    "command": "token",
+    "cycles": 31014
+   },
+   {
+    "step": "create-token-linear",
+    "command": "create",
+    "cycles": 263078
+   },
+   {
+    "step": "claim-token-public",
+    "command": "claim",
+    "cycles": 107172
+   }
+  ],
+  "get_events_answer": {
+   "code": -32601,
+   "message": "Method not found"
+  },
+  "time": {
+   "command": "env E2E_DEV_MODE=0 E2E_OUT=<workdir>/e2e/.run/out-r2-real bash e2e/run_e2e.sh",
+   "user_s": 37763.51,
+   "system_s": 984.94,
+   "cpu_percent": 2484,
+   "elapsed": "25:59.61",
+   "max_rss_kib": 9710956,
+   "exit_status": 0,
+   "e2e_dev_mode_in_command": 0,
+   "elapsed_s": 1559.61,
+   "cpu_s": 38748.45,
+   "stdout_pass_lines": 75,
+   "stdout_pass_lines_match_jsonl": true
+  },
+  "log": {
+   "header": "== real-proof suite 2026-11-24T22:58:22+00:00",
+   "header_time": "2026-11-24T22:58:22+00:00",
+   "REAL_EXIT": 0,
+   "summary": {
+    "passed": 75,
+    "failed": 0,
+    "dev_mode": 0
+   }
+  },
+  "start": "2026-11-24T22:58:22+00:00",
+  "end": "2026-11-24T23:24:21+00:00"
+ }
+}
