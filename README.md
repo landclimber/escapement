@@ -1,5 +1,7 @@
 # Escapement: privacy-preserving token vesting for LEZ v0.4
 
+**Grant reviewers: [start here for a 10-minute verification path and the honest limits](docs/START-HERE.md).**
+
 Escapement is a token vesting program for the Logos Execution Zone (LEZ), written against LEZ's
 v0.4 actor model (`v0.4.0-rc3`), for [Logos RFP-017](https://github.com/logos-co/rfp/blob/master/RFPs/RFP-017-token-vesting.md).
 A creator locks native LEZ or tokens in a program-owned escrow against a cliff + linear, linear, or
