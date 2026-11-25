@@ -196,7 +196,32 @@ NATIVE_BEFORE_CLAIM="$(echo "$R" | jq -r .result.account_native_balance_after)"
 R="$(private_claim claim-private-token "$BF" "$KS" 60000000)"
 expect claim-private-token-applied ".result.tx.reverted == false and .result.escrow_debited == \"60000000\" and .result.private_commitment_found == true and .result.private_account_id_in_tx_bytes == false and ([.result.token_holdings_after[] | select(.definition == \"$DEF\") | .balance] == [\"60000000\"]) and ((.result.account_native_balance_after | tonumber) == $NATIVE_BEFORE_CLAIM - (.result.fee_reserve | tonumber))" "$R"
 
-# 6. Events: on LEZ v0.4.0-rc3 `getEvents` is the indexer's RPC, not the sequencer's.
+# 6. Batches: one BatchCreate for several recipients on one escrow. A dry run shows each recipient's terms and sends
+#    nothing; a cliff batch gives each recipient its own cliff amount (an absolute cliff for all is refused); a
+#    duplicated recipient is refused before anything is built; a token batch; a zero total, sent without the
+#    client's checks, is refused on chain and creates no schedule.
+NOW="$(clock)"
+CLIFF_SHAPE="$((NOW - 1000)),$NOW,$((NOW + 600000))"
+DB="$(step batch-dry-run cli batch --recipients "$BA:60000000:20000000,$CA:40000000:10000000" --cliff "$CLIFF_SHAPE" --dry-run)"
+expect batch-dry-run-shows-each-recipients-terms ".result.dry_run == true and (.result.items | length) == 2 and .result.items[0].beneficiary == \"$BA\" and .result.items[0].cliff_amount == \"20000000\" and .result.items[1].beneficiary == \"$CA\" and .result.items[1].cliff_amount == \"10000000\"" "$DB"
+expect_fail batch-dry-run-created-nothing cli show --schedule "$(echo "$DB" | jq -r '.result.schedules[0]')"
+expect_fail batch-duplicate-recipient-refused cli batch --recipients "$BA:1,$BA:2" --linear "$NOW,$((NOW + 1000))"
+expect_fail batch-absolute-cliff-refused cli batch --recipients "$BA:60000000,$CA:40000000" --cliff "$CLIFF_SHAPE,10000000"
+NB="$(step batch-create-native-cliff cli batch --recipients "$BA:60000000:20000000,$CA:40000000:10000000" --cliff "$CLIFF_SHAPE")"
+expect batch-native-escrow-holds-the-sum '.result.tx.reverted == false and .result.escrow_balance == "100000000"' "$NB"
+S0="$(cli show --schedule "$(echo "$NB" | jq -r '.result.schedules[0]')")"
+expect batch-native-recipient-0-terms ".result.beneficiary == \"$BA\" and .result.total == \"60000000\"" "$S0"
+S1="$(cli show --schedule "$(echo "$NB" | jq -r '.result.schedules[1]')")"
+expect batch-native-recipient-1-terms ".result.beneficiary == \"$CA\" and .result.total == \"40000000\"" "$S1"
+R="$(step claim-from-batch as_c claim --schedule "$(echo "$NB" | jq -r '.result.schedules[1]')" --to "$CA")"
+expect claim-from-batch-at-least-its-cliff '.result.tx.reverted == false and (.result.escrow_debited | tonumber) >= 10000000' "$R"
+TB="$(step batch-create-token cli batch --token "$DEF" --recipients "$BA:30000000,$CA:20000000" --linear "$NOW,$((NOW + 600000))")"
+expect batch-token-escrow-holds-the-sum '.result.tx.reverted == false and .result.escrow_balance == "50000000"' "$TB"
+ZB="$(step batch-zero-total-sent-without-checks cli batch --recipients "$BA:0" --linear "$NOW,$((NOW + 600000))" --no-precheck)"
+expect batch-zero-total-reverted '.result.tx.reverted == true' "$ZB"
+expect_fail batch-zero-total-created-nothing cli show --schedule "$(echo "$ZB" | jq -r '.result.schedules[0]')"
+
+# 7. Events: on LEZ v0.4.0-rc3 `getEvents` is the indexer's RPC, not the sequencer's.
 EV="$("$S" rpc getEvents '[{"from_block":1,"to_block":1000}]' 2>&1 || true)"
 expect getEvents-is-not-a-sequencer-rpc-on-rc3 '.error.code == -32601' "$EV"
 

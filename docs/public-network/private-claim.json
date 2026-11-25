@@ -1,0 +1,67 @@
+{
+ "about": "The private claim's records, as the CLI and systemd reported them on the network's host (25 Nov 2026). Sanitized: the private account's id, its key file and the disclosure token are left out.",
+ "prepare": {
+  "alias": "8dVohtazioQf4e7Mr4Cch1gM899n2LMm97AcvHTi95of",
+  "amount": "50000000",
+  "fee_reserve": "5457080",
+  "needs_confirmation": true,
+  "public_cycles_simulated": 48308
+ },
+ "confirm": {
+  "account_native_balance_after": "44542920",
+  "account_state_saved": true,
+  "alias": "8dVohtazioQf4e7Mr4Cch1gM899n2LMm97AcvHTi95of",
+  "amount": "50000000",
+  "claimed_total": "50000000",
+  "dev_mode": false,
+  "escrow_debited": "50000000",
+  "fee_reserve": "5457080",
+  "private_account_id_in_tx_bytes": false,
+  "private_commitment_found": true,
+  "proof_bytes": 237142,
+  "prove_s": 2922.810347616,
+  "public_cycles_simulated": 48308,
+  "token_holdings_after": [],
+  "tx": {
+   "block": 19219,
+   "bytes": 251302,
+   "hash": "05a7d6b292dec4887d10fa7b3459a0a65fe6616da1a01af3acd60a842bcbe571",
+   "index": 0,
+   "reverted": false,
+   "wait_s": 1.016616503
+  }
+ },
+ "command": {
+  "started_utc": "2026-11-25T15:02:46Z",
+  "output_written_utc": "2026-11-25T15:51:31Z",
+  "started_unix": 1795618966,
+  "output_written_unix": 1795621891,
+  "wall_s": 2925
+ },
+ "resources": {
+  "systemd_unit_memory_peak_bytes": 9849651200,
+  "systemd_unit_cpu_usage_s_at_last_sample": 5064.8,
+  "sampled": "every 5 s while the unit ran; memory peak is the unit's control group (page cache included)"
+ },
+ "host": {
+  "cpu_model": "Intel(R) Xeon(R) Platinum 8488C",
+  "vcpus": 4,
+  "mem_total_kib": 16078356,
+  "instance": "AWS m7i.xlarge",
+  "shared_with": "the network's sequencer, Logos Blockchain node, indexer, explorer and the CLI's other steps"
+ },
+ "prover_limits": {
+  "rayon_threads": 2,
+  "nice": 19,
+  "cpu_weight": 10,
+  "memory_max": "10 GiB",
+  "oom_score_adjust": 1000
+ },
+ "prover": {
+  "r0vm": "3.0.5",
+  "r0vm_sha256": "36c016a5bb2ded5bd1f8f92cc487e6ffaeb1e95ec05850c983081a0f716b515b",
+  "escapement_cli_sha256": "1b7b7a06d193fafaed634ca5fb1b8bd2f8c1abd7ed223397e3af4787583a4106",
+  "escapement_cli_built_from": "2ddc57c",
+  "note": "operator-reported: the binaries installed on the host and checked there against these SHA-256s; r0vm --version printed risc0-r0vm 3.0.5"
+ }
+}

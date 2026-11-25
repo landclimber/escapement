@@ -11,6 +11,10 @@
 //! escapement create --beneficiary ID --total N (--linear S,E | --cliff S,C,E,CLIFF | --milestones A,B,..)
 //!                   [--token ID [--funding-holding ID]] [--non-cancelable] [--transferable]
 //!                   [--cancel-authority ID] [--milestone-authority ID] [--refund-to ID] [--salt HEX] [--fee]
+//! escapement batch --recipients ID:TOTAL[:CLIFF],.. (--linear S,E | --cliff S,C,E) [--token ID [--funding-holding ID]]
+//!                   [--non-cancelable] [--transferable] [--refund-to ID] [--batch-id HEX] [--fee] [--allow-duplicates]
+//!                                                      one BatchCreate: a schedule per recipient (its own total and,
+//!                                                      with --cliff, its own cliff amount), one shared escrow
 //! escapement show --schedule ID                        terms, tranches, claimable now, next unlock
 //! escapement claim --schedule ID [--amount N] --to ID  public claim
 //! escapement claim --schedule ID [--amount N] --to-private FILE [--confirm TOKEN]
@@ -38,19 +42,20 @@
 //! (fund it with `private-account shield`) for token schedules. The reserve is the fee at the current
 //! base fees, so no refund has to be received later.
 //!
-//! `--dry-run` is available on create, claim, cancel, make-non-cancelable, signal,
+//! `--dry-run` is available on create, batch, claim, cancel, make-non-cancelable, signal,
 //! transfer-beneficiary and withdraw-fees (print what would be sent, send nothing); `--no-precheck`
 //! (skip the SDK's checks and the local simulation, so the program itself refuses: used by the
 //! end-to-end suite to test refusals on chain). Unknown flags are refused.
 //!
-//! Environment: `LEZ_RPC` (default `http://127.0.0.1:3040`, loopback only: this tool never talks
-//! to a public network), `ESCAPEMENT_KEY` (signer and fee payer, hex; default LEZ's published local
+//! Environment: `LEZ_RPC` (default `http://127.0.0.1:3040`, loopback only: this tool talks only to
+//! a sequencer on its own machine), `ESCAPEMENT_KEY` (signer and fee payer, hex; default LEZ's published local
 //! test key from `lez/sequencer/service/networks/local.json`), `ESCAPEMENT_PROGRAM` (the deployed
 //! program's address), `ESCAPEMENT_ELF` (the deployed guest binary, for local simulation and
 //! private-claim proving), `ESCAPEMENT_TOKEN_PROGRAM` and `ESCAPEMENT_TOKEN_ELF` (the token program's
 //! address and binary, for token schedules). Proofs are real unless `RISC0_DEV_MODE=1`. Each command
 //! prints one JSON line to stdout; progress and human-readable summaries go to stderr.
 
+mod batchargs;
 mod keyfile;
 
 use std::{
@@ -64,8 +69,9 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use common::{transaction::LeeTransaction, HashType};
 use escapement_core::{
-    config_pda, math::claimable_at, schedule_pda, single_escrow_pda, Asset, Message,
-    MilestoneTranche, ScheduleAccount, ScheduleKind, VestingActorState,
+    batch_escrow_pda, batch_schedule_pda, config_pda, math::claimable_at, schedule_pda,
+    single_escrow_pda, Asset, BatchCreateParams, BatchRecipient, Message, MilestoneTranche,
+    ScheduleAccount, ScheduleKind, VestingActorState,
 };
 use escapement_sdk::{
     builders::{self, Call, Deployment, ScheduleRequest},
@@ -119,6 +125,18 @@ fn random_vec(len: usize) -> Vec<u8> {
     bytes
 }
 
+/// The usage block of this file's documentation (its `text` fence), for the unknown-command help.
+fn usage() -> String {
+    include_str!("main.rs")
+        .lines()
+        .skip_while(|l| !l.starts_with("//! ```text"))
+        .skip(1)
+        .take_while(|l| !l.starts_with("//! ```"))
+        .map(|l| l.trim_start_matches("//! ").trim_start_matches("//!"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn random_bytes() -> [u8; 32] {
     random_vec(32).try_into().expect("32 bytes")
 }
@@ -170,12 +188,15 @@ fn loopback_url(url: &str) -> Result<String> {
 struct Args {
     positional: Vec<String>,
     flags: BTreeMap<String, Option<String>>,
+    /// Flags given more than once (refused: the last one would silently win).
+    repeated: Vec<String>,
 }
 
 impl Args {
     fn parse(raw: &[String]) -> Self {
         let mut positional = Vec::new();
         let mut flags = BTreeMap::new();
+        let mut repeated = Vec::new();
         let mut i = 0;
         while i < raw.len() {
             if let Some(name) = raw[i].strip_prefix("--") {
@@ -183,13 +204,19 @@ impl Args {
                 if value.is_some() {
                     i += 1;
                 }
-                flags.insert(name.to_string(), value);
+                if flags.insert(name.to_string(), value).is_some() {
+                    repeated.push(name.to_string());
+                }
             } else {
                 positional.push(raw[i].clone());
             }
             i += 1;
         }
-        Self { positional, flags }
+        Self {
+            positional,
+            flags,
+            repeated,
+        }
     }
 
     fn has(&self, name: &str) -> bool {
@@ -199,6 +226,9 @@ impl Args {
     /// Refuses any flag the command does not take (a typo must never send a different
     /// transaction from the one meant).
     fn check(&self, allowed: &[&str]) -> Result<()> {
+        if let Some(name) = self.repeated.first() {
+            bail!("--{name} is given more than once");
+        }
         for name in self.flags.keys() {
             if !allowed.contains(&name.as_str()) {
                 bail!(
@@ -414,7 +444,7 @@ impl Ctx {
                 bail!("refused in simulation, nothing sent: {e}");
             }
             simulated = Some(cycles);
-            gas_limit = (cycles + cycles.div_ceil(4)).max(50_000);
+            gas_limit = (cycles + cycles.div_ceil(4)).max(50_000).min(MAX_GAS_EXEC);
         }
         let tx = self.build_public(call, signers, evidence, gas_limit, nonces, price);
         let included = self.send_and_wait(LeeTransaction::Public(tx)).await?;
@@ -784,21 +814,37 @@ async fn token(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
 }
 
 fn kind_from(a: &Args, total: u128) -> Result<ScheduleKind> {
+    // One shape, never a silent choice between two.
+    let given = ["linear", "cliff", "milestones"]
+        .iter()
+        .filter(|f| a.has(f))
+        .count();
+    if given != 1 {
+        bail!("exactly one of --linear, --cliff or --milestones is required ({given} given)");
+    }
     if let Some(v) = a.u64s("linear")? {
         let [start_ts, end_ts] = v[..] else {
             bail!("--linear START,END (unix ms)")
         };
         return Ok(ScheduleKind::Linear { start_ts, end_ts });
     }
-    if let Some(v) = a.u64s("cliff")? {
-        let [start_ts, cliff_ts, end_ts, cliff_amount] = v[..] else {
+    if let Some(v) = a.get("cliff") {
+        // Times are u64 milliseconds; the amount is a u128 like every amount.
+        let parts: Vec<&str> = v.split(',').map(str::trim).collect();
+        let [start, cliff, end, amount] = parts[..] else {
             bail!("--cliff START,CLIFF,END,CLIFF_AMOUNT")
         };
+        let ms = |x: &str| {
+            x.parse::<u64>()
+                .map_err(|e| anyhow!("--cliff: the time {x:?}: {e}"))
+        };
         return Ok(ScheduleKind::CliffLinear {
-            start_ts,
-            cliff_ts,
-            end_ts,
-            cliff_amount: u128::from(cliff_amount),
+            start_ts: ms(start)?,
+            cliff_ts: ms(cliff)?,
+            end_ts: ms(end)?,
+            cliff_amount: amount
+                .parse::<u128>()
+                .map_err(|e| anyhow!("--cliff: the amount {amount:?}: {e}"))?,
         });
     }
     if let Some(v) = a.get("milestones") {
@@ -812,7 +858,11 @@ fn kind_from(a: &Args, total: u128) -> Result<ScheduleKind> {
                 })
             })
             .collect::<Result<_>>()?;
-        if tranches.iter().map(|t| t.amount).sum::<u128>() != total {
+        let sum = tranches
+            .iter()
+            .try_fold(0u128, |acc, t| acc.checked_add(t.amount))
+            .context("--milestones add up past the largest amount")?;
+        if sum != total {
             bail!("--milestones must add up to --total");
         }
         return Ok(ScheduleKind::Milestone { tranches });
@@ -901,6 +951,176 @@ async fn create(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
     Ok(
         json!({"tx": included.json(), "simulated_cycles": cycles, "schedule": schedule.to_string(),
               "escrow": escrow.to_string(), "escrow_balance": asset_balance(ctx, asset, escrow).await?.to_string()}),
+    )
+}
+
+/// `batch`: one `BatchCreate` for several beneficiaries with the same schedule times and their own totals (and, for
+/// cliff + linear, their own cliff amounts; milestones are per schedule), funded from one escrow.
+async fn batch(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
+    a.check(&[
+        "recipients",
+        "linear",
+        "cliff",
+        "token",
+        "funding-holding",
+        "non-cancelable",
+        "transferable",
+        "refund-to",
+        "batch-id",
+        "fee",
+        "dry-run",
+        "no-precheck",
+        "allow-duplicates",
+    ])?;
+    // Which flags were given decides the shape (a flag given without a value is an error, not absent).
+    let (start_ts, cliff_ts, end_ts) = match (a.has("linear"), a.has("cliff")) {
+        (true, false) => {
+            let v = a.u64s("linear")?.unwrap_or_default();
+            let [s, e] = v[..] else {
+                bail!("--linear START,END (unix ms)")
+            };
+            (s, None, e)
+        }
+        (false, true) => {
+            let v = a.u64s("cliff")?.unwrap_or_default();
+            let [s, c, e] = v[..] else {
+                bail!("in a batch, --cliff START,CLIFF,END (unix ms); each recipient's cliff amount goes in --recipients ID:TOTAL:CLIFF")
+            };
+            (s, Some(c), e)
+        }
+        _ => bail!("exactly one of --linear START,END or --cliff START,CLIFF,END is required"),
+    };
+    let recipients = batchargs::parse_recipients(
+        a.need("recipients")?,
+        cliff_ts.is_some(),
+        a.has("allow-duplicates"),
+    )?;
+    if recipients.len() > builders::SAFE_BATCH_CEILING {
+        bail!(
+            "{} recipients: one batch takes at most {} (split them over several batches)",
+            recipients.len(),
+            builders::SAFE_BATCH_CEILING
+        );
+    }
+    if !a.has("no-precheck") {
+        batchargs::zero_totals_refused(&recipients)?;
+    }
+    let d = deployment()?;
+    let batch_id: [u8; 32] = match a.get("batch-id") {
+        Some(h) => hex::decode(h)?
+            .try_into()
+            .map_err(|_| anyhow!("--batch-id: 32 bytes hex"))?,
+        None => random_bytes(),
+    };
+    let asset = match a.opt_account("token")? {
+        Some(definition) => {
+            if d.token_program.is_none() {
+                bail!("--token needs ESCAPEMENT_TOKEN_PROGRAM");
+            }
+            Asset::Token { definition }
+        }
+        None => Asset::Native,
+    };
+    let mut items = Vec::new();
+    for r in &recipients {
+        let kind = match (cliff_ts, r.cliff) {
+            (Some(cliff_ts), Some(cliff_amount)) => ScheduleKind::CliffLinear {
+                start_ts,
+                cliff_ts,
+                end_ts,
+                cliff_amount,
+            },
+            _ => ScheduleKind::Linear { start_ts, end_ts },
+        };
+        items.push(BatchRecipient {
+            beneficiary: r
+                .id
+                .parse()
+                .map_err(|e| anyhow!("--recipients {}: {e:?}", r.id))?,
+            total_amount: r.total,
+            kind,
+            cancelable: !a.has("non-cancelable"),
+            transferable: a.has("transferable"),
+            cancel_authority: None,
+            milestone_authority: None,
+        });
+    }
+    let funding = a.opt_account("funding-holding")?.unwrap_or(ctx.me);
+    let params = BatchCreateParams {
+        batch_id,
+        asset,
+        creator_holding: funding,
+        refund_holding: a.opt_account("refund-to")?.unwrap_or(funding),
+        broker: None,
+        items,
+    };
+    let call = builders::batch_create(&d, ctx.me, &params, a.has("fee"));
+    let schedules: Vec<String> = (0..params.items.len())
+        .map(|i| {
+            let index = u32::try_from(i).expect("batch index fits u32");
+            batch_schedule_pda(d.program, &ctx.me, &batch_id, index).to_string()
+        })
+        .collect();
+    let escrow = batch_escrow_pda(d.program, &ctx.me, &batch_id);
+    // Each recipient's terms as they will be on chain, so that a dry run shows exactly who gets what.
+    let terms: Vec<serde_json::Value> = params
+        .items
+        .iter()
+        .zip(&schedules)
+        .map(|(i, s)| {
+            let mut v = json!({"schedule": s, "beneficiary": i.beneficiary.to_string(),
+                               "total": i.total_amount.to_string(), "cancelable": i.cancelable,
+                               "transferable": i.transferable});
+            match &i.kind {
+                ScheduleKind::Linear { start_ts, end_ts } => {
+                    v["kind"] = json!("linear");
+                    v["start_ms"] = json!(start_ts);
+                    v["end_ms"] = json!(end_ts);
+                }
+                ScheduleKind::CliffLinear {
+                    start_ts,
+                    cliff_ts,
+                    end_ts,
+                    cliff_amount,
+                } => {
+                    v["kind"] = json!("cliff+linear");
+                    v["start_ms"] = json!(start_ts);
+                    v["cliff_ms"] = json!(cliff_ts);
+                    v["end_ms"] = json!(end_ts);
+                    v["cliff_amount"] = json!(cliff_amount.to_string());
+                }
+                ScheduleKind::Milestone { .. } => v["kind"] = json!("milestone"),
+            }
+            v
+        })
+        .collect();
+    if a.has("dry-run") {
+        return Ok(
+            json!({"dry_run": true, "batch_id": hex::encode(batch_id), "asset": format!("{asset:?}"),
+                   "funding_holding": params.creator_holding.to_string(),
+                   "refund_holding": params.refund_holding.to_string(),
+                   "escrow": escrow.to_string(), "schedules": schedules, "items": terms,
+                   "call": print_call(&call)}),
+        );
+    }
+    let catalog = catalog_for(Some(d.program))?;
+    let gas = (2_000_000 + 600_000 * params.items.len() as u64).min(MAX_GAS_EXEC);
+    let (included, cycles) = ctx
+        .send_call(
+            &call,
+            &[],
+            vec![],
+            Some(&catalog),
+            !a.has("no-precheck"),
+            gas,
+        )
+        .await?;
+    Ok(
+        json!({"tx": included.json(), "simulated_cycles": cycles, "batch_id": hex::encode(batch_id),
+              "asset": format!("{asset:?}"), "funding_holding": params.creator_holding.to_string(),
+              "refund_holding": params.refund_holding.to_string(), "schedules": schedules, "items": terms,
+              "escrow": escrow.to_string(),
+              "escrow_balance": asset_balance(ctx, asset, escrow).await?.to_string()}),
     )
 }
 
@@ -1528,6 +1748,7 @@ async fn main() -> Result<()> {
         "token" => token(&ctx, &a).await?,
         "private-account" => private_account(&ctx, &a).await?,
         "create" => create(&ctx, &a).await?,
+        "batch" => batch(&ctx, &a).await?,
         "show" | "claimable" => show(&ctx, &a).await?,
         "claim" => claim(&ctx, &a).await?,
         "cancel" | "make-non-cancelable" | "signal" | "transfer-beneficiary" => {
@@ -1580,19 +1801,43 @@ async fn main() -> Result<()> {
             simple(&ctx, &a, call, d.program).await?
         }
         _ => {
-            eprintln!(
-                "{}",
-                include_str!("main.rs")
-                    .lines()
-                    .skip(2)
-                    .take(24)
-                    .map(|l| l.trim_start_matches("//! ").trim_start_matches("//!"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            );
+            eprintln!("{}", usage());
             bail!("unknown command {command:?}");
         }
     };
     println!("{}", json!({"command": command, "result": out}));
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_unknown_command_help_lists_every_command() {
+        let u = super::usage();
+        for c in [
+            "keygen",
+            "fund",
+            "probe",
+            "deploy",
+            "configure",
+            "token new",
+            "token init-holding",
+            "create",
+            "batch",
+            "show",
+            "claim",
+            "private-account new",
+            "private-account show",
+            "private-account shield",
+            "private-account init-holding",
+            "cancel",
+            "make-non-cancelable",
+            "signal",
+            "transfer-beneficiary",
+            "withdraw-fees",
+        ] {
+            assert!(u.contains(c), "{c} missing from the help");
+        }
+        assert!(!u.contains("```"), "the help runs past the usage block");
+    }
 }

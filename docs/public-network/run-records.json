@@ -1,0 +1,1703 @@
+{
+ "about": "Every step's output from `escapement` on the network's host (one JSON object per command, as printed), sanitized as in private-claim.json. Step names follow transactions.tsv; `sNN-*` and `*-before`/`*-after` are `escapement show` reads.",
+ "steps": {
+  "01-deploy-escapement": {
+   "command": "deploy",
+   "result": {
+    "admin_init": {
+     "block": 18913,
+     "bytes": 650,
+     "hash": "cbbd256da82ea14793da48a7d3df4e5801da53a5ed5ececa0b6b4c8945e43531",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 10.050601104
+    },
+    "elf_bytes": 495452,
+    "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+    "immutable": true,
+    "program_address": "Be6eH1Ps2cr7zSmuV2XfwZDkF14naGcEG6h71ViszSXW",
+    "segments": 5,
+    "transactions": [
+     {
+      "block": 18907,
+      "bytes": 70392,
+      "hash": "96c5b134f8638dadbd917232dcfefd86b43885ce562e6a8bffcc5cd521fec44f",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 9.348183175
+     },
+     {
+      "block": 18908,
+      "bytes": 98916,
+      "hash": "a20ac18892310ee55b1e4c4e26010745f3e618b516f003edbcd19c070d05bc24",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 11.143451825
+     },
+     {
+      "block": 18909,
+      "bytes": 98916,
+      "hash": "a0d0153dcd45ee4ad83909564859be1a78354f086e39169cb5e6f4d91e940c37",
+      "index": 1,
+      "reverted": false,
+      "wait_s": 9.435576995
+     },
+     {
+      "block": 18910,
+      "bytes": 98916,
+      "hash": "a2d00caba788298cc744593c702715e1fb6eae64c394bbbd36e4deacbbcd3b0c",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 9.52476327
+     },
+     {
+      "block": 18911,
+      "bytes": 98916,
+      "hash": "4e2025bb1883d5c2ae1babb18199b1ddb2159a59f4f02ddc7d3dfac096eb7711",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 10.31204983
+     },
+     {
+      "block": 18912,
+      "bytes": 608,
+      "hash": "0a8644e2b9931f1b66b93290b247fceb13516c4ac1086ba7d11a6d641be38374",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 9.733640449
+     }
+    ]
+   }
+  },
+  "02-deploy-token-program": {
+   "command": "deploy",
+   "result": {
+    "elf_bytes": 230428,
+    "image_id": "62f542e9fe5d7e740cafd920ce2866bfb4b0394bc3a5427ec480c89b7e057e5a",
+    "immutable": true,
+    "program_address": "2RAjghNzt7QjRDRmuekUhRZmyj6ctwgEDoTrSjj7JJtq",
+    "segments": 3,
+    "transactions": [
+     {
+      "block": 18914,
+      "bytes": 1976,
+      "hash": "89b143fd5ed83cc6e54e26712e0bd5c78cdfc05bd115f9a060538a7c3c50c8b7",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 10.738414595
+     },
+     {
+      "block": 18915,
+      "bytes": 98916,
+      "hash": "0f90a849e23666324837310a3e0967bc3b172ffe55a8d49c032f118d682521cf",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 9.021484117
+     },
+     {
+      "block": 18916,
+      "bytes": 98916,
+      "hash": "08d64af510a7f58a05e08796aa92cfe2bff5fbb11b8eba25b71b8649aaa2a781",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 11.074851889
+     },
+     {
+      "block": 18917,
+      "bytes": 608,
+      "hash": "c7fe38998fe8d9f629aa2b8fecebb4e2ea218777f757aad37f33fcce4b25bb9c",
+      "index": 0,
+      "reverted": false,
+      "wait_s": 9.266756637
+     }
+    ]
+   }
+  },
+  "03-configure-token-program": {
+   "command": "configure",
+   "result": {
+    "tx": {
+     "block": 18918,
+     "bytes": 675,
+     "hash": "6d041ab8fa112ba025f43953c45aac7a22726c35442e32c603b50669258939c3",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.763468838
+    }
+   }
+  },
+  "04-fund-beneficiary": {
+   "command": "fund",
+   "result": {
+    "balance": "1000000000",
+    "to": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "tx": {
+     "block": 18919,
+     "bytes": 544,
+     "hash": "da3cb6ce12ff895eb0f71d5276412a774e7297e548d8620f5cb919ccd5361ab8",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.942117411
+    }
+   }
+  },
+  "05-fund-second": {
+   "command": "fund",
+   "result": {
+    "balance": "500000000",
+    "to": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "tx": {
+     "block": 18920,
+     "bytes": 544,
+     "hash": "4e5171debc44117e6369ffc1dc4231d38e5b87cc8a3ce507d9cd8c2058d73ac7",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 10.015921714
+    }
+   }
+  },
+  "06-fund-privben": {
+   "command": "fund",
+   "result": {
+    "balance": "500000000",
+    "to": "5KohpBppxuWMKmhkcZPBmRfykqutxPWGmTmmeSjW5CjZ",
+    "tx": {
+     "block": 18921,
+     "bytes": 544,
+     "hash": "24e5ebc715df99e1244bc994e73f0c171320d5f9847392bd50c974b60e0cb0a8",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.544680852
+    }
+   }
+  },
+  "07-create-native-linear-for-private-claim": {
+   "command": "create",
+   "result": {
+    "escrow": "7oQeP3zdDKeibSbRZK6TMV2p7m88WfWpvEFYNXWnFf8x",
+    "escrow_balance": "200000000",
+    "schedule": "79nFmLroryv5N6kjmPozRB7nk4VvajcGxXMahhn7WkFD",
+    "simulated_cycles": 141323,
+    "tx": {
+     "block": 18926,
+     "bytes": 822,
+     "hash": "2617629b8e4301507f0944d9dfc97e9d0611867a49be3e61a1e3941ca83d86cf",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 4.992904096
+    }
+   }
+  },
+  "08-private-account-new": {
+   "command": "private-account",
+   "result": {}
+  },
+  "09-private-claim-prepare": {
+   "command": "claim",
+   "result": {
+    "alias": "8dVohtazioQf4e7Mr4Cch1gM899n2LMm97AcvHTi95of",
+    "amount": "50000000",
+    "fee_reserve": "5457080",
+    "needs_confirmation": true,
+    "public_cycles_simulated": 48308
+   }
+  },
+  "10-private-claim-confirm": {
+   "command": "claim",
+   "result": {
+    "account_native_balance_after": "44542920",
+    "account_state_saved": true,
+    "alias": "8dVohtazioQf4e7Mr4Cch1gM899n2LMm97AcvHTi95of",
+    "amount": "50000000",
+    "claimed_total": "50000000",
+    "dev_mode": false,
+    "escrow_debited": "50000000",
+    "fee_reserve": "5457080",
+    "private_account_id_in_tx_bytes": false,
+    "private_commitment_found": true,
+    "proof_bytes": 237142,
+    "prove_s": 2922.810347616,
+    "public_cycles_simulated": 48308,
+    "token_holdings_after": [],
+    "tx": {
+     "block": 19219,
+     "bytes": 251302,
+     "hash": "05a7d6b292dec4887d10fa7b3459a0a65fe6616da1a01af3acd60a842bcbe571",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 1.016616503
+    }
+   }
+  },
+  "11-create-native-linear": {
+   "command": "create",
+   "result": {
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "200000000",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "simulated_cycles": 141323,
+    "tx": {
+     "block": 18957,
+     "bytes": 822,
+     "hash": "ce3312289510fc32aef347842c336b2d52a2631b54c3803741003a914902b651",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 2.946613572
+    }
+   }
+  },
+  "12-create-native-cliff-linear": {
+   "command": "create",
+   "result": {
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "300000000",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "simulated_cycles": 142854,
+    "tx": {
+     "block": 18958,
+     "bytes": 846,
+     "hash": "9a4616f9b6d111a86e5be64ab7e49c94ace754da2f3c3693cb998f20201960c9",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.586778862
+    }
+   }
+  },
+  "13-create-native-milestone": {
+   "command": "create",
+   "result": {
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "300000000",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "simulated_cycles": 148215,
+    "tx": {
+     "block": 18959,
+     "bytes": 878,
+     "hash": "0eb60bd7137eb17d3d44eefd32c8428d2c9872e1a7d3117b48472d5c7ac9ef68",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.106480331
+    }
+   }
+  },
+  "14-create-native-transferable": {
+   "command": "create",
+   "result": {
+    "escrow": "9ZvhZbwzoLpW8bXwCMsFo2ckud2XjyoJTkiGSCHHqnT7",
+    "escrow_balance": "50000000",
+    "schedule": "6t6tgP6LDE9KuN8FwZyhcSYG31AohdeJL9Npd547ZcdD",
+    "simulated_cycles": 141318,
+    "tx": {
+     "block": 18960,
+     "bytes": 822,
+     "hash": "c5f23d47be005802c268750a6efc33846eff3d7f226ff7fdd9dc38cdeac3d77a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.143998448
+    }
+   }
+  },
+  "15-create-native-for-non-cancelable": {
+   "command": "create",
+   "result": {
+    "escrow": "62fvNgLcZ3knALxP9S5iP1FN7DJEwetkdUM89ao3ZeS7",
+    "escrow_balance": "50000000",
+    "schedule": "H8E4PYPsGZgxuFx7W1gDst8e8GSyT8Urqfd6yBj5s5jY",
+    "simulated_cycles": 141323,
+    "tx": {
+     "block": 18961,
+     "bytes": 822,
+     "hash": "75e71f266068460a5819911af67a70cba3c777632b4d9aa82bbbdfd0349070c2",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.082871353
+    }
+   }
+  },
+  "16-claim-native-linear-public-partial": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "20000000",
+    "destination_delta": "19358264",
+    "escrow_debited": "20000000",
+    "simulated_cycles": 79481,
+    "tx": {
+     "block": 18962,
+     "bytes": 736,
+     "hash": "cdf3467326062f7bbde04a92113b8cb3accc921aacc0e79951b83b09aead0b56",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.11451797
+    }
+   }
+  },
+  "17-refused-overclaim": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "20000000",
+    "destination_delta": "-580968",
+    "escrow_debited": "0",
+    "simulated_cycles": null,
+    "tx": {
+     "block": 18963,
+     "bytes": 736,
+     "hash": "209767621fe00657db9f4d224befe6c98d3de8516eb93d06286ee32130e3f5a2",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.810666909
+    }
+   }
+  },
+  "18-claim-native-cliff-linear-public": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "108496797",
+    "destination_delta": "107852445",
+    "escrow_debited": "108496797",
+    "simulated_cycles": 79824,
+    "tx": {
+     "block": 18964,
+     "bytes": 720,
+     "hash": "a0a0c1553ae20d635491b2d2f65a123502d040d87130f489177d3342fcf4bee0",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.418423663
+    }
+   }
+  },
+  "19-refused-signal-by-creator": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 18965,
+     "bytes": 560,
+     "hash": "6c130519a7aadf536196f9bf6b4ac9e045d8bc1cf5c1d54932421c3e8b8bb698",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.388229709
+    }
+   }
+  },
+  "20-signal-milestone-by-authority": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": 77407,
+    "tx": {
+     "block": 18966,
+     "bytes": 560,
+     "hash": "bb37c54d31c72b57724a16d7bf8696827df7a98afd24a883eb5310f49d356cd6",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.699526693
+    }
+   }
+  },
+  "21-claim-native-milestone-tranche": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "100000000",
+    "destination_delta": "99340864",
+    "escrow_debited": "100000000",
+    "simulated_cycles": 81672,
+    "tx": {
+     "block": 18967,
+     "bytes": 720,
+     "hash": "2c85312ccb8d76c3632da93cff04446f8bae0a608c464be69d47aa9ff351ad89",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.490916088
+    }
+   }
+  },
+  "22-transfer-beneficiary": {
+   "command": "transfer-beneficiary",
+   "result": {
+    "simulated_cycles": 44477,
+    "tx": {
+     "block": 18968,
+     "bytes": 527,
+     "hash": "650e5a3a26de5e3ca75d23239d4355f4e9eb4cecd3425d88f9d3229bfdc7e637",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.612968219999999
+    }
+   }
+  },
+  "23-refused-claim-by-old-beneficiary": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "0",
+    "destination_delta": "-98936",
+    "escrow_debited": "0",
+    "simulated_cycles": null,
+    "tx": {
+     "block": 18969,
+     "bytes": 720,
+     "hash": "9d8f0904fe826d6b8e12c04c4f1fc25c5ea5fad1a1e46c22cca6bf2cb6b5930f",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.532436946
+    }
+   }
+  },
+  "24-claim-by-new-beneficiary": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "50000000",
+    "destination_delta": "49366552",
+    "escrow_debited": "50000000",
+    "simulated_cycles": 78461,
+    "tx": {
+     "block": 18970,
+     "bytes": 720,
+     "hash": "609d812477e14064ff700e3807cdefffedd0f46b695bd49a56c33f1b6a599810",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.91133638
+    }
+   }
+  },
+  "25-make-non-cancelable": {
+   "command": "make-non-cancelable",
+   "result": {
+    "simulated_cycles": 42740,
+    "tx": {
+     "block": 18971,
+     "bytes": 495,
+     "hash": "53f549d6975369ba6c3fb58bda52a79b81359b1c1e9672d4d7b5531474b45274",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.353229778
+    }
+   }
+  },
+  "26-refused-cancel-of-non-cancelable": {
+   "command": "cancel",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 18972,
+     "bytes": 687,
+     "hash": "c045790a8679faadd2003c1b27c1d120ebcc35d0261bd0bd7e4280195c57fb2e",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.867220499
+    }
+   }
+  },
+  "27-cancel-native-linear": {
+   "command": "cancel",
+   "result": {
+    "simulated_cycles": 77499,
+    "tx": {
+     "block": 18973,
+     "bytes": 687,
+     "hash": "3e2177ee80bb24f5737c82b72d2920101ceb6b8a27da70a5e967f43ee70b4c64",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.565737506
+    }
+   }
+  },
+  "28-claim-vested-after-cancel": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "51111222",
+    "destination_delta": "30467462",
+    "escrow_debited": "31111222",
+    "simulated_cycles": 79750,
+    "tx": {
+     "block": 18974,
+     "bytes": 720,
+     "hash": "3a504297d6abef158ef74daca5c030e85131f05225fed8479769d54158fc1314",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.651634562
+    }
+   }
+  },
+  "29-token-definition": {
+   "command": "token",
+   "result": {
+    "definition": "AQSzUKN1bMD2L3hhFgCphZSKZUPDZZNQBifw1bLn84BF",
+    "holder": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "holder_balance": "1000000000000",
+    "simulated_cycles": 23200,
+    "tx": {
+     "block": 18975,
+     "bytes": 734,
+     "hash": "a4c0848ad537d03f5d8ac189910be2c74babb06bbcbb69d119782e03bff1c813",
+     "index": 1,
+     "reverted": false,
+     "wait_s": 9.861187621
+    }
+   }
+  },
+  "30-token-holding-beneficiary": {
+   "command": "token",
+   "result": {
+    "simulated_cycles": 31014,
+    "tx": {
+     "block": 18976,
+     "bytes": 495,
+     "hash": "68e3023611cb28ca49914141b9dff5d21ae8b7b528bbfb129ec605c04f00d23a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.293492702
+    }
+   }
+  },
+  "31-create-token-linear": {
+   "command": "create",
+   "result": {
+    "escrow": "4uK16VzqqrnVkMGULAzr68PEBCiERgWS6efftuKXN7SY",
+    "escrow_balance": "200000000",
+    "schedule": "84c9ZTPF4xFKqtTXJ1pWWRtGnH5UqKGYxRtn1kuGRsx1",
+    "simulated_cycles": 263076,
+    "tx": {
+     "block": 18977,
+     "bytes": 918,
+     "hash": "ad1343bafc38ec3b8f27d38731bf6f10a84fb0dd9bdda9422fa62fcc4af6a11a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 10.760701507
+    }
+   }
+  },
+  "32-create-token-cliff-linear": {
+   "command": "create",
+   "result": {
+    "escrow": "689Bb2GiAsQxh5G82tYvWsAsDyjkVj7mGeYSZtYoZcFw",
+    "escrow_balance": "300000000",
+    "schedule": "J9iuF8SQz4T2TkQumoGvfetoY9UUt4JKidSoU4NQ338H",
+    "simulated_cycles": 264924,
+    "tx": {
+     "block": 18978,
+     "bytes": 942,
+     "hash": "b122578f1ccd581c074d4757431ced34ab2038b0c7744b578ee7a6bf3b4ec962",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.061931388
+    }
+   }
+  },
+  "33-create-token-milestone": {
+   "command": "create",
+   "result": {
+    "escrow": "6H5vMZde3Dnu1f53pAt5KDar7zbDRhGotSN2ZLFU3Szc",
+    "escrow_balance": "300000000",
+    "schedule": "CXdJwpKLcAkKLGT82kEpHwY3GPyLpL8FiUu34oqNZe51",
+    "simulated_cycles": 271244,
+    "tx": {
+     "block": 18979,
+     "bytes": 974,
+     "hash": "74f27750a140a3e7fd135a506917a3cab97dddf1155fe6559e97a624e239ffbc",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 8.634280984
+    }
+   }
+  },
+  "35-claim-token-cliff-linear-public": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "105882418",
+    "destination_delta": "105882418",
+    "escrow_debited": "105882418",
+    "simulated_cycles": 107455,
+    "tx": {
+     "block": 18980,
+     "bytes": 720,
+     "hash": "f60350508b9c3df9faf6c8e0f122aa6854669afc73738be0d946f818c835a567",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 8.11077793
+    }
+   }
+  },
+  "36-signal-token-milestone": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": 79015,
+    "tx": {
+     "block": 18981,
+     "bytes": 560,
+     "hash": "88b01685a717f78feecb283c8d46f690ff2e9dc801c859c09ed675f5800e8cd2",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.49124023
+    }
+   }
+  },
+  "37-claim-token-milestone-tranche": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "100000000",
+    "destination_delta": "100000000",
+    "escrow_debited": "100000000",
+    "simulated_cycles": 109343,
+    "tx": {
+     "block": 18982,
+     "bytes": 720,
+     "hash": "8de98eb0eaebb2dfcc031b0045be42e87211c06870337c84a3cfb040f040b676",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.669575359
+    }
+   }
+  },
+  "38-cancel-token-linear": {
+   "command": "cancel",
+   "result": {
+    "simulated_cycles": 105183,
+    "tx": {
+     "block": 18983,
+     "bytes": 687,
+     "hash": "c63acf66628a2daadc7f222aece89a048f99efb99a197a4990238042c3d5c050",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.501933728000001
+    }
+   }
+  },
+  "39-batch-create-native": {
+   "command": "batch",
+   "result": {
+    "batch_id": "6f60a80f715184ed0fe8cc74af08165d434b9a844f58895f76826dc4ca16d475",
+    "escrow": "6sskbyuJop8VWS2uaEVqg4NP2NDX5JEz16tTqWcsogSs",
+    "escrow_balance": "120000000",
+    "schedules": [
+     "BXejgYkqVTeZNjmNfvqCj4qjHRYjtPrKpouyCgjYNuUc",
+     "EBnobBWiZgU5guA85FwZpsbtxxSF8kW28uQWtU5FQJXA",
+     "7AddFn8ZFvtXcnkfYjFHuWQveV9k1Jeco1Xmn6EBTJCi"
+    ],
+    "simulated_cycles": 257442,
+    "tx": {
+     "block": 18990,
+     "bytes": 1156,
+     "hash": "affe24f55bc31cf8118c9f240044be6561bfd63347d2f0f87c32d780d3447383",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 7.888657997
+    }
+   }
+  },
+  "40-claim-batch-share-public": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "20333300",
+    "destination_delta": "19696620",
+    "escrow_debited": "20333300",
+    "simulated_cycles": 78865,
+    "tx": {
+     "block": 18991,
+     "bytes": 720,
+     "hash": "2374b332e9e24bd09448dfc93c3517c2769825917f9bfac8c14bed88539cccbe",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 8.655079078
+    }
+   }
+  },
+  "41-claim-token-vested-after-cancel": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "40000000",
+    "destination_delta": "40000000",
+    "escrow_debited": "40000000",
+    "simulated_cycles": 107421,
+    "tx": {
+     "block": 18992,
+     "bytes": 720,
+     "hash": "e030c4eb53eacca535c5ed3f80a2938f7927183d5cf40a1796f52c388da6412f",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.823030484
+    }
+   }
+  },
+  "42-refused-second-signal-of-tranche-0": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 19056,
+     "bytes": 560,
+     "hash": "80c232884caa9289dc7411c34c54679787f7c176e32a42ce9b214caf9b67781b",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 10.069285961
+    }
+   }
+  },
+  "42-refused-second-signal-of-tranche-0-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "100000000",
+    "clock_ms": 1795620260217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "200000000",
+    "locked": "200000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 1 tranche(s) wait for the milestone authority (next: index 1)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": true,
+      "unlocked_at_ms": 1795619350217
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "42-refused-second-signal-of-tranche-0-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "100000000",
+    "clock_ms": 1795620250217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "200000000",
+    "locked": "200000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 1 tranche(s) wait for the milestone authority (next: index 1)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": true,
+      "unlocked_at_ms": 1795619350217
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "43-refused-cancel-by-beneficiary": {
+   "command": "cancel",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 19057,
+     "bytes": 687,
+     "hash": "49a103d72e912507d8306bb939b13bcee25925a247bec31eb165123a1c02d85d",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.747742839
+    }
+   }
+  },
+  "43-refused-cancel-by-beneficiary-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "61437843",
+    "claimed": "108496797",
+    "clock_ms": 1795620270216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620270217,
+    "next_unlock_utc": "2026-11-25 15:24:30 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "43-refused-cancel-by-beneficiary-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "60784314",
+    "claimed": "108496797",
+    "clock_ms": 1795620260217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620260218,
+    "next_unlock_utc": "2026-11-25 15:24:20 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "44-refused-transfer-of-non-transferable": {
+   "command": "transfer-beneficiary",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 19058,
+     "bytes": 527,
+     "hash": "cd6763e516c76d8f39cedfde5e81cd05b4ccc9a992544f3c8b4d3822a23751bf",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.773628762
+    }
+   }
+  },
+  "44-refused-transfer-of-non-transferable-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "62091438",
+    "claimed": "108496797",
+    "clock_ms": 1795620280216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620280217,
+    "next_unlock_utc": "2026-11-25 15:24:40 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "44-refused-transfer-of-non-transferable-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "61437843",
+    "claimed": "108496797",
+    "clock_ms": 1795620270216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620270217,
+    "next_unlock_utc": "2026-11-25 15:24:30 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "45-refused-claim-of-unsignaled-tranche": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "100000000",
+    "destination_delta": "-598160",
+    "escrow_debited": "0",
+    "simulated_cycles": null,
+    "tx": {
+     "block": 19059,
+     "bytes": 736,
+     "hash": "96ab803e579bab8b614ca367e1e414911c1b5d631ffa529c9ed20aaa1c35e277",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.932868121
+    }
+   }
+  },
+  "45-refused-claim-of-unsignaled-tranche-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "100000000",
+    "clock_ms": 1795620290217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "200000000",
+    "locked": "200000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 1 tranche(s) wait for the milestone authority (next: index 1)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": true,
+      "unlocked_at_ms": 1795619350217
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "45-refused-claim-of-unsignaled-tranche-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "100000000",
+    "clock_ms": 1795620280216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "200000000",
+    "locked": "200000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 1 tranche(s) wait for the milestone authority (next: index 1)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": true,
+      "unlocked_at_ms": 1795619350217
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "46-refused-make-non-cancelable-by-beneficiary": {
+   "command": "make-non-cancelable",
+   "result": {
+    "simulated_cycles": null,
+    "tx": {
+     "block": 19060,
+     "bytes": 495,
+     "hash": "4439ee45b65797048b564f2665cb973b0cc697332b989ba99564b9f15b8981fe",
+     "index": 0,
+     "reverted": true,
+     "wait_s": 9.557469566
+    }
+   }
+  },
+  "46-refused-make-non-cancelable-by-beneficiary-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "63398627",
+    "claimed": "108496797",
+    "clock_ms": 1795620300216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620300217,
+    "next_unlock_utc": "2026-11-25 15:25:00 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "46-refused-make-non-cancelable-by-beneficiary-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "62745098",
+    "claimed": "108496797",
+    "clock_ms": 1795620290217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7FqCNbreUiZvrRBXwse3q7Z3QUAY9AZXVU4S2t2oPLne",
+    "escrow_balance": "191503203",
+    "locked": "191503203",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795620290218,
+    "next_unlock_utc": "2026-11-25 15:24:50 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "2FpKGSEDAzyTPvHkRDrvP3nG2Zqp2rS9Wx5h7vj3cgvG",
+    "total": "300000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "47-signal-native-milestone-tranche-1": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": 77390,
+    "tx": {
+     "block": 19061,
+     "bytes": 560,
+     "hash": "0eb0764d9cefcb1e21a138782ad81d5a6bb677d84a61c593ff4e33a3e1692d9a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.761248403
+    }
+   }
+  },
+  "48-claim-native-milestone-tranche-1": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "300000000",
+    "destination_delta": "199336896",
+    "escrow_debited": "200000000",
+    "simulated_cycles": 82168,
+    "tx": {
+     "block": 19062,
+     "bytes": 720,
+     "hash": "a636f3a2ebeaa9cba0fba9b68748646558e676603714f29f80e9ab8a7ef0351a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.54000815
+    }
+   }
+  },
+  "49-signal-token-milestone-tranche-1": {
+   "command": "signal",
+   "result": {
+    "simulated_cycles": 78998,
+    "tx": {
+     "block": 19063,
+     "bytes": 560,
+     "hash": "3d986344ff052412c062c641b265f5064f58efd37e66d4b676d461ebc4fb476a",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.452950994
+    }
+   }
+  },
+  "50-claim-token-milestone-tranche-1": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "300000000",
+    "destination_delta": "200000000",
+    "escrow_debited": "200000000",
+    "simulated_cycles": 109839,
+    "tx": {
+     "block": 19064,
+     "bytes": 720,
+     "hash": "4c9289e18bd051d2c60406738579ebf2452774d770e40651529d3103f5a59e35",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.653596618
+    }
+   }
+  },
+  "51-claim-native-cliff-linear-more": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "174509869",
+    "destination_delta": "65368336",
+    "escrow_debited": "66013072",
+    "simulated_cycles": 79872,
+    "tx": {
+     "block": 19065,
+     "bytes": 720,
+     "hash": "cb97461bf3c21da03a8e955b947e7ad5641f88552349672b6eb9756cb71a7847",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.291179934
+    }
+   }
+  },
+  "52-claim-token-cliff-linear-more": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "162091503",
+    "destination_delta": "56209085",
+    "escrow_debited": "56209085",
+    "simulated_cycles": 107521,
+    "tx": {
+     "block": 19066,
+     "bytes": 720,
+     "hash": "9d7400d09692ffbe633aad35d39c4f05e5b1deb197e5487fc7164d377bc3e35b",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.855295254
+    }
+   }
+  },
+  "53-make-non-cancelable-token-cliff": {
+   "command": "make-non-cancelable",
+   "result": {
+    "simulated_cycles": 44081,
+    "tx": {
+     "block": 19067,
+     "bytes": 495,
+     "hash": "b058c7cad573c536401998fa06e9806e23afecfdfa6f3bb2dbb843b2373e1a84",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.130004203
+    }
+   }
+  },
+  "54-batch-create-token": {
+   "command": "batch",
+   "result": {
+    "batch_id": "9ef36c0b347e9f25018a84a0caa33aa699ed6785d2fc368be88853c1c6228ac2",
+    "escrow": "2s1indW3sSB61M9aNohE6a7RfwrgXQmnMTvmcLbrZVvh",
+    "escrow_balance": "60000000",
+    "schedules": [
+     "3Z9EkrQ48U5GBV71D8uk1RUCH6MwJpnzj321pGJZKVX9",
+     "2xFSceaAEXNRQmxBeS54cuPmXDBiXfkoXsNWM926kGwk",
+     "7mPB9h4fy8DBpQW1G6dVEqVFAw7gRThdwW88zLMxSFLm"
+    ],
+    "simulated_cycles": 387521,
+    "tx": {
+     "block": 19068,
+     "bytes": 1252,
+     "hash": "9c00ab13d4b0b9f5774bff9d4c877ae701906097028f5266acbfdbd1e8473abb",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 10.403115073
+    }
+   }
+  },
+  "55-claim-token-batch-item-0": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "15250050",
+    "destination_delta": "15250050",
+    "escrow_debited": "15250050",
+    "simulated_cycles": 106549,
+    "tx": {
+     "block": 19069,
+     "bytes": 720,
+     "hash": "055a3a35204aa56f35b8553a9356a851bd6625f3db3436e91f8c765b82f3ae36",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 8.100761858
+    }
+   }
+  },
+  "56-claim-native-batch-item-0": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "60000000",
+    "destination_delta": "59366528",
+    "escrow_debited": "60000000",
+    "simulated_cycles": 78464,
+    "tx": {
+     "block": 19070,
+     "bytes": 720,
+     "hash": "aca0b0e3681d3a7466cc9b4a70e05098d9efdc4b7ee3a63672e06491c82c49b4",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.417800931
+    }
+   }
+  },
+  "57-token-holding-second": {
+   "command": "token",
+   "result": {
+    "simulated_cycles": 31014,
+    "tx": {
+     "block": 19071,
+     "bytes": 495,
+     "hash": "28feabbd512bd26c7d8b7b828cdcc18aa3a6d4800e7efc0a04b917de5e7efeac",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 9.363793608
+    }
+   }
+  },
+  "58-claim-token-batch-item-1": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "10666683",
+    "destination_delta": "10666683",
+    "escrow_debited": "10666683",
+    "simulated_cycles": 106521,
+    "tx": {
+     "block": 19072,
+     "bytes": 720,
+     "hash": "04edb61f1e87bd4c95de695b5f29ef63465d7090fda0e2c37a2b6395c3b23f9c",
+     "index": 0,
+     "reverted": false,
+     "wait_s": 10.02635419
+    }
+   }
+  },
+  "59-claim-native-batch-item-2-after-private-claim": {
+   "command": "claim",
+   "result": {
+    "claimed_total": "20000000",
+    "destination_delta": "19366528",
+    "escrow_debited": "20000000",
+    "simulated_cycles": 78464,
+    "tx": {
+     "block": 19220,
+     "bytes": 720,
+     "hash": "df3683b9c5e12cce60527a467cacd54793fe729e907887c3870093ed851b7eed",
+     "index": 1,
+     "reverted": false,
+     "wait_s": 8.993723416
+    }
+   }
+  },
+  "60-private-account-show": {
+   "command": "private-account",
+   "result": {
+    "native_balance": "44542920",
+    "new_account": false,
+    "state_committed_on_chain": true,
+    "token_holdings": []
+   }
+  },
+  "deployer-accounts": {
+   "daemon": "9NrTmgrH9SHmUF4yrkdu7pJVKcbkPsY9HrtrsBe6RcUr",
+   "payer": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F"
+  },
+  "s17-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "21111222",
+    "claimed": "20000000",
+    "clock_ms": 1795619330217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "180000000",
+    "locked": "180000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619330218,
+    "next_unlock_utc": "2026-11-25 15:08:50 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s17-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "20000111",
+    "claimed": "20000000",
+    "clock_ms": 1795619320217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "180000000",
+    "locked": "180000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619320218,
+    "next_unlock_utc": "2026-11-25 15:08:40 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s19-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "0",
+    "clock_ms": 1795619350217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "300000000",
+    "locked": "300000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 2 tranche(s) wait for the milestone authority (next: index 0)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "s19-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "0",
+    "claimed": "0",
+    "clock_ms": 1795619340216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "8A4RUb7intkyicpmzcC69SSGkVtAq4y6gzTwKqifjzXe",
+    "escrow_balance": "300000000",
+    "locked": "300000000",
+    "milestone_authority": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "no signalled milestone is left to claim; 2 tranche(s) wait for the milestone authority (next: index 0)",
+    "schedule": "FetNjedGRertCrGM2pnPKt6cMdBrq2HzAbbNTwoky8Rt",
+    "total": "300000000",
+    "tranches": [
+     {
+      "amount": "100000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     },
+     {
+      "amount": "200000000",
+      "unlocked": false,
+      "unlocked_at_ms": null
+     }
+    ],
+    "transferable": false
+   }
+  },
+  "s23-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "50000000",
+    "claimed": "0",
+    "clock_ms": 1795619390217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "9ZvhZbwzoLpW8bXwCMsFo2ckud2XjyoJTkiGSCHHqnT7",
+    "escrow_balance": "50000000",
+    "locked": "50000000",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "tokens are claimable now",
+    "schedule": "6t6tgP6LDE9KuN8FwZyhcSYG31AohdeJL9Npd547ZcdD",
+    "total": "50000000",
+    "tranches": null,
+    "transferable": true
+   }
+  },
+  "s23-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "FehjGQw4YYhkBPVCA8WY6Xd9YEsSXaKbvekUZqrzcgBN",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "50000000",
+    "claimed": "0",
+    "clock_ms": 1795619380217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "9ZvhZbwzoLpW8bXwCMsFo2ckud2XjyoJTkiGSCHHqnT7",
+    "escrow_balance": "50000000",
+    "locked": "50000000",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "tokens are claimable now",
+    "schedule": "6t6tgP6LDE9KuN8FwZyhcSYG31AohdeJL9Npd547ZcdD",
+    "total": "50000000",
+    "tranches": null,
+    "transferable": true
+   }
+  },
+  "s26-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": false,
+    "cancelled": null,
+    "claimable_now": "2222236",
+    "claimed": "0",
+    "clock_ms": 1795619420217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "62fvNgLcZ3knALxP9S5iP1FN7DJEwetkdUM89ao3ZeS7",
+    "escrow_balance": "50000000",
+    "locked": "50000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619420218,
+    "next_unlock_utc": "2026-11-25 15:10:20 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "H8E4PYPsGZgxuFx7W1gDst8e8GSyT8Urqfd6yBj5s5jY",
+    "total": "50000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s26-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": false,
+    "cancelled": null,
+    "claimable_now": "2083347",
+    "claimed": "0",
+    "clock_ms": 1795619410217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "62fvNgLcZ3knALxP9S5iP1FN7DJEwetkdUM89ao3ZeS7",
+    "escrow_balance": "50000000",
+    "locked": "50000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619410218,
+    "next_unlock_utc": "2026-11-25 15:10:10 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "H8E4PYPsGZgxuFx7W1gDst8e8GSyT8Urqfd6yBj5s5jY",
+    "total": "50000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s27-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": {
+     "at_ms": 1795619420217,
+     "refunded": "148888778",
+     "vested": "51111222"
+    },
+    "claimable_now": "31111222",
+    "claimed": "20000000",
+    "clock_ms": 1795619430217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "31111222",
+    "locked": "180000000",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "tokens are claimable now",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s27-before": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "31111222",
+    "claimed": "20000000",
+    "clock_ms": 1795619420217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "180000000",
+    "locked": "180000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619420218,
+    "next_unlock_utc": "2026-11-25 15:10:20 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s28-after": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": {
+     "at_ms": 1795619420217,
+     "refunded": "148888778",
+     "vested": "51111222"
+    },
+    "claimable_now": "0",
+    "claimed": "51111222",
+    "clock_ms": 1795619440216,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "7Yhmb5bSTH2saANb3q7LnUMkuqhTFtLcHFAosmDmgKjt",
+    "escrow_balance": "0",
+    "locked": "148888778",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "the schedule was cancelled and its vested part is already claimed",
+    "schedule": "7GYwwsVK3nDv3gLqRwdGiKgA58wteBdnEHPmkZSH6MfJ",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s38-after": {
+   "command": "show",
+   "result": {
+    "asset": "Token { definition: AQSzUKN1bMD2L3hhFgCphZSKZUPDZZNQBifw1bLn84BF }",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": {
+     "at_ms": 1795619520216,
+     "refunded": "160000000",
+     "vested": "40000000"
+    },
+    "claimable_now": "40000000",
+    "claimed": "0",
+    "clock_ms": 1795619530217,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "4uK16VzqqrnVkMGULAzr68PEBCiERgWS6efftuKXN7SY",
+    "escrow_balance": "40000000",
+    "locked": "200000000",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "tokens are claimable now",
+    "schedule": "84c9ZTPF4xFKqtTXJ1pWWRtGnH5UqKGYxRtn1kuGRsx1",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s40-batch-escrow": {
+   "command": "show",
+   "result": {
+    "asset": "Native",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": null,
+    "claimable_now": "31500050",
+    "claimed": "0",
+    "clock_ms": 1795619620218,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "6sskbyuJop8VWS2uaEVqg4NP2NDX5JEz16tTqWcsogSs",
+    "escrow_balance": "99666700",
+    "locked": "60000000",
+    "milestone_authority": null,
+    "next_unlock_ms": 1795619620219,
+    "next_unlock_utc": "2026-11-25 15:13:40 UTC",
+    "reason": "tokens are claimable now",
+    "schedule": "BXejgYkqVTeZNjmNfvqCj4qjHRYjtPrKpouyCgjYNuUc",
+    "total": "60000000",
+    "tranches": null,
+    "transferable": false
+   }
+  },
+  "s41-after": {
+   "command": "show",
+   "result": {
+    "asset": "Token { definition: AQSzUKN1bMD2L3hhFgCphZSKZUPDZZNQBifw1bLn84BF }",
+    "beneficiary": "9LX1fRDTUMsSx6PFJFgrnNRXoNtBw5oV6HukWvjDLs1o",
+    "cancel_authority": null,
+    "cancelable": true,
+    "cancelled": {
+     "at_ms": 1795619520216,
+     "refunded": "160000000",
+     "vested": "40000000"
+    },
+    "claimable_now": "0",
+    "claimed": "40000000",
+    "clock_ms": 1795619620218,
+    "creator": "2EFSpHWfrMtKgmb7wH8A7j7d2mMHeQxtvqhvu2J6cn6F",
+    "escrow": "4uK16VzqqrnVkMGULAzr68PEBCiERgWS6efftuKXN7SY",
+    "escrow_balance": "0",
+    "locked": "160000000",
+    "milestone_authority": null,
+    "next_unlock_ms": null,
+    "next_unlock_utc": null,
+    "reason": "the schedule was cancelled and its vested part is already claimed",
+    "schedule": "84c9ZTPF4xFKqtTXJ1pWWRtGnH5UqKGYxRtn1kuGRsx1",
+    "total": "200000000",
+    "tranches": null,
+    "transferable": false
+   }
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Ferrata LEZ test network (a public LEZ v0.4.0-rc3 network)",
+  "lez": "v0.4.0-rc3",
+  "rpc": "https://54-156-116-24.sslip.io/rpc",
+  "explorer": "https://54-156-116-24.sslip.io/explorer/",
+  "network_page": "https://54-156-116-24.sslip.io/network",
+  "program": "Be6eH1Ps2cr7zSmuV2XfwZDkF14naGcEG6h71ViszSXW",
+  "token_program": "2RAjghNzt7QjRDRmuekUhRZmyj6ctwgEDoTrSjj7JJtq",
+  "records": {
+    "transactions": 66,
+    "accounts": 23,
+    "native_escrows": 7
+  }
+}
