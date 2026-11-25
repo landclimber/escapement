@@ -31,11 +31,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fnmatch
 import hashlib
 import json
 import os
 import re
 import shlex
+import shutil
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -61,15 +63,19 @@ ENFORCED = [
     "Requirements, Open Source) has words that no clause quotes;",
     "a named Rust test does not exist: the script reads each crate's source, follows its modules "
     "and evaluates `#[cfg]`, so the name is the full libtest path in the named crate;",
-    "a named Rust test is not run by any `cargo test` in `.github/workflows/ci.yml`: the package, "
-    "the target, the filters and `#[ignore]` (run only with `--ignored`) are all taken into "
-    "account;",
-    "after the tests are built, a named Rust test is missing from the compiled test binaries "
-    "(`cargo test ... -- --list`), in the job that runs it;",
+    "a named Rust test is not run by any `cargo test` in `.github/workflows/ci.yml` whose failure "
+    "fails the job: the package, the target (`test = false`, `harness = false`, "
+    "`required-features`, `autotests`), the filters, `#[ignore]` (also through `cfg_attr`; run only "
+    "with `--ignored`) and `#[should_panic]` are all taken into account, and a step with "
+    "`continue-on-error`, a command followed by `||`, `&&` or `&`, piped without `pipefail`, run "
+    "under `set +e` or inside `( ... )` does not count;",
+    "after the tests are built, a named Rust test, or its whole test binary, is missing from the "
+    "compiled test binaries (`cargo test ... -- --list`) of the job that runs it;",
     "a named end-to-end check is not one that `e2e/run_e2e.sh` records, or no CI job runs that "
     "suite; after the suite runs in CI, a named check was not recorded as passed in that run;",
-    "a `shown` clause names no test, or none of its tests runs on every push to `main` (a test "
-    "that only the manual job runs does not count on its own);",
+    "a `shown` clause names no test, or none of its tests runs on every push to `main` (a manual "
+    "job, a job that `needs` one, or a push trigger filtered by `paths`, `tags` or "
+    "`branches-ignore` does not count);",
     "an `in part`, `not yet` or `waits on Logos` clause does not say what remains (`not yet` must "
     "name its milestone, `waits on Logos` must name LEZ testnet 0.4);",
     "a status differs from the one the filed proposal gives and the row does not say what in the "
@@ -189,7 +195,9 @@ class RustTest:
     path: str            # libtest name, e.g. math::tests::fee_boundary_classes
     file: str            # repo-relative source file
     ignored: bool
-    cfg_unknown: bool    # behind a cfg this script cannot evaluate
+    cfg_unknown: bool    # behind a cfg (or cfg_attr) this script cannot evaluate
+    should_panic: bool = False
+    tgt: "Target | None" = None
 
 
 @dataclass
@@ -199,6 +207,8 @@ class Target:
     name: str
     root: str            # repo-relative root source file
     list_key: tuple      # ("unittests src/lib.rs" | "tests/idl.rs", binary stem)
+    untested: str | None = None      # why `cargo test` does not run it as libtest tests
+    required_features: list = field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -217,9 +227,53 @@ def _attr_text(toks: list[str]) -> str:
     return "".join(toks)
 
 
+def _split_top(s: str) -> list[str]:
+    parts, depth, cur = [], 0, ""
+    for ch in s:
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+            continue
+        depth += ch == "("
+        depth -= ch == ")"
+        cur += ch
+    if cur:
+        parts.append(cur)
+    return parts
+
+
+def _expand_cfg_attr(attrs: list[str]) -> list[str]:
+    """`cfg_attr(PRED, A, B)` becomes A, B when PRED holds for `cargo test` and nothing when it does
+    not; a test-relevant attribute behind a PRED this script cannot evaluate becomes `cfg_attr?`."""
+    out = []
+    for a in attrs:
+        if a.startswith("cfg_attr(") and a.endswith(")"):
+            pred, *inner = _split_top(a[9:-1])
+            v = cfg_value(pred)
+            if v is True:
+                out += _expand_cfg_attr(inner)
+            elif v is None and any(x in ("test", "ignore") or x.startswith(("ignore=", "should_panic", "cfg("))
+                                   for x in inner):
+                out.append("cfg_attr?")
+        else:
+            out.append(a)
+    return out
+
+
 def scan_target(target: Target) -> list[RustTest]:
     tests: list[RustTest] = []
     seen: set[str] = set()
+
+    def skip_block(toks: list[str], k: int) -> int:
+        """Index just past the brace block that opens at toks[k]."""
+        d = 0
+        while k < len(toks):
+            d += toks[k] == "{"
+            d -= toks[k] == "}"
+            if d == 0:
+                return k + 1
+            k += 1
+        return k
 
     def walk(file: Path, modpath: list[str], mod_dir: Path, cond_unknown: bool):
         rel = str(file.relative_to(ROOT))
@@ -246,9 +300,27 @@ def scan_target(target: Target) -> list[RustTest]:
                     if d == 0:
                         break
                     k += 1
-                if not inner:
-                    pending.append(_attr_text(toks[j + 1:k]))
+                text = _attr_text(toks[j + 1:k])
                 i = k + 1
+                if not inner:
+                    pending.append(text)
+                    continue
+                # An inner `#![cfg(...)]` applies to the whole file or inline module it is in.
+                for a in _expand_cfg_attr([text]):
+                    v = cfg_value(a[4:-1]) if a.startswith("cfg(") else (None if a == "cfg_attr?" else True)
+                    if v is None:
+                        cur_unknown = True
+                    elif v is False:
+                        if not stack:
+                            return
+                        m = i
+                        while m < len(toks) and depth > stack[-1][0]:
+                            depth += toks[m] == "{"
+                            depth -= toks[m] == "}"
+                            m += 1
+                        _, cur_path, cur_dir, cur_unknown = stack.pop()
+                        i = m
+                        break
                 continue
             if pending and (t in ("pub", "async", "unsafe", "const", "extern", "crate", "(", ")") or t.startswith('"')):
                 # `pub`, `pub(crate)`, `async`, `extern "C"` between attributes and the item
@@ -256,24 +328,14 @@ def scan_target(target: Target) -> list[RustTest]:
                 continue
             if t == "mod" and i + 2 < len(toks) and _IDENT.fullmatch(toks[i + 1]):
                 name, nxt = toks[i + 1], toks[i + 2]
-                cfgs = [a[4:-1] for a in pending if a.startswith("cfg(")]
-                vals = [cfg_value(c) for c in cfgs]
-                path_attr = next((a[6:-1] for a in pending if a.startswith('path="')), None)
+                attrs = _expand_cfg_attr(pending)
+                vals = [cfg_value(a[4:-1]) for a in attrs if a.startswith("cfg(")]
+                path_attr = next((a[6:-1] for a in attrs if a.startswith('path="')), None)
                 pending = []
                 if False in vals:
-                    if nxt == "{":  # skip the whole inline module
-                        d, k = 0, i + 2
-                        while k < len(toks):
-                            d += toks[k] == "{"
-                            d -= toks[k] == "}"
-                            if d == 0:
-                                break
-                            k += 1
-                        i = k + 1
-                    else:
-                        i += 3
+                    i = skip_block(toks, i + 2) if nxt == "{" else i + 3
                     continue
-                unknown = cur_unknown or (None in vals)
+                unknown = cur_unknown or (None in vals) or "cfg_attr?" in attrs
                 if nxt == ";":
                     cands = [file.parent / path_attr] if path_attr else [cur_dir / f"{name}.rs", cur_dir / name / "mod.rs"]
                     for cand in cands:
@@ -292,16 +354,17 @@ def scan_target(target: Target) -> list[RustTest]:
                     i += 3
                     continue
             if t == "fn" and i + 1 < len(toks) and _IDENT.fullmatch(toks[i + 1]):
-                is_test = any(a in ("test", "tokio::test") for a in pending)
-                if is_test:
-                    cfgs = [a[4:-1] for a in pending if a.startswith("cfg(")]
-                    vals = [cfg_value(c) for c in cfgs]
+                attrs = _expand_cfg_attr(pending)
+                if any(a in ("test", "tokio::test") for a in attrs):
+                    vals = [cfg_value(a[4:-1]) for a in attrs if a.startswith("cfg(")]
                     if False not in vals:
                         tests.append(RustTest(
                             package=target.package, target=target.id,
                             path="::".join(cur_path + [toks[i + 1]]), file=rel,
-                            ignored=any(a == "ignore" or a.startswith("ignore=") for a in pending),
-                            cfg_unknown=cur_unknown or (None in vals)))
+                            ignored=any(a == "ignore" or a.startswith("ignore=") for a in attrs),
+                            cfg_unknown=cur_unknown or (None in vals) or "cfg_attr?" in attrs,
+                            should_panic=any(a.startswith("should_panic") for a in attrs),
+                            tgt=target))
                 pending = []
                 i += 2
                 continue
@@ -339,28 +402,45 @@ def discover_packages() -> list[Package]:
 
 
 def _package(d: str, ws_root: str) -> Package:
+    """The package's lib, bin and integration-test targets, as cargo finds them (explicit tables,
+    `autobins`/`autotests`), with what keeps `cargo test` from running one as libtest tests."""
     data = tomllib.loads((ROOT / d / "Cargo.toml").read_text())
-    name = data["package"]["name"]
+    pk = data["package"]
+    name = pk["name"]
     pkg = Package(name=name, dir=d, workspace_root=ws_root)
+
+    def add(kind: str, tname: str, path: str, entry: dict, list_key: tuple):
+        why = None
+        if entry.get("test") is False:
+            why = "`test = false` in its manifest"
+        elif entry.get("harness") is False:
+            why = "`harness = false` in its manifest: not libtest, so no test names"
+        pkg.targets.append(Target(name, kind, tname, f"{d}/{path}", list_key, why,
+                                  list(entry.get("required-features", []))))
+
     lib = data.get("lib", {})
     lib_path = lib.get("path", "src/lib.rs")
     if (ROOT / d / lib_path).exists():
         stem = lib.get("name", name).replace("-", "_")
-        pkg.targets.append(Target(name, "lib", stem, f"{d}/{lib_path}", (f"unittests {lib_path}", stem)))
-    bins = {b["name"]: b.get("path", f"src/bin/{b['name']}.rs") for b in data.get("bin", [])}
-    if not bins:
-        if (ROOT / d / "src/main.rs").exists():
-            bins[name] = "src/main.rs"
-    for f in sorted((ROOT / d / "src/bin").glob("*.rs")) if (ROOT / d / "src/bin").is_dir() else []:
-        bins.setdefault(f.stem, f"src/bin/{f.name}")
-    for bname, bpath in bins.items():
-        stem = bname.replace("-", "_")
-        pkg.targets.append(Target(name, "bin", bname, f"{d}/{bpath}", (f"unittests {bpath}", stem)))
-    tests = {t["name"]: t.get("path", f"tests/{t['name']}.rs") for t in data.get("test", [])}
-    for f in sorted((ROOT / d / "tests").glob("*.rs")) if (ROOT / d / "tests").is_dir() else []:
-        tests.setdefault(f.stem, f"tests/{f.name}")
-    for tname, tpath in tests.items():
-        pkg.targets.append(Target(name, "test", tname, f"{d}/{tpath}", (tpath, tname.replace("-", "_"))))
+        add("lib", stem, lib_path, lib, (f"unittests {lib_path}", stem))
+    bins = {b["name"]: b for b in data.get("bin", [])}
+    if pk.get("autobins", True):
+        if (ROOT / d / "src/main.rs").exists() and name not in bins \
+                and not any(b.get("path") == "src/main.rs" for b in bins.values()):
+            bins[name] = {"name": name, "path": "src/main.rs"}
+        if (ROOT / d / "src/bin").is_dir():
+            for f in sorted((ROOT / d / "src/bin").glob("*.rs")):
+                bins.setdefault(f.stem, {"name": f.stem, "path": f"src/bin/{f.name}"})
+    for bname, b in bins.items():
+        bpath = b.get("path", f"src/bin/{bname}.rs")
+        add("bin", bname, bpath, b, (f"unittests {bpath}", bname.replace("-", "_")))
+    tests = {t["name"]: t for t in data.get("test", [])}
+    if pk.get("autotests", True) and (ROOT / d / "tests").is_dir():
+        for f in sorted((ROOT / d / "tests").glob("*.rs")):
+            tests.setdefault(f.stem, {"name": f.stem, "path": f"tests/{f.name}"})
+    for tname, t in tests.items():
+        tpath = t.get("path", f"tests/{tname}.rs")
+        add("test", tname, tpath, t, (tpath, tname.replace("-", "_")))
     return pkg
 
 
@@ -525,6 +605,8 @@ class CargoRun:
     argv: list[str]
     triggers: str        # "every push and pull request" | "manual"
     on_push: bool
+    gating: bool = True  # a failure fails the job
+    why: str = ""        # why it does not gate
 
 
 @dataclass
@@ -533,10 +615,17 @@ class SuiteRun:
     step: str
     triggers: str
     on_push: bool
+    gating: bool = True
+    why: str = ""
+
+
+def _truthy(v) -> bool:
+    return v not in (None, False, "false", "False", "")
 
 
 def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[SuiteRun]]:
-    """`cargo test` commands, runs of the end-to-end suite, and runs of this script, in CI."""
+    """`cargo test` commands, runs of the end-to-end suite, and runs of this script, in CI, each
+    with whether it runs on every push to main and whether its failure fails the job."""
     wf = parse_yaml(workflow_text)
     on = wf.get("on") or wf.get(True) or {}
     if isinstance(on, str):
@@ -544,18 +633,48 @@ def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[Su
     if isinstance(on, list):
         on = {k: None for k in on}
     push = on.get("push", "absent") if isinstance(on, dict) else "absent"
-    push_main = push != "absent" and (
-        push is None or not push.get("branches") or DEFAULT_BRANCH in push.get("branches"))
-    cargo_runs, suite_runs, reqmap_runs = [], [], []
-    for job_id, job in (wf.get("jobs") or {}).items():
-        cond = (job.get("if") or "").strip()
-        if not cond:
-            on_push, triggers = push_main, "every push and pull request" if push_main else "pull request"
-        elif re.fullmatch(r"""github\.event_name\s*==\s*['"]workflow_dispatch['"]""", cond):
-            on_push, triggers = False, "manual (workflow_dispatch)"
+    every_push, not_push = False, "not triggered by push"
+    if push != "absent":
+        pf = push or {}
+        filters = [k for k in ("paths", "paths-ignore", "branches-ignore", "tags", "tags-ignore") if k in pf]
+        if filters:
+            not_push = f"push filtered by `{'`, `'.join(filters)}`"
+        elif pf.get("branches") and not any(fnmatch.fnmatchcase(DEFAULT_BRANCH, b) for b in pf["branches"]):
+            not_push = f"push branches do not include {DEFAULT_BRANCH}"
         else:
-            on_push, triggers = False, f"only if `{cond}`"
-        default_dir = ((job.get("defaults") or {}).get("run") or {}).get("working-directory", ".")
+            every_push = True
+    jobs = wf.get("jobs") or {}
+    base: dict[str, tuple[bool, str]] = {}
+    for job_id, job in jobs.items():
+        cond = str(job.get("if") or "").strip()
+        if not cond:
+            base[job_id] = (every_push, "every push and pull request" if every_push else f"not every push ({not_push})")
+        elif re.fullmatch(r"""github\.event_name\s*==\s*['"]workflow_dispatch['"]""", cond):
+            base[job_id] = (False, "manual (workflow_dispatch)")
+        else:
+            base[job_id] = (False, f"only if `{cond}`")
+
+    def needs(j: str) -> list[str]:
+        n = jobs[j].get("needs") or []
+        return [n] if isinstance(n, str) else list(n)
+
+    def push_status(j: str, seen: tuple = ()) -> tuple[bool, str]:
+        if j in seen or j not in jobs:
+            return False, f"needs unknown or cyclic job `{j}`"
+        on_push, trig = base[j]
+        for n in needs(j):
+            ok, _ = push_status(n, seen + (j,))
+            if on_push and not ok:
+                return False, f"skipped on push: needs `{n}`, which does not run on every push"
+        return on_push, trig
+
+    wf_shell = ((wf.get("defaults") or {}).get("run") or {}).get("shell")
+    cargo_runs, suite_runs, reqmap_runs = [], [], []
+    for job_id, job in jobs.items():
+        on_push, triggers = push_status(job_id)
+        job_defaults = (job.get("defaults") or {}).get("run") or {}
+        default_dir = job_defaults.get("working-directory", ".")
+        job_why = "job has `continue-on-error`" if _truthy(job.get("continue-on-error")) else ""
         for step in job.get("steps") or []:
             run = step.get("run")
             if not run:
@@ -564,15 +683,19 @@ def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[Su
             scond = str(step.get("if") or "").strip()
             if scond and scond not in ("always()", "success()"):
                 step_on_push, step_triggers = False, f"{triggers}, step only if `{scond}`"
+            step_why = job_why or ("step has `continue-on-error`" if _truthy(step.get("continue-on-error")) else "")
+            shell = step.get("shell", job_defaults.get("shell", wf_shell))
             cwd = os.path.normpath(step.get("working-directory", default_dir))
-            for argv, at in _commands(run, cwd):
+            for argv, at, cmd_why in _commands(run, cwd, shell):
+                why = step_why or cmd_why or ""
+                gate = dict(gating=not why, why=why)
                 if argv[:2] == ["cargo", "test"]:
-                    cargo_runs.append(CargoRun(job_id, step.get("name", ""), at, argv[2:], step_triggers, step_on_push))
+                    cargo_runs.append(CargoRun(job_id, step.get("name", ""), at, argv[2:], step_triggers, step_on_push, **gate))
                 elif (argv[0] in ("bash", "sh") and len(argv) > 1 and os.path.normpath(os.path.join(at, argv[1])) == str(E2E_SUITE)) \
                         or os.path.normpath(os.path.join(at, argv[0])) == str(E2E_SUITE):
-                    suite_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push))
+                    suite_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, **gate))
                 elif any(os.path.normpath(os.path.join(at, x)) == "scripts/check-reqmap.py" for x in argv[:2]):
-                    reqmap_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push))
+                    reqmap_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, **gate))
     return cargo_runs, suite_runs, reqmap_runs
 
 
@@ -607,8 +730,50 @@ def _strip_shell_comments(script: str) -> str:
     return "".join(out)
 
 
-def _commands(script: str, cwd: str):
-    """(argv, cwd) of each simple command of a `run:` script, following `cd`."""
+_REDIRECT = re.compile(r"^(>>?|<<?<?|>&|<&|&>>?)$")
+
+
+def _shell_flags(shell) -> tuple[bool, bool] | None:
+    """(errexit, pipefail) a `run:` script starts with; None for a shell this script does not read.
+    GitHub runs an unspecified shell on Linux as `bash -e {0}`, `shell: bash` as
+    `bash --noprofile --norc -eo pipefail {0}`, and `shell: sh` as `sh -e {0}`."""
+    if shell is None or str(shell).strip() in ("sh",):
+        return True, False
+    s = str(shell).strip()
+    if s == "bash":
+        return True, True
+    words = s.split()
+    if words and words[0] in ("bash", "sh") and "{0}" in s:
+        errexit = any(re.fullmatch(r"-[a-z]*e[a-z]*", w) for w in words) or "errexit" in words
+        return errexit, "pipefail" in words
+    return None
+
+
+def _set_flags(args: list[str], errexit: bool, pipefail: bool) -> tuple[bool, bool]:
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if len(a) > 1 and a[0] in "-+":
+            on = a[0] == "-"
+            if "e" in a[1:]:
+                errexit = on
+            if a.endswith("o") and i + 1 < len(args):
+                if args[i + 1] == "pipefail":
+                    pipefail = on
+                elif args[i + 1] == "errexit":
+                    errexit = on
+                i += 1
+        i += 1
+    return errexit, pipefail
+
+
+def _commands(script: str, cwd: str, shell=None):
+    """(argv, cwd, why) of each simple command of a `run:` script, following `cd` and `set`;
+    `why` says why the command's failure would not fail the step (None when it would)."""
+    flags = _shell_flags(shell)
+    if flags is None:
+        return
+    errexit, pipefail = flags
     script = _strip_shell_comments(script.replace("\\\n", " "))
     lex = shlex.shlex(script, posix=True, punctuation_chars="();<>|&\n")
     lex.whitespace = " \t\r"
@@ -618,24 +783,51 @@ def _commands(script: str, cwd: str):
         toks = list(lex)
     except ValueError as e:
         raise MapError(f"workflow run script: {e}") from e
+    cmds = []
     cmd: list[str] = []
     subshells: list[str] = []
+    skip_word = False
     for t in toks + [";"]:
         if t and set(t) <= set("();<>|&\n"):   # shlex groups adjacent punctuation: "\n(", ");"
-            while cmd and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", cmd[0]):
+            if _REDIRECT.match(t):
+                if cmd and cmd[-1].isdigit():
+                    cmd.pop()                      # the fd of "2>&1" is not an argument
+                skip_word = True
+                continue
+            sep = "||" if "||" in t else "|" if "|" in t else "&&" if "&&" in t else "&" if "&" in t else ";"
+            while cmd and (re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", cmd[0]) or cmd[0] in ("env", "time")):
                 cmd = cmd[1:]
             if cmd and cmd[0] == "cd" and len(cmd) > 1:
                 cwd = os.path.normpath(os.path.join(cwd, cmd[1]))
+            elif cmd and cmd[0] == "set":
+                errexit, pipefail = _set_flags(cmd[1:], errexit, pipefail)
             elif cmd:
-                yield cmd, cwd
+                cmds.append((cmd, cwd, errexit, pipefail, len(subshells), sep))
             cmd = []
             for ch in t:
                 if ch == "(":
                     subshells.append(cwd)
                 elif ch == ")" and subshells:
                     cwd = subshells.pop()   # a `cd` inside `( ... )` ends with it
+        elif skip_word:
+            skip_word = False
         else:
             cmd.append(t)
+    for n, (argv, at, ee, pf, depth, sep) in enumerate(cmds):
+        why = None
+        if depth:
+            why = "inside `( ... )`"
+        elif sep == "||":
+            why = "followed by `||`"
+        elif sep == "&&":
+            why = "followed by `&&`"
+        elif sep == "&":
+            why = "run in the background"
+        elif sep == "|" and not pf:
+            why = "piped without `pipefail` (the default shell is `bash -e`)"
+        elif not ee and n != len(cmds) - 1:
+            why = "`errexit` is off (`set +e`)"
+        yield argv, at, why
 
 
 _CARGO_VALUE_OPTS = {"-p", "--package", "--test", "--bin", "--example", "--bench", "--features", "-F",
@@ -715,6 +907,11 @@ def cargo_selects(run: CargoRun, pkgs: list[Package], test: RustTest) -> bool:
         return False
     if test.package not in selected:
         return False
+    req = test.tgt.required_features if test.tgt else []
+    if req and "--all-features" not in flags:
+        feats = {f for v in opts.get("--features", []) + opts.get("-F", []) for f in re.split(r"[ ,]+", v) if f}
+        if not set(req) <= feats:
+            return False
     # Which targets.
     explicit = {"--lib", "--bins", "--tests", "--doc", "--all-targets", "--examples", "--benches"} & flags \
         or "--test" in opts or "--bin" in opts
@@ -836,6 +1033,7 @@ class Resolved:
     on_push: bool = False
     rust: RustTest | None = None
     error: str = ""
+    jobs: set = field(default_factory=set)   # jobs whose gating `cargo test` runs it
 
 
 def resolve_test(ctx: Context, ref: dict) -> Resolved:
@@ -848,44 +1046,66 @@ def resolve_test(ctx: Context, ref: dict) -> Resolved:
             return Resolved(ref, False, error=f"`{ref['rust']}` is in several targets of `{ref['crate']}`: name one with \"target\"")
         t = cands[0]
         if t.cfg_unknown:
-            return Resolved(ref, False, where=t.file, error=f"`{t.path}` sits behind a `cfg` this check cannot evaluate")
-        runs = [r for r in ctx.cargo_runs if cargo_selects(r, ctx.packages, t)]
+            return Resolved(ref, False, where=t.file, error=f"`{t.path}` sits behind a `cfg` or `cfg_attr` this check cannot evaluate")
+        if t.tgt and t.tgt.untested:
+            return Resolved(ref, False, where=t.file, error=f"`{t.path}`: its target is not run by `cargo test` as libtest tests ({t.tgt.untested})")
+        if t.should_panic and not ref.get("expect_panic"):
+            return Resolved(ref, False, where=t.file, error=f"`{t.path}` is #[should_panic], so it passes by panicking; set \"expect_panic\": true if that is what shows the clause")
+        sel = [r for r in ctx.cargo_runs if cargo_selects(r, ctx.packages, t)]
+        runs = [r for r in sel if r.gating]
         if not runs:
-            why = " (it is #[ignore] and no CI command passes --ignored with a filter that selects it)" if t.ignored else ""
+            why = ""
+            if sel:
+                why = f" (only by steps that do not gate CI: {'; '.join(sorted({r.why for r in sel}))})"
+            elif t.ignored:
+                why = " (it is #[ignore] and no CI command passes --ignored with a filter that selects it)"
+            elif t.tgt and t.tgt.required_features:
+                why = f" (its target needs features {t.tgt.required_features} that no CI command enables)"
             return Resolved(ref, False, where=t.file, rust=t, error=f"no `cargo test` in {WORKFLOW} runs `{t.path}`{why}")
-        return Resolved(ref, True, where=t.file, rust=t,
+        return Resolved(ref, True, where=t.file, rust=t, jobs={r.job for r in runs},
                         runs=sorted({f"{r.job} ({r.triggers})" for r in runs}), on_push=any(r.on_push for r in runs))
     if "e2e" in ref:
         if ref["e2e"] not in ctx.e2e_names:
             return Resolved(ref, False, where=str(E2E_SUITE), error=f"`{ref['e2e']}` is not a check of {E2E_SUITE}")
-        if not ctx.suite_runs:
-            return Resolved(ref, False, where=str(E2E_SUITE), error=f"no CI job runs {E2E_SUITE}")
-        return Resolved(ref, True, where=str(E2E_SUITE),
-                        runs=sorted({f"{r.job} ({r.triggers})" for r in ctx.suite_runs}),
-                        on_push=any(r.on_push for r in ctx.suite_runs))
+        runs = [r for r in ctx.suite_runs if r.gating]
+        if not runs:
+            why = f" (only by steps that do not gate CI: {'; '.join(sorted({r.why for r in ctx.suite_runs}))})" if ctx.suite_runs else ""
+            return Resolved(ref, False, where=str(E2E_SUITE), error=f"no CI job runs {E2E_SUITE}{why}")
+        return Resolved(ref, True, where=str(E2E_SUITE), jobs={r.job for r in runs},
+                        runs=sorted({f"{r.job} ({r.triggers})" for r in runs}),
+                        on_push=any(r.on_push for r in runs))
     if "check" in ref:
         if ref["check"] not in CHECKS:
             return Resolved(ref, False, error=f"unknown check `{ref['check']}`")
-        if not ctx.reqmap_runs:
-            return Resolved(ref, False, error="no CI job runs scripts/check-reqmap.py")
+        runs = [r for r in ctx.reqmap_runs if r.gating]
+        if not runs:
+            return Resolved(ref, False, error="no gating CI step runs scripts/check-reqmap.py")
         return Resolved(ref, True, where="scripts/check-reqmap.py",
-                        runs=sorted({f"{r.job} ({r.triggers})" for r in ctx.reqmap_runs}),
-                        on_push=any(r.on_push for r in ctx.reqmap_runs))
+                        runs=sorted({f"{r.job} ({r.triggers})" for r in runs}),
+                        on_push=any(r.on_push for r in runs))
     return Resolved(ref, False, error=f"unknown test reference {ref}")
 
 
 def check_license(ctx: Context) -> list[str]:
+    """Every manifest with a [package] in the repository, nested and excluded crates (the guests)
+    included, says MIT OR Apache-2.0."""
     errs = []
     for f in ("LICENSE-MIT", "LICENSE-APACHE"):
         if not (ROOT / f).is_file():
             errs.append(f"license: {f} missing")
-    for p in ctx.packages:
-        data = tomllib.loads((ROOT / p.dir / "Cargo.toml").read_text())
+    ws_license = tomllib.loads((ROOT / "Cargo.toml").read_text()).get("workspace", {}).get("package", {}).get("license")
+    for m in sorted(ROOT.rglob("Cargo.toml")):
+        rel = m.relative_to(ROOT)
+        if any(part == "target" or part.startswith(".") for part in rel.parts[:-1]):
+            continue
+        data = tomllib.loads(m.read_text())
+        if "package" not in data:
+            continue
         lic = data["package"].get("license")
         if isinstance(lic, dict) and lic.get("workspace"):
-            lic = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["license"]
+            lic = ws_license
         if lic != "MIT OR Apache-2.0":
-            errs.append(f"license: {p.dir}/Cargo.toml says {lic!r}, not 'MIT OR Apache-2.0'")
+            errs.append(f"license: {rel} says {lic!r}, not 'MIT OR Apache-2.0'")
     return errs
 
 
@@ -907,15 +1127,16 @@ def s3_missing(rmap: dict) -> list[str]:
 
 
 CHECKS = {
-    "reqmap:license": ("LICENSE-MIT and LICENSE-APACHE exist and every crate's manifest says "
-                       "`license = \"MIT OR Apache-2.0\"`", check_license),
+    "reqmap:license": ("LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the "
+                       "repository, the guest crates included, says `license = \"MIT OR Apache-2.0\"`",
+                       check_license),
     "reqmap:s3-coverage": ("every hard Functionality, Usability, Reliability and Performance clause "
                            "names a test, or S3 is not `shown`", check_s3),
 }
 
 
 def validate(ctx: Context, rfp_text: str | None = None, cargo_list: list[str] | None = None,
-             e2e_records: list[str] | None = None) -> tuple[list[str], dict[str, Resolved]]:
+             e2e_records: list[str] | None = None, cargo_job: str | None = None) -> tuple[list[str], dict[str, Resolved]]:
     rmap, errs = ctx.rmap, []
     resolved: dict[str, Resolved] = {}
     for key in ("schema", "rfp", "proposal", "statuses", "groups", "clauses"):
@@ -979,7 +1200,7 @@ def validate(ctx: Context, rfp_text: str | None = None, cargo_list: list[str] | 
     if rfp_text is not None:
         errs += check_rfp(rmap, rfp_text)
     if cargo_list is not None:
-        errs += check_cargo_list(ctx, resolved, cargo_list)
+        errs += check_cargo_list(ctx, resolved, cargo_list, cargo_job)
     if e2e_records is not None:
         errs += check_e2e_records(resolved, e2e_records)
     return errs, resolved
@@ -994,7 +1215,7 @@ def check_record(rec: dict) -> list[str]:
     if not path or not (ROOT / path).exists():
         return [f"record file {path!r} does not exist"]
     anchor = rec.get("anchor")
-    if anchor and anchor not in (ROOT / path).read_text():
+    if anchor and not re.search(rf"(?<![\w-]){re.escape(anchor)}(?![\w-])", (ROOT / path).read_text()):
         return [f"record {path}: `{anchor}` not found in it"]
     return []
 
@@ -1038,26 +1259,27 @@ def parse_cargo_list(text: str) -> dict[tuple, set[str]]:
     return out
 
 
-def check_cargo_list(ctx: Context, resolved: dict[str, Resolved], files: list[str]) -> list[str]:
+def check_cargo_list(ctx: Context, resolved: dict[str, Resolved], files: list[str], job: str | None) -> list[str]:
+    """Every named test that a gating `cargo test` of `job` runs is in that job's listing: its
+    binary is there, and the test is in it."""
+    if not job:
+        return ["cargo list: --cargo-list needs --cargo-job, the CI job whose `cargo test` it lists"]
     listed: dict[tuple, set[str]] = {}
     for text in files:
         for k, v in parse_cargo_list(text).items():
             listed.setdefault(k, set()).update(v)
-    if not listed:
-        return ["cargo list: no test binaries found in the listing"]
-    targets = {(p.name, t.id): t for p in ctx.packages for t in p.targets}
-    errs, checked = [], 0
-    for r in resolved.values():
-        if not r.ok or r.rust is None:
-            continue
-        tg = targets[(r.rust.package, r.rust.target)]
+    expected = [r for r in resolved.values() if r.ok and r.rust is not None and job in r.jobs]
+    if not expected:
+        return [f"cargo list: no named test is run by job `{job}`"]
+    errs: list[str] = []
+    for r in sorted(expected, key=lambda r: (r.rust.package, r.rust.path)):
+        tg = r.rust.tgt
         if tg.list_key not in listed:
-            continue
-        checked += 1
-        if r.rust.path not in listed[tg.list_key]:
+            e = f"cargo list: the {tg.list_key[0]} binary of {r.rust.package} is missing from the listing"
+            if e not in errs:
+                errs.append(e)
+        elif r.rust.path not in listed[tg.list_key]:
             errs.append(f"cargo list: `{r.rust.path}` is not in the compiled {tg.list_key[0]} of {r.rust.package}")
-    if not checked:
-        errs.append("cargo list: none of the map's tests are in the listed binaries")
     return errs
 
 
@@ -1227,20 +1449,62 @@ def stale_errors(doc: str) -> list[str]:
     return []
 
 
-def self_test(ctx: Context) -> list[str]:
-    failures = []
-    base_errs, _ = validate(ctx)
+def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
+    """Inject each kind of error this script claims to catch, into the map, the workflow, a copy
+    of the sources (target/reqmap/selftest), a test listing or E2E records; each must be caught.
+    A few injections that must *not* be errors are checked too."""
+    global ROOT
+    failures: list[str] = []
+    base_errs, base_res = validate(ctx)
     if base_errs:
         return ["self-test needs a clean map first"] + base_errs
+    real_root = ROOT
+    wf = (ROOT / WORKFLOW).read_text()
+    sandbox = ROOT / "target" / "reqmap" / "selftest"
+    if sandbox.exists():
+        shutil.rmtree(sandbox)
+    for rel in ("Cargo.toml", "README.md", "LICENSE-MIT", "LICENSE-APACHE", str(WORKFLOW), str(E2E_SUITE)):
+        (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel, sandbox / rel)
+    for d in ("crates", "docs", "idl"):
+        shutil.copytree(ROOT / d, sandbox / d, ignore=shutil.ignore_patterns("target", ".run"))
 
-    def expect(label: str, mutate, needle: str, workflow: str | None = None):
+    def attempt(label, rmap_mut=None, workflow=None, files=None, **extra):
+        global ROOT
         m = copy.deepcopy(ctx.rmap)
-        mutate(m)
-        runs = ci_runs(workflow) if workflow else (ctx.cargo_runs, ctx.suite_runs, ctx.reqmap_runs)
-        c2 = Context(m, ctx.packages, ctx.tests, *runs, ctx.e2e_names)
-        errs, _ = validate(c2)
+        if rmap_mut:
+            rmap_mut(m)
+        originals: dict[Path, str] = {}
+        try:
+            if files:
+                ROOT = sandbox
+                for rel, (old, new) in files.items():
+                    path = sandbox / rel
+                    text = path.read_text()
+                    originals[path] = text
+                    if old is not None and old not in text:
+                        return [f"(self-test setup: {old!r} not in {rel})"]
+                    path.write_text(new + text if old is None else text.replace(old, new, 1))
+            return validate(load_context(m, workflow), **extra)[0]
+        except MapError as e:
+            return [str(e)]
+        finally:
+            for path, text in originals.items():
+                path.write_text(text)
+            ROOT = real_root
+
+    def expect(label, needle, **kw):
+        errs = attempt(label, **kw)
         if not any(needle in e for e in errs):
             failures.append(f"self-test `{label}`: expected an error containing {needle!r}, got {errs[:3]}")
+
+    def expect_ok(label, **kw):
+        errs = attempt(label, **kw)
+        if errs:
+            failures.append(f"self-test `{label}`: expected no error, got {errs[:3]}")
+
+    def clause(m, cid):
+        return next(c for c in m["clauses"] if c["id"] == cid)
 
     def first(m, status):
         return next(c for c in m["clauses"] if c["status"] == status and any("rust" in t for t in c.get("tests") or []))
@@ -1248,51 +1512,122 @@ def self_test(ctx: Context) -> list[str]:
     def rust_ref(m, status="shown"):
         return next(t for t in first(m, status)["tests"] if "rust" in t)
 
-    expect("renamed test", lambda m: rust_ref(m).update(rust=rust_ref(m)["rust"] + "_renamed"), "no test")
-    expect("wrong crate", lambda m: rust_ref(m).update(crate="escapement-idl"), "no test")
-    expect("unknown e2e step", lambda m: first(m, "shown")["tests"].append({"e2e": "no-such-step"}), "is not a check of")
-    expect("shown without tests", lambda m: first(m, "shown").update(tests=[]), "names no test")
-    expect("in part without remaining", lambda m: first(m, "in part").update(remaining=""), "does not say what is missing")
-    expect("status differs silently", lambda m: first(m, "in part").update(status="shown"), "differs from the proposal")
-    expect("missing record", lambda m: first(m, "shown").setdefault("records", []).append({"file": "docs/NOPE.md"}), "does not exist")
-    expect("missing anchor", lambda m: first(m, "shown").setdefault("records", []).append({"file": "docs/EVIDENCE.md", "anchor": "E-99"}), "not found")
-    ignored = next((t for t in ctx.tests if t.ignored), None)
-    if ignored:
-        wf = (ROOT / WORKFLOW).read_text()
-        no_manual = re.sub(r"-- --ignored", "--", wf)
-        expect("ignored test not run", lambda m: first(m, "shown")["tests"].append(
-            {"rust": ignored.path, "crate": ignored.package}), "#[ignore]", workflow=no_manual)
-        expect("only manual CI", lambda m: first(m, "shown").update(
-            tests=[{"rust": ignored.path, "crate": ignored.package}]), "runs on every push")
-    wf = (ROOT / WORKFLOW).read_text()
-    expect("crate not tested by CI", lambda m: None, "no `cargo test`",
-           workflow=wf.replace("cargo test --workspace --locked -- --nocapture", "cargo test -p escapement-idl --locked -- --nocapture"))
-    expect("suite not run", lambda m: None, "no CI job runs", workflow=wf.replace("bash e2e/run_e2e.sh", "true"))
+    # The map.
+    expect("renamed test", "no test", rmap_mut=lambda m: rust_ref(m).update(rust=rust_ref(m)["rust"] + "_renamed"))
+    expect("wrong crate", "no test", rmap_mut=lambda m: rust_ref(m).update(crate="escapement-idl"))
+    expect("unknown E2E check", "is not a check of", rmap_mut=lambda m: first(m, "shown")["tests"].append({"e2e": "no-such-step"}))
+    expect("shown without tests", "names no test", rmap_mut=lambda m: first(m, "shown").update(tests=[]))
+    expect("in part without remaining", "does not say what is missing", rmap_mut=lambda m: first(m, "in part").update(remaining=""))
+    expect("not yet without milestone", "names no milestone", rmap_mut=lambda m: clause(m, "U2a").update(remaining="later"))
+    expect("waits on Logos without testnet", "does not name LEZ testnet 0.4", rmap_mut=lambda m: clause(m, "P2").update(remaining="later"))
+    expect("status differs silently", "differs from the proposal", rmap_mut=lambda m: clause(m, "U1").update(status="shown"))
+    expect("code_says on an equal status", "`code_says` is set but", rmap_mut=lambda m: clause(m, "F1").update(code_says="x"))
+    expect("missing record", "does not exist", rmap_mut=lambda m: clause(m, "F1")["records"].append({"file": "docs/NOPE.md"}))
+    expect("missing anchor", "not found", rmap_mut=lambda m: clause(m, "F1")["records"].append({"file": "docs/EVIDENCE.md", "anchor": "E-99"}))
+    expect("anchor that is only a prefix (E-1 in E-12)", "not found",
+           rmap_mut=lambda m: clause(m, "F1")["records"].append({"file": "docs/EVIDENCE.md", "anchor": "E-1"}))
+    expect("test named twice", "named twice", rmap_mut=lambda m: clause(m, "F1")["tests"].append(dict(clause(m, "F1")["tests"][0])))
 
     def s3_shown(m):
-        next(c for c in m["clauses"] if c["id"] == "S3").update(status="shown", code_says="self-test")
-    expect("S3 overclaims", s3_shown, "S3 is `shown`")
-    # A map edit without regenerating the page.
-    m = copy.deepcopy(ctx.rmap)
-    m["clauses"][0]["note"] = (m["clauses"][0].get("note") or "") + " (edited)"
-    c2 = Context(m, ctx.packages, ctx.tests, ctx.cargo_runs, ctx.suite_runs, ctx.reqmap_runs, ctx.e2e_names)
-    _, resolved = validate(c2)
-    if not stale_errors(render(c2, resolved)):
+        clause(m, "S3").update(status="shown", code_says="self-test")
+    expect("S3 overclaims", "S3 is `shown`", rmap_mut=s3_shown)
+    ignored = next((t for t in ctx.tests if t.ignored), None)
+    if ignored:
+        expect("only a manual job runs it", "runs on every push",
+               rmap_mut=lambda m: clause(m, "F1").update(tests=[{"rust": ignored.path, "crate": ignored.package}]))
+        expect("ignored test not run", "#[ignore]", workflow=wf.replace("-- --ignored", "--"),
+               rmap_mut=lambda m: clause(m, "F1")["tests"].append({"rust": ignored.path, "crate": ignored.package}))
+    m2 = copy.deepcopy(ctx.rmap)
+    m2["clauses"][0]["note"] = (m2["clauses"][0].get("note") or "") + " (edited)"
+    c2 = Context(m2, ctx.packages, ctx.tests, ctx.cargo_runs, ctx.suite_runs, ctx.reqmap_runs, ctx.e2e_names)
+    if not stale_errors(render(c2, validate(c2)[1])):
         failures.append("self-test `stale page`: an edited map did not make the page stale")
-    # RFP text: a changed clause, an uncovered item, a different file.
-    rfp_path = os.environ.get("REQMAP_SELFTEST_RFP")
-    if rfp_path:
-        text = Path(rfp_path).read_text()
+
+    # The workflow: not run, not gating, not on every push.
+    test_cmd = "cargo test --workspace --locked -- --nocapture"
+    test_step = f"        run: {test_cmd}\n"
+    if test_step not in wf or "  push:\n    branches: [main]\n" not in wf or "  core-and-guest:\n    runs-on: ubuntu-latest\n" not in wf:
+        failures.append("self-test: the workflow no longer has the lines the injections edit")
+    else:
+        expect("crate not tested by CI", "no `cargo test`", workflow=wf.replace(test_cmd, "cargo test -p escapement-idl --locked -- --nocapture"))
+        expect("suite not run", "no CI job runs", workflow=wf.replace("bash e2e/run_e2e.sh", "true"))
+        expect("step continue-on-error", "do not gate", workflow=wf.replace(test_step, test_step + "        continue-on-error: true\n"))
+        expect("job continue-on-error", "do not gate", workflow=wf.replace(
+            "  core-and-guest:\n    runs-on: ubuntu-latest\n", "  core-and-guest:\n    runs-on: ubuntu-latest\n    continue-on-error: true\n"))
+        expect("`|| true`", "do not gate", workflow=wf.replace(test_cmd, test_cmd + " || true"))
+        expect("`&& echo`", "do not gate", workflow=wf.replace(test_step, f"        run: |\n          {test_cmd} && echo done\n          echo next\n"))
+        expect("pipe without pipefail", "do not gate", workflow=wf.replace(test_cmd, test_cmd + " | tee log.txt"))
+        expect("`set +e`", "do not gate", workflow=wf.replace(test_step, f"        run: |\n          set +e\n          {test_cmd}\n          echo done\n"))
+        expect("inside a subshell", "do not gate", workflow=wf.replace(test_cmd, f"({test_cmd})"))
+        expect("background", "do not gate", workflow=wf.replace(test_step, f"        run: |\n          {test_cmd} &\n          wait\n"))
+        expect_ok("pipe under `shell: bash` (pipefail) still gates", workflow=wf.replace(
+            test_step, f"        shell: bash\n        run: {test_cmd} 2>&1 | tee log.txt\n"))
+        expect_ok("pipe after `set -o pipefail` still gates", workflow=wf.replace(
+            test_step, f"        run: |\n          set -o pipefail\n          {test_cmd} | tee log.txt\n"))
+        expect("needs a manual job", "runs on every push", workflow=wf.replace(
+            "  core-and-guest:\n    runs-on: ubuntu-latest\n", "  core-and-guest:\n    needs: real-stark-proof\n    runs-on: ubuntu-latest\n").replace(
+            "  e2e-standalone-sequencer:\n    runs-on: ubuntu-latest\n", "  e2e-standalone-sequencer:\n    needs: real-stark-proof\n    runs-on: ubuntu-latest\n"))
+        expect("push filtered by paths", "runs on every push", workflow=wf.replace(
+            "  push:\n    branches: [main]\n", "  push:\n    branches: [main]\n    paths: ['nothing/**']\n"))
+        expect("push to other branches only", "runs on every push", workflow=wf.replace(
+            "  push:\n    branches: [main]\n", "  push:\n    branches: [release]\n"))
+
+    # The sources and manifests (in the copy).
+    idl_test = "crates/escapement-idl/tests/idl.rs"
+    idl_fn = "fn u6_generated_idl_matches_committed"
+    idl_toml = "crates/escapement-idl/Cargo.toml"
+    expect("cfg_attr(unknown, ignore)", "cannot evaluate", files={idl_test: (idl_fn, '#[cfg_attr(not(feature = "never"), ignore)]\n' + idl_fn)})
+    expect("cfg_attr(test, ignore)", "#[ignore]", files={idl_test: (idl_fn, "#[cfg_attr(test, ignore)]\n" + idl_fn)})
+    expect("should_panic", "should_panic", files={idl_test: (idl_fn, "#[should_panic]\n" + idl_fn)})
+    expect("inner #![cfg(unknown)]", "cannot evaluate", files={idl_test: (None, '#![cfg(feature = "never")]\n')})
+    expect("inner #![cfg(false)]", "no test", files={idl_test: (None, "#![cfg(kani)]\n")})
+    expect("cfg(false) on the test", "no test", files={idl_test: (idl_fn, "#[cfg(windows)]\n" + idl_fn)})
+    expect("required-features", "needs features", files={idl_toml: ("[dependencies]", '[[test]]\nname = "idl"\nrequired-features = ["never"]\n\n[dependencies]')})
+    expect("harness = false", "harness = false", files={idl_toml: ("[dependencies]", '[[test]]\nname = "idl"\nharness = false\n\n[dependencies]')})
+    expect("test = false", "test = false", files={"crates/escapement-sdk/Cargo.toml": ("[dependencies]", "[lib]\ntest = false\n\n[dependencies]")})
+    expect("autotests = false", "no test", files={idl_toml: ("[package]\n", "[package]\nautotests = false\n")})
+    expect("same name in two targets", "several targets", files={"crates/escapement-idl/src/lib.rs": (None, f"#[test]\n{idl_fn}() {{}}\n")})
+    expect("guest manifest without the licence", "license:", files={"crates/escapement-methods/guest/Cargo.toml": ('license = "MIT OR Apache-2.0"\n', "")})
+
+    # Listings of compiled tests, and E2E records.
+    blocks: dict[tuple, set[str]] = {}
+    for r in base_res.values():
+        if r.ok and r.rust is not None and "core-and-guest" in r.jobs:
+            blocks.setdefault(r.rust.tgt.list_key, set()).add(r.rust.path)
+
+    def listing(drop_target=None, drop_test=None) -> str:
+        out = []
+        for (src, stem), names in sorted(blocks.items()):
+            if stem != drop_target:
+                out.append(f"     Running {src} (target/debug/deps/{stem}-0123456789abcdef)")
+                out += [f"{n}: test" for n in sorted(names) if n != drop_test]
+        return "\n".join(out)
+    one = sorted(blocks)[0]
+    expect_ok("complete listing", cargo_list=[listing()], cargo_job="core-and-guest")
+    expect("a whole test binary missing", "missing from the listing", cargo_list=[listing(drop_target="escapement_e2e")], cargo_job="core-and-guest")
+    expect("a test missing from its binary", "is not in the compiled", cargo_list=[listing(drop_test=sorted(blocks[one])[0])], cargo_job="core-and-guest")
+    expect("empty listing", "missing from the listing", cargo_list=[""], cargo_job="core-and-guest")
+    expect("listing without its job", "needs --cargo-job", cargo_list=[listing()])
+    names = list(dict.fromkeys(ctx.e2e_names))
+    rec = lambda n, ok=True: json.dumps({"step": n, "ok": ok, "out": None})  # noqa: E731
+    named = sorted({r.ref["e2e"] for r in base_res.values() if "e2e" in r.ref})
+    expect_ok("complete E2E records", e2e_records=["\n".join(rec(n) for n in names)])
+    expect("an E2E check not recorded", "was not recorded", e2e_records=["\n".join(rec(n) for n in names if n != named[0])])
+    expect("an E2E check failed", "failed in this run", e2e_records=["\n".join(rec(n, n != named[0]) for n in names)])
+
+    # The RFP text.
+    if rfp_text is not None:
         m = copy.deepcopy(ctx.rmap)
         m["clauses"][0]["text"] += " (paraphrased)"
-        if not any("verbatim" in e for e in check_rfp(m, text)):
+        if not any("verbatim" in e for e in check_rfp(m, rfp_text)):
             failures.append("self-test `paraphrased clause`: not caught")
         m = copy.deepcopy(ctx.rmap)
         m["clauses"] = [c for c in m["clauses"] if c["id"] != "R2"]
-        if not any("not covered" in e for e in check_rfp(m, text)):
+        if not any("not covered" in e for e in check_rfp(m, rfp_text)):
             failures.append("self-test `dropped clause`: not caught")
-        if not any("SHA-256" in e for e in check_rfp(ctx.rmap, text + "\n")):
+        if not any("SHA-256" in e for e in check_rfp(ctx.rmap, rfp_text + "\n")):
             failures.append("self-test `different RFP file`: not caught")
+    shutil.rmtree(sandbox, ignore_errors=True)
     return failures
 
 
@@ -1303,6 +1638,7 @@ def main() -> int:
     ap.add_argument("--write", action="store_true", help="regenerate docs/REQUIREMENTS.md")
     ap.add_argument("--rfp", help="the RFP text at the pinned commit")
     ap.add_argument("--cargo-list", action="append", default=[], help="output of `cargo test ... -- --list` (repeatable)")
+    ap.add_argument("--cargo-job", help="the CI job the --cargo-list listing comes from")
     ap.add_argument("--e2e-records", action="append", default=[], help="e2e/.run/out/e2e.jsonl (repeatable)")
     ap.add_argument("--self-test", action="store_true", help="show each kind of error is caught")
     ap.add_argument("--print-rfp-url", action="store_true", help="print where CI downloads the pinned RFP text")
@@ -1314,9 +1650,7 @@ def main() -> int:
     try:
         ctx = load_context()
         if a.self_test:
-            if a.rfp:
-                os.environ["REQMAP_SELFTEST_RFP"] = a.rfp
-            fails = self_test(ctx)
+            fails = self_test(ctx, Path(a.rfp).read_text() if a.rfp else None)
             for f in fails:
                 print(f"FAIL {f}", file=sys.stderr)
             print(f"check-reqmap self-test: {'FAILED' if fails else 'every injected error was caught'}")
@@ -1325,7 +1659,8 @@ def main() -> int:
             ctx,
             rfp_text=Path(a.rfp).read_text() if a.rfp else None,
             cargo_list=[Path(f).read_text() for f in a.cargo_list] or None,
-            e2e_records=[Path(f).read_text() for f in a.e2e_records] or None)
+            e2e_records=[Path(f).read_text() for f in a.e2e_records] or None,
+            cargo_job=a.cargo_job)
         doc = render(ctx, resolved)
         if a.write:
             (ROOT / DOC).write_text(doc)

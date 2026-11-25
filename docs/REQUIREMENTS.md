@@ -6,7 +6,7 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 
 **Status** is the one the filed proposal gives (section 9, "Strict Requirement Status Table (24 Nov 2026)", filed for repository commit 2ddc57c) unless a row says the code disagrees. **shown**: every clause asserted by a named test that CI runs on every push to main, on real compiled code (LEZ v0.4.0-rc3's state machine in-process with the real guest, and/or an unmodified standalone v0.4.0-rc3 sequencer). **in part**: some of the clause shown as above; what remains is named. **not yet**: not built; the milestone that builds it is named. **waits on Logos**: needs LEZ testnet 0.4, which has not launched (latest LEZ tag v0.4.0-rc3).
 
-**45 clauses: 29 shown, 11 in part, 3 not yet, 2 waits on Logos.** No row's status is contradicted by the code. Evidence gaps noted (status kept): R2.
+**45 clauses: 27 shown, 13 in part, 3 not yet, 2 waits on Logos.** Rows where the code contradicts the proposal: F3c, P1. 
 
 ## What CI enforces
 
@@ -14,10 +14,10 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 
 - a clause is not quoted verbatim from the RFP text at the pinned commit (CI downloads it from that commit and checks its SHA-256), or a requirement item of the RFP (Fee structure 1-4, Functionality, Usability, Reliability, Performance, Supportability, + Privacy, Soft Requirements, Open Source) has words that no clause quotes;
 - a named Rust test does not exist: the script reads each crate's source, follows its modules and evaluates `#[cfg]`, so the name is the full libtest path in the named crate;
-- a named Rust test is not run by any `cargo test` in `.github/workflows/ci.yml`: the package, the target, the filters and `#[ignore]` (run only with `--ignored`) are all taken into account;
-- after the tests are built, a named Rust test is missing from the compiled test binaries (`cargo test ... -- --list`), in the job that runs it;
+- a named Rust test is not run by any `cargo test` in `.github/workflows/ci.yml` whose failure fails the job: the package, the target (`test = false`, `harness = false`, `required-features`, `autotests`), the filters, `#[ignore]` (also through `cfg_attr`; run only with `--ignored`) and `#[should_panic]` are all taken into account, and a step with `continue-on-error`, a command followed by `||`, `&&` or `&`, piped without `pipefail`, run under `set +e` or inside `( ... )` does not count;
+- after the tests are built, a named Rust test, or its whole test binary, is missing from the compiled test binaries (`cargo test ... -- --list`) of the job that runs it;
 - a named end-to-end check is not one that `e2e/run_e2e.sh` records, or no CI job runs that suite; after the suite runs in CI, a named check was not recorded as passed in that run;
-- a `shown` clause names no test, or none of its tests runs on every push to `main` (a test that only the manual job runs does not count on its own);
+- a `shown` clause names no test, or none of its tests runs on every push to `main` (a manual job, a job that `needs` one, or a push trigger filtered by `paths`, `tags` or `branches-ignore` does not count);
 - an `in part`, `not yet` or `waits on Logos` clause does not say what remains (`not yet` must name its milestone, `waits on Logos` must name LEZ testnet 0.4);
 - a status differs from the one the filed proposal gives and the row does not say what in the code contradicts it;
 - a record (file, or an anchor in it such as an EVIDENCE row) does not exist;
@@ -29,15 +29,15 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | Clause | Requirement (short) | Status | Tests | Records |
 |---|---|---|---|---|
 | [F1](#f1) | Vesting program that escrows tokens against a schedule | shown | 5 | 3 |
-| [F1a](#f1a) | Cliff + linear vesting | shown | 4 | 2 |
+| [F1a](#f1a) | Cliff + linear vesting | shown | 5 | 2 |
 | [F1b](#f1b) | Fully linear vesting | shown | 7 | 2 |
-| [F1c](#f1c) | Milestone vesting, fixed amount per signal | shown | 5 | 2 |
+| [F1c](#f1c) | Milestone vesting, fixed amount per signal | shown | 6 | 2 |
 | [F2a](#f2a) | Beneficiary set at creation | shown | 4 | 1 |
 | [F2b](#f2b) | Claim to a public or a private account | shown | 8 | 3 |
 | [F2c](#f2c) | Creator does not learn the private account | shown | 6 | 2 |
 | [F3a](#f3a) | Cancelable set at creation, default cancelable | shown | 4 | 1 |
 | [F3b](#f3b) | One-way conversion to non-cancelable | shown | 5 | 2 |
-| [F3c](#f3c) | Cancel returns the unvested balance to the creator | shown | 5 | 2 |
+| [F3c](#f3c) | Cancel returns the unvested balance to the creator | in part (code differs from the proposal) | 5 | 2 |
 | [F3d](#f3d) | Vested tokens stay claimable after cancel | shown | 7 | 2 |
 | [F4](#f4) | Transferability set at creation, immutable | shown | 5 | 2 |
 | [F5](#f5) | Batch creation; maximum per transaction documented | shown | 3 | 2 |
@@ -53,10 +53,10 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | [U6](#u6) | IDL with SPEL | shown | 2 | 2 |
 | [U7](#u7) | Actionable errors, next unlock when nothing is claimable | in part | 7 | 2 |
 | [R1](#r1) | Atomic claim; retry without loss | shown | 6 | 2 |
-| [R2](#r2) | Atomic cancellation | shown (evidence gap noted) | 5 | 2 |
+| [R2](#r2) | Atomic cancellation | shown | 5 | 2 |
 | [R3](#r3) | Concurrent claims on independent schedules | shown | 3 | 1 |
 | [R4](#r4) | Milestone signal idempotent, deterministic error | shown | 3 | 2 |
-| [P1](#p1) | One claim, one transaction | shown | 6 | 1 |
+| [P1](#p1) | One claim, one transaction | in part (code differs from the proposal) | 6 | 1 |
 | [P2](#p2) | Cost of each operation, measured on testnet 0.4 | waits on Logos | 2 | 2 |
 | [S1](#s1) | Deployed and tested on testnet 0.4 | waits on Logos | 2 | 1 |
 | [S2](#s2) | E2E against a standalone sequencer, in CI, green on main | shown | 7 | 4 |
@@ -108,10 +108,11 @@ Records:
 
 **Status: shown.** Proposal row `F1`: shown.
 
-**Note:** The lump sum is the creator's `cliff_amount`, released at `cliff_ts`; the rest vests linearly to `end_ts`. Shown in-process (property tests and the real guest); the sequencer suite runs linear and milestone schedules, not a cliff.
+**Note:** The lump sum is the creator's `cliff_amount`, released at `cliff_ts`; the rest vests linearly to `end_ts` (hand-computed values before, at and after the cliff, in the tail and at the end, plus property tests). The guest runs the same `escapement-core` function; in-process tests show the cliff payment and the pre-cliff refusal. The sequencer suite runs linear and milestone schedules, not a cliff.
 
 Tests:
 
+- `math::tests::f1a_cliff_lump_sum_then_linear_tail_at_concrete_points` (escapement-core, [crates/escapement-core/src/math.rs](../crates/escapement-core/src/math.rs)); CI: core-and-guest (every push and pull request)
 - `math::tests::cliff_linear_monotonic_bounded_and_exact_terminal` (escapement-core, [crates/escapement-core/src/math.rs](../crates/escapement-core/src/math.rs)); CI: core-and-guest (every push and pull request)
 - `math::tests::degenerate_bounds_and_validation_negatives` (escapement-core, [crates/escapement-core/src/math.rs](../crates/escapement-core/src/math.rs)); CI: core-and-guest (every push and pull request)
 - `full_lifecycle_all_schedule_types_authorities_and_refusals` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
@@ -153,12 +154,13 @@ Records:
 
 **Status: shown.** Proposal row `F1`: shown.
 
-**Note:** The creator signals unless a milestone authority was named at creation; that authority then replaces the creator exclusively (SR2, DECISIONS D-06).
+**Note:** The creator signals and the beneficiary then claims exactly that tranche (3,000 of 10,000) in `negative_guards_*`; the stateful suite has the creator signal among its random operations. When a milestone authority is named at creation it replaces the creator exclusively (SR2, DECISIONS D-06): `full_lifecycle_*` and the sequencer suite signal through such an authority.
 
 Tests:
 
+- `negative_guards_authority_zero_address_and_overclaim_suite` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
+- `stateful_handler_conservation_invariant_suite` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - `full_lifecycle_all_schedule_types_authorities_and_refusals` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
-- `native_asset_lifecycle_fees_batch_private_claim_and_ceilings` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - E2E `create-milestone`; CI: e2e-standalone-sequencer (every push and pull request)
 - E2E `signal-applied`; CI: e2e-standalone-sequencer (every push and pull request)
 - E2E `milestone-tranche-received`; CI: e2e-standalone-sequencer (every push and pull request)
@@ -288,9 +290,11 @@ Records:
 
 *RFP: Hard Requirements / Functionality 3, third sentence.*
 
-**Status: shown.** Proposal row `F3`: shown.
+**Status: in part.** Proposal row `F3`: shown.
 
-**Note:** The refund goes to the schedule's `refund_holding`, fixed at creation and validated then; the SDK and CLI default it to the creator's funding account (DECISIONS D-06).
+**The code says otherwise:** The refund goes to the schedule's `refund_holding`, which the creator may set at creation to any valid account, not only its own: `full_lifecycle_*` refunds 40,000 to a treasury distinct from the creator (DECISIONS D-06, D-13). Refunds go to the creator's account by default (SDK and CLI) and in every other test.
+
+**Remaining:** Restricting `refund_holding` to the creator's own account, or the RFP accepting a creator-named refund account; changing it changes the guest's image id.
 
 Tests:
 
@@ -647,13 +651,13 @@ Records:
 
 **Status: shown.** Proposal row `R1–R4`: shown.
 
-**Evidence gap:** The tests that compare the whole state before and after a failed cancel all fail it at its first step (wrong authority, cancelled twice, after non-cancelable). The one cancel that fails after its first step, once the schedule's state has been set to pending the clock reply (`c1_same_block_clock_lag_cancel_protects_shared_batch_escrow`: a fully claimed schedule, code 20), asserts only the exit code, not that the schedule is back in its prior state.
+**Note:** `c1_*` cancels a fully claimed schedule: `Cancel` first sets the schedule to wait for the clock reply, then the continuation refuses (code 20); the test compares every account before and after and finds the schedule back in its prior, uncancelled state. The other tests compare the whole state after cancels refused at the first step (wrong authority, cancelled twice, after non-cancelable, by the beneficiary).
 
 Tests:
 
+- `c1_same_block_clock_lag_cancel_protects_shared_batch_escrow` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - `stateful_handler_conservation_invariant_suite` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - `comprehensive_error_codes_and_security_hardening_suite` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
-- `c1_same_block_clock_lag_cancel_protects_shared_batch_escrow` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - E2E `refusal-cancel-after-noncancelable-reverted-state-unchanged`; CI: e2e-standalone-sequencer (every push and pull request)
 - E2E `refusal-beneficiary-cancels-reverted-state-unchanged`; CI: e2e-standalone-sequencer (every push and pull request)
 
@@ -711,9 +715,11 @@ Records:
 
 *RFP: Hard Requirements / Performance 1.*
 
-**Status: shown.** Proposal row `P1`: shown (public: native + token; private: native and token with real proofs on the sequencer, one transaction per claim once the private token holding exists).
+**Status: in part.** Proposal row `P1`: shown (public: native + token; private: native and token with real proofs on the sequencer, one transaction per claim once the private token holding exists).
 
-**Note:** A new private account first needs one private `InitializeHolding` transaction per token (folded into the claim in M2).
+**The code says otherwise:** A claim into a private account that has no holding of the token yet takes two transactions: one private `InitializeHolding`, then the claim (E2E `private-token-holding` before `claim-private-token-*`); a claim without the holding is refused. Public claims, native private claims and token private claims into an existing holding take one transaction each.
+
+**Remaining:** Folding the private holding's initialization into the claim, so a fresh private token account also claims in one transaction (M2).
 
 Tests:
 
@@ -1064,7 +1070,7 @@ Records:
 
 Tests:
 
-- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every crate's manifest says `license = "MIT OR Apache-2.0"`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), requirement-map (every push and pull request)
+- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the repository, the guest crates included, says `license = "MIT OR Apache-2.0"`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), requirement-map (every push and pull request)
 
 Records:
 

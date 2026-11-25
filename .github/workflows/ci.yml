@@ -134,7 +134,7 @@ jobs:
         run: |
           mkdir -p target/reqmap
           cargo test --workspace --locked -- --list > target/reqmap/workspace-tests.txt 2>&1 || { cat target/reqmap/workspace-tests.txt; exit 1; }
-          python3 scripts/check-reqmap.py --cargo-list target/reqmap/workspace-tests.txt
+          python3 scripts/check-reqmap.py --cargo-job core-and-guest --cargo-list target/reqmap/workspace-tests.txt
 
   # S2: the end-to-end suite against an unmodified standalone LEZ v0.4.0-rc3 sequencer (mock
   # Bedrock, loopback only), driven by the Escapement CLI: immutable deployment and header read-back,
@@ -209,7 +209,7 @@ jobs:
         run: |
           mkdir -p target/reqmap
           (cd crates/escapement-cli && cargo test --release --locked -- --list) > target/reqmap/cli-tests.txt 2>&1 || { cat target/reqmap/cli-tests.txt; exit 1; }
-          python3 scripts/check-reqmap.py --cargo-list target/reqmap/cli-tests.txt --e2e-records e2e/.run/out/e2e.jsonl
+          python3 scripts/check-reqmap.py --cargo-job e2e-standalone-sequencer --cargo-list target/reqmap/cli-tests.txt --e2e-records e2e/.run/out/e2e.jsonl
 
       - name: Keep the suite's records
         if: always()

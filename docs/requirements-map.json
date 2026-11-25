@@ -1,22 +1,8 @@
 {
   "schema": "escapement-requirements-map/1",
-  "rfp": {
-    "id": "RFP-017",
-    "title": "Privacy-Preserving Token Vesting",
-    "repo": "logos-co/rfp",
-    "path": "RFPs/RFP-017-token-vesting.md",
-    "commit": "fa029d7d9328aceb2393cca44955daf7256d5dca",
-    "sha256": "33cf4a43d34530a78b43060262338ca86bd2c01f5346bf891f576f11739b30c8"
-  },
-  "proposal": {
-    "where": "section 9, \"Strict Requirement Status Table (24 Nov 2026)\", filed for repository commit 2ddc57c"
-  },
-  "statuses": {
-    "shown": "every clause asserted by a named test that CI runs on every push to main, on real compiled code (LEZ v0.4.0-rc3's state machine in-process with the real guest, and/or an unmodified standalone v0.4.0-rc3 sequencer).",
-    "in part": "some of the clause shown as above; what remains is named.",
-    "not yet": "not built; the milestone that builds it is named.",
-    "waits on Logos": "needs LEZ testnet 0.4, which has not launched (latest LEZ tag v0.4.0-rc3)."
-  },
+  "rfp": {"id": "RFP-017", "title": "Privacy-Preserving Token Vesting", "repo": "logos-co/rfp", "path": "RFPs/RFP-017-token-vesting.md", "commit": "fa029d7d9328aceb2393cca44955daf7256d5dca", "sha256": "33cf4a43d34530a78b43060262338ca86bd2c01f5346bf891f576f11739b30c8"},
+  "proposal": {"where": "section 9, \"Strict Requirement Status Table (24 Nov 2026)\", filed for repository commit 2ddc57c"},
+  "statuses": {"shown": "every clause asserted by a named test that CI runs on every push to main, on real compiled code (LEZ v0.4.0-rc3's state machine in-process with the real guest, and/or an unmodified standalone v0.4.0-rc3 sequencer).", "in part": "some of the clause shown as above; what remains is named.", "not yet": "not built; the milestone that builds it is named.", "waits on Logos": "needs LEZ testnet 0.4, which has not launched (latest LEZ tag v0.4.0-rc3)."},
   "groups": [
     {"id": "F", "title": "Hard requirements: Functionality", "s3": true},
     {"id": "U", "title": "Hard requirements: Usability", "s3": true},
@@ -31,10 +17,13 @@
   ],
   "clauses": [
     {
-      "id": "F1", "group": "F", "rfp_where": "Hard Requirements / Functionality 1",
+      "id": "F1",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 1",
       "short": "Vesting program that escrows tokens against a schedule",
       "text": "Implement a vesting program on LEZ that locks tokens in escrow against a configured schedule. The program must support:",
-      "status": "shown", "proposal": {"row": "F1", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F1", "status": "shown"},
       "note": "Native LEZ and token schedules. Each schedule's tokens sit in a program-derived escrow (one per schedule, or one shared per batch) that only the program debits, with its PDA seed (DECISIONS D-07, D-13).",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -50,12 +39,16 @@
       ]
     },
     {
-      "id": "F1a", "group": "F", "rfp_where": "Hard Requirements / Functionality 1, first bullet",
+      "id": "F1a",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 1, first bullet",
       "short": "Cliff + linear vesting",
       "text": "Cliff + linear vesting: tokens become claimable in a lump sum at the cliff date, then linearly over the remaining duration (e.g., 1-year cliff, 3-year linear release).",
-      "status": "shown", "proposal": {"row": "F1", "status": "shown"},
-      "note": "The lump sum is the creator's `cliff_amount`, released at `cliff_ts`; the rest vests linearly to `end_ts`. Shown in-process (property tests and the real guest); the sequencer suite runs linear and milestone schedules, not a cliff.",
+      "status": "shown",
+      "proposal": {"row": "F1", "status": "shown"},
+      "note": "The lump sum is the creator's `cliff_amount`, released at `cliff_ts`; the rest vests linearly to `end_ts` (hand-computed values before, at and after the cliff, in the tail and at the end, plus property tests). The guest runs the same `escapement-core` function; in-process tests show the cliff payment and the pre-cliff refusal. The sequencer suite runs linear and milestone schedules, not a cliff.",
       "tests": [
+        {"crate": "escapement-core", "rust": "math::tests::f1a_cliff_lump_sum_then_linear_tail_at_concrete_points"},
         {"crate": "escapement-core", "rust": "math::tests::cliff_linear_monotonic_bounded_and_exact_terminal"},
         {"crate": "escapement-core", "rust": "math::tests::degenerate_bounds_and_validation_negatives"},
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -67,10 +60,13 @@
       ]
     },
     {
-      "id": "F1b", "group": "F", "rfp_where": "Hard Requirements / Functionality 1, second bullet",
+      "id": "F1b",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 1, second bullet",
       "short": "Fully linear vesting",
       "text": "Fully linear vesting: no cliff; tokens accrue continuously from the start date.",
-      "status": "shown", "proposal": {"row": "F1", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F1", "status": "shown"},
       "tests": [
         {"crate": "escapement-core", "rust": "math::tests::linear_monotonic_bounded_and_exact_terminal"},
         {"crate": "escapement-tests", "rust": "native_asset_lifecycle_fees_batch_private_claim_and_ceilings"},
@@ -86,14 +82,18 @@
       ]
     },
     {
-      "id": "F1c", "group": "F", "rfp_where": "Hard Requirements / Functionality 1, third bullet",
+      "id": "F1c",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 1, third bullet",
       "short": "Milestone vesting, fixed amount per signal",
       "text": "Milestone-based vesting: the schedule creator explicitly signals completion of discrete tranches; each signal unlocks a fixed token amount for the beneficiary to claim.",
-      "status": "shown", "proposal": {"row": "F1", "status": "shown"},
-      "note": "The creator signals unless a milestone authority was named at creation; that authority then replaces the creator exclusively (SR2, DECISIONS D-06).",
+      "status": "shown",
+      "proposal": {"row": "F1", "status": "shown"},
+      "note": "The creator signals and the beneficiary then claims exactly that tranche (3,000 of 10,000) in `negative_guards_*`; the stateful suite has the creator signal among its random operations. When a milestone authority is named at creation it replaces the creator exclusively (SR2, DECISIONS D-06): `full_lifecycle_*` and the sequencer suite signal through such an authority.",
       "tests": [
+        {"crate": "escapement-tests", "rust": "negative_guards_authority_zero_address_and_overclaim_suite"},
+        {"crate": "escapement-tests", "rust": "stateful_handler_conservation_invariant_suite"},
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
-        {"crate": "escapement-tests", "rust": "native_asset_lifecycle_fees_batch_private_claim_and_ceilings"},
         {"e2e": "create-milestone"},
         {"e2e": "signal-applied"},
         {"e2e": "milestone-tranche-received"}
@@ -104,10 +104,13 @@
       ]
     },
     {
-      "id": "F2a", "group": "F", "rfp_where": "Hard Requirements / Functionality 2, first sentence",
+      "id": "F2a",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 2, first sentence",
       "short": "Beneficiary set at creation",
       "text": "The schedule creator specifies the beneficiary at schedule creation.",
-      "status": "shown", "proposal": {"row": "F2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F2", "status": "shown"},
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
         {"crate": "escapement-tests", "rust": "negative_guards_authority_zero_address_and_overclaim_suite"},
@@ -119,10 +122,13 @@
       ]
     },
     {
-      "id": "F2b", "group": "F", "rfp_where": "Hard Requirements / Functionality 2, second sentence",
+      "id": "F2b",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 2, second sentence",
       "short": "Claim to a public or a private account",
       "text": "Recipients can claim vested tokens to a public account or to a private account.",
-      "status": "shown", "proposal": {"row": "F2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F2", "status": "shown"},
       "note": "Native and token claims, public and private, on the sequencer; the private ones also with real RISC Zero proofs verified by the sequencer (EVIDENCE E-13). The in-process real-proof test runs in CI's manual job only.",
       "tests": [
         {"crate": "escapement-tests", "rust": "s1_private_claim_blinded_alias_single_tx_and_fresh_values_per_claim"},
@@ -141,10 +147,13 @@
       ]
     },
     {
-      "id": "F2c", "group": "F", "rfp_where": "Hard Requirements / Functionality 2, third sentence",
+      "id": "F2c",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 2, third sentence",
       "short": "Creator does not learn the private account",
       "text": "The schedule creator does not learn the recipient's private account address from the claim interaction.",
-      "status": "shown", "proposal": {"row": "F2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F2", "status": "shown"},
       "note": "No private account id, nullifier key or viewing key in the transaction bytes, events or state; fresh aliases, nullifiers and commitments per claim. The claims themselves stay linkable through the public beneficiary, schedule, amount and time, as the RFP's privacy limitation accepts.",
       "tests": [
         {"crate": "escapement-tests", "rust": "adversarial_20_claim_no_leak_and_distinct_values_suite"},
@@ -160,10 +169,13 @@
       ]
     },
     {
-      "id": "F3a", "group": "F", "rfp_where": "Hard Requirements / Functionality 3, first sentence",
+      "id": "F3a",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 3, first sentence",
       "short": "Cancelable set at creation, default cancelable",
       "text": "The schedule creator sets whether the schedule is cancelable at creation time (default: cancelable).",
-      "status": "shown", "proposal": {"row": "F3", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F3", "status": "shown"},
       "note": "The SDK's requests default to cancelable; the CLI's `create` is cancelable unless `--non-cancelable` is given (the suite creates its linear schedule without the flag and cancels it).",
       "tests": [
         {"crate": "escapement-sdk", "rust": "builders::tests::f3a_requests_default_to_cancelable_with_refunds_to_the_funder"},
@@ -176,10 +188,13 @@
       ]
     },
     {
-      "id": "F3b", "group": "F", "rfp_where": "Hard Requirements / Functionality 3, second sentence",
+      "id": "F3b",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 3, second sentence",
       "short": "One-way conversion to non-cancelable",
       "text": "A cancelable schedule can be converted to non-cancelable by the creator; this conversion is irreversible.",
-      "status": "shown", "proposal": {"row": "F3", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F3", "status": "shown"},
       "note": "No message makes a schedule cancelable again. When a cancel authority was named at creation, that authority (not the creator) converts, as it alone cancels (DECISIONS D-06).",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -194,11 +209,13 @@
       ]
     },
     {
-      "id": "F3c", "group": "F", "rfp_where": "Hard Requirements / Functionality 3, third sentence",
+      "id": "F3c",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 3, third sentence",
       "short": "Cancel returns the unvested balance to the creator",
       "text": "When a cancelable schedule is cancelled, the unclaimed, unvested token balance returns to the creator's account.",
-      "status": "shown", "proposal": {"row": "F3", "status": "shown"},
-      "note": "The refund goes to the schedule's `refund_holding`, fixed at creation and validated then; the SDK and CLI default it to the creator's funding account (DECISIONS D-06).",
+      "status": "in part",
+      "proposal": {"row": "F3", "status": "shown"},
       "tests": [
         {"crate": "escapement-core", "rust": "math::tests::split_on_cancel_conserves_total_and_never_refunds_claimed"},
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -209,13 +226,18 @@
       "records": [
         {"file": "docs/EVIDENCE.md", "anchor": "E-05"},
         {"file": "docs/EVIDENCE.md", "anchor": "E-06"}
-      ]
+      ],
+      "code_says": "The refund goes to the schedule's `refund_holding`, which the creator may set at creation to any valid account, not only its own: `full_lifecycle_*` refunds 40,000 to a treasury distinct from the creator (DECISIONS D-06, D-13). Refunds go to the creator's account by default (SDK and CLI) and in every other test.",
+      "remaining": "Restricting `refund_holding` to the creator's own account, or the RFP accepting a creator-named refund account; changing it changes the guest's image id."
     },
     {
-      "id": "F3d", "group": "F", "rfp_where": "Hard Requirements / Functionality 3, fourth sentence",
+      "id": "F3d",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 3, fourth sentence",
       "short": "Vested tokens stay claimable after cancel",
       "text": "Tokens already vested but not yet claimed remain claimable by the beneficiary after cancellation.",
-      "status": "shown", "proposal": {"row": "F3", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F3", "status": "shown"},
       "tests": [
         {"crate": "escapement-core", "rust": "math::tests::split_on_cancel_clamps_to_claimed_under_clock_lag"},
         {"crate": "escapement-core", "rust": "math::tests::claimable_bounded_by_total_minus_claimed_and_cancel_freezes_all_queries"},
@@ -231,10 +253,13 @@
       ]
     },
     {
-      "id": "F4", "group": "F", "rfp_where": "Hard Requirements / Functionality 4",
+      "id": "F4",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 4",
       "short": "Transferability set at creation, immutable",
       "text": "The schedule creator can configure whether the vesting position (beneficiary rights) is transferable to a new beneficiary. Transferability must be set at schedule creation and cannot be changed afterwards.",
-      "status": "shown", "proposal": {"row": "F4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "F4", "status": "shown"},
       "note": "A transfer of a non-transferable schedule exits with code 21; no message changes the flag after creation.",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -249,10 +274,13 @@
       ]
     },
     {
-      "id": "F5", "group": "F", "rfp_where": "Hard Requirements / Functionality 5",
+      "id": "F5",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 5",
       "short": "Batch creation; maximum per transaction documented",
       "text": "Multi-recipient batch creation: a creator can set up vesting schedules for multiple recipients in a single operation, up to the LEZ transaction size limit. Document the maximum number of recipients achievable in one transaction.",
-      "status": "shown", "proposal": {"row": "F5", "status": "shown", "as_filed": "testnet re-measure in M4"},
+      "status": "shown",
+      "proposal": {"row": "F5", "status": "shown", "as_filed": "testnet re-measure in M4"},
       "note": "N_max measured on LEZ v0.4.0-rc3 for three schedule shapes and both assets, N_max + 1 refused (OutOfGas): docs/gas-and-batch.md. Re-measured on testnet 0.4 in M4.",
       "tests": [
         {"crate": "escapement-tests", "rust": "batch_create_concurrent_claims_and_exact_ceiling_benchmark"},
@@ -265,10 +293,13 @@
       ]
     },
     {
-      "id": "F6", "group": "F", "rfp_where": "Hard Requirements / Functionality 6",
+      "id": "F6",
+      "group": "F",
+      "rfp_where": "Hard Requirements / Functionality 6",
       "short": "An event per state transition; schema documented",
       "text": "The program emits a log event (using the LEZ event/log mechanism; see LP-0012) for each state transition: schedule creation, claim, cancellation, milestone signal, and beneficiary transfer. Event schema must be documented.",
-      "status": "in part", "proposal": {"row": "F6", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "F6", "status": "in part"},
       "remaining": "Reading the events back through an indexer: on LEZ v0.4.0-rc3 `getEvents` is the indexer's RPC, not the sequencer's, so this waits on LEZ testnet 0.4 (M4).",
       "note": "All eight events asserted in-process, including the `Claimed` event of a private claim; selectors checked; schema in docs/events.md and the IDL.",
       "tests": [
@@ -285,10 +316,13 @@
       ]
     },
     {
-      "id": "U1", "group": "U", "rfp_where": "Hard Requirements / Usability 1",
+      "id": "U1",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 1",
       "short": "SDK for Logos modules: full lifecycle, public and private claims",
       "text": "Provide an SDK that can be used to build Logos modules interacting with the vesting program. The SDK must expose the full lifecycle: create schedule, query claimable amount, claim, cancel, signal milestone, and transfer beneficiary. The SDK must support claiming to both public and private accounts.",
-      "status": "in part", "proposal": {"row": "U1", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U1", "status": "in part"},
       "remaining": "The Logos Core module wrapper (`escapement_core_module`) over the Rust SDK is not built (M2).",
       "note": "The Rust SDK (`crates/escapement-sdk`) has builders for every operation and both assets, the claim gates and the error messages; every step of the sequencer suite goes through it.",
       "tests": [
@@ -306,31 +340,43 @@
       ]
     },
     {
-      "id": "U2a", "group": "U", "rfp_where": "Hard Requirements / Usability 2, first sentence",
+      "id": "U2a",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 2, first sentence",
       "short": "Basecamp mini-app: build, assets, loadable via git",
       "text": "Provide a Logos mini-app GUI with local build instructions, downloadable assets, and loadable in Logos app (Basecamp) via git repo. The mini-app must cover at minimum:",
-      "status": "not yet", "proposal": {"row": "U2", "status": "not yet"},
+      "status": "not yet",
+      "proposal": {"row": "U2", "status": "not yet"},
       "remaining": "The Basecamp mini-app is built in M3, over M2's `escapement_core_module`."
     },
     {
-      "id": "U2b", "group": "U", "rfp_where": "Hard Requirements / Usability 2, first bullet",
+      "id": "U2b",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 2, first bullet",
       "short": "Mini-app recipient view",
       "text": "Recipient view: current vesting position, total locked, amount claimable now, next unlock event, claim action.",
-      "status": "not yet", "proposal": {"row": "U2", "status": "not yet"},
+      "status": "not yet",
+      "proposal": {"row": "U2", "status": "not yet"},
       "remaining": "Built in M3 with the mini-app; the SDK already computes claimable now and the next unlock (U7)."
     },
     {
-      "id": "U2c", "group": "U", "rfp_where": "Hard Requirements / Usability 2, second bullet",
+      "id": "U2c",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 2, second bullet",
       "short": "Mini-app creator view",
       "text": "Creator view: create a new schedule (all parameters), list active schedules, cancel a schedule, signal a milestone.",
-      "status": "not yet", "proposal": {"row": "U2", "status": "not yet"},
+      "status": "not yet",
+      "proposal": {"row": "U2", "status": "not yet"},
       "remaining": "Built in M3 with the mini-app."
     },
     {
-      "id": "U3", "group": "U", "rfp_where": "Hard Requirements / Usability 3",
+      "id": "U3",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 3",
       "short": "CLI: create, claim, cancel, signal, query claimable",
       "text": "Provide a CLI that covers core functionality of the program. The CLI may have fewer features than the GUI mini-app but must support all essential operations: create schedule, claim, cancel, signal milestone, and query claimable amount.",
-      "status": "in part", "proposal": {"row": "U3", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U3", "status": "in part"},
       "remaining": "Remote endpoints and wallet-held keys for LEZ testnet 0.4 (M4).",
       "note": "On a local sequencer the CLI creates, claims (public, and private into the beneficiary's own private account), cancels, signals and shows a schedule (`show`: claimable now and the next unlock), for native and token schedules. The suite reads `show` for the cancel record; it does not assert its `claimable_now` field.",
       "tests": [
@@ -354,10 +400,13 @@
       ]
     },
     {
-      "id": "U4a", "group": "U", "rfp_where": "Hard Requirements / Usability 4, first sentence",
+      "id": "U4a",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 4, first sentence",
       "short": "Mini-app pre-claim summary: claimable and fee",
       "text": "The mini-app must display a pre-claim confirmation summary: claimable amount and estimated transaction fee.",
-      "status": "in part", "proposal": {"row": "U4", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U4", "status": "in part"},
       "remaining": "The mini-app that displays it (M3).",
       "note": "The SDK builds the summary the mini-app will show (`PreClaimSummary`: claimable now, estimated gas and fee, the payer's reserve).",
       "tests": [
@@ -371,10 +420,13 @@
       ]
     },
     {
-      "id": "U4b", "group": "U", "rfp_where": "Hard Requirements / Usability 4, second sentence",
+      "id": "U4b",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 4, second sentence",
       "short": "Private path: gas check with an actionable error",
       "text": "When using the private account path, it must confirm that the beneficiary account has sufficient gas to cover the claim; a clear, actionable error must be shown if the balance is insufficient.",
-      "status": "in part", "proposal": {"row": "U4", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U4", "status": "in part"},
       "remaining": "The mini-app's display (M3); a separate private fee-payer account (M2).",
       "note": "The SDK refuses an under-funded private payer with the shortfall; the CLI checks the private account's balance against the exact fee reserve before proving, and the suite checks each balance after equals the credit less that reserve.",
       "tests": [
@@ -391,10 +443,13 @@
       ]
     },
     {
-      "id": "U5", "group": "U", "rfp_where": "Hard Requirements / Usability 5",
+      "id": "U5",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 5",
       "short": "Privacy disclosure before each private claim",
       "text": "When using the private account path, the mini-app must display a privacy disclosure before each claim, identifying what will be visible on-chain (claim amount, beneficiary address, vesting schedule address) and what will not be traceable (the destination private account and subsequent movements).",
-      "status": "in part", "proposal": {"row": "U5", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U5", "status": "in part"},
       "remaining": "The mini-app's disclosure screen (M3).",
       "note": "The SDK's disclosure (PR 235's wording) is bound to a confirmation token for the exact claim; the CLI prints it with its token and sends only with `--confirm <token>`; a wrong token is refused before anything is proven.",
       "tests": [
@@ -412,10 +467,13 @@
       ]
     },
     {
-      "id": "U6", "group": "U", "rfp_where": "Hard Requirements / Usability 6",
+      "id": "U6",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 6",
       "short": "IDL with SPEL",
       "text": "Provide an IDL for the vesting program using the SPEL framework.",
-      "status": "shown", "proposal": {"row": "U6", "status": "shown", "as_filed": "re-gen on tagged SPEL in M4"},
+      "status": "shown",
+      "proposal": {"row": "U6", "status": "shown", "as_filed": "re-gen on tagged SPEL in M4"},
       "note": "Generated by SPEL's v0.4 generator (branch `refactor/lez-v0.4.x` at `c90ca0bc`; no SPEL release supports LEZ v0.4 yet); CI fails if the committed IDL differs from what SPEL generates.",
       "tests": [
         {"crate": "escapement-idl", "rust": "u6_generated_idl_matches_committed"},
@@ -427,10 +485,13 @@
       ]
     },
     {
-      "id": "U7", "group": "U", "rfp_where": "Hard Requirements / Usability 7",
+      "id": "U7",
+      "group": "U",
+      "rfp_where": "Hard Requirements / Usability 7",
       "short": "Actionable errors, next unlock when nothing is claimable",
       "text": "Failed claims must return clear, actionable error messages, including the case where nothing is yet claimable (with the next unlock time displayed).",
-      "status": "in part", "proposal": {"row": "U7", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "U7", "status": "in part"},
       "remaining": "The mini-app's display (M3).",
       "note": "Exit codes 1..=35, each with an SDK message; \"nothing claimable\" carries the exact next unlock time; the CLI refuses before sending and `show` prints the next unlock.",
       "tests": [
@@ -448,10 +509,13 @@
       ]
     },
     {
-      "id": "R1", "group": "R", "rfp_where": "Hard Requirements / Reliability 1",
+      "id": "R1",
+      "group": "R",
+      "rfp_where": "Hard Requirements / Reliability 1",
       "short": "Atomic claim; retry without loss",
       "text": "A claim is atomic: a failed or rejected claim does not consume vested tokens and leaves the claimant able to retry without loss.",
-      "status": "shown", "proposal": {"row": "R1–R4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "R1–R4", "status": "shown"},
       "note": "Refused claims leave the state byte-identical and a later claim succeeds; a raced or stale proven private claim rolls back whole and is retried in one transaction.",
       "tests": [
         {"crate": "escapement-tests", "rust": "s1_private_claim_blinded_alias_single_tx_and_fresh_values_per_claim"},
@@ -467,28 +531,34 @@
       ]
     },
     {
-      "id": "R2", "group": "R", "rfp_where": "Hard Requirements / Reliability 2",
+      "id": "R2",
+      "group": "R",
+      "rfp_where": "Hard Requirements / Reliability 2",
       "short": "Atomic cancellation",
       "text": "A schedule cancellation is atomic: partial failure leaves the schedule in its prior state, not an undefined one.",
-      "status": "shown", "proposal": {"row": "R1–R4", "status": "shown"},
-      "gap": "The tests that compare the whole state before and after a failed cancel all fail it at its first step (wrong authority, cancelled twice, after non-cancelable). The one cancel that fails after its first step, once the schedule's state has been set to pending the clock reply (`c1_same_block_clock_lag_cancel_protects_shared_batch_escrow`: a fully claimed schedule, code 20), asserts only the exit code, not that the schedule is back in its prior state.",
+      "status": "shown",
+      "proposal": {"row": "R1–R4", "status": "shown"},
       "tests": [
+        {"crate": "escapement-tests", "rust": "c1_same_block_clock_lag_cancel_protects_shared_batch_escrow"},
         {"crate": "escapement-tests", "rust": "stateful_handler_conservation_invariant_suite"},
         {"crate": "escapement-tests", "rust": "comprehensive_error_codes_and_security_hardening_suite"},
-        {"crate": "escapement-tests", "rust": "c1_same_block_clock_lag_cancel_protects_shared_batch_escrow"},
         {"e2e": "refusal-cancel-after-noncancelable-reverted-state-unchanged"},
         {"e2e": "refusal-beneficiary-cancels-reverted-state-unchanged"}
       ],
       "records": [
         {"file": "docs/EVIDENCE.md", "anchor": "E-08"},
         {"file": "docs/EVIDENCE.md", "anchor": "E-12"}
-      ]
+      ],
+      "note": "`c1_*` cancels a fully claimed schedule: `Cancel` first sets the schedule to wait for the clock reply, then the continuation refuses (code 20); the test compares every account before and after and finds the schedule back in its prior, uncancelled state. The other tests compare the whole state after cancels refused at the first step (wrong authority, cancelled twice, after non-cancelable, by the beneficiary)."
     },
     {
-      "id": "R3", "group": "R", "rfp_where": "Hard Requirements / Reliability 3",
+      "id": "R3",
+      "group": "R",
+      "rfp_where": "Hard Requirements / Reliability 3",
       "short": "Concurrent claims on independent schedules",
       "text": "Concurrent claims against independent schedules must not corrupt shared program state.",
-      "status": "shown", "proposal": {"row": "R1–R4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "R1–R4", "status": "shown"},
       "note": "Interleaved claims, including schedules that share a batch escrow and a claim and a cancel in the same block, with per-escrow and global supply conserved after every step.",
       "tests": [
         {"crate": "escapement-tests", "rust": "batch_create_concurrent_claims_and_exact_ceiling_benchmark"},
@@ -500,10 +570,13 @@
       ]
     },
     {
-      "id": "R4", "group": "R", "rfp_where": "Hard Requirements / Reliability 4",
+      "id": "R4",
+      "group": "R",
+      "rfp_where": "Hard Requirements / Reliability 4",
       "short": "Milestone signal idempotent, deterministic error",
       "text": "Milestone signalling is idempotent per milestone index: signalling the same milestone twice must be rejected with a deterministic error and must not double-unlock tokens.",
-      "status": "shown", "proposal": {"row": "R1–R4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "R1–R4", "status": "shown"},
       "note": "A second signal of the same index exits with code 25 and the schedule stays byte-identical.",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -516,11 +589,13 @@
       ]
     },
     {
-      "id": "P1", "group": "P", "rfp_where": "Hard Requirements / Performance 1",
+      "id": "P1",
+      "group": "P",
+      "rfp_where": "Hard Requirements / Performance 1",
       "short": "One claim, one transaction",
       "text": "A single claim completes within one LEZ transaction.",
-      "status": "shown", "proposal": {"row": "P1", "status": "shown", "as_filed": "public: native + token; private: native and token with real proofs on the sequencer, one transaction per claim once the private token holding exists"},
-      "note": "A new private account first needs one private `InitializeHolding` transaction per token (folded into the claim in M2).",
+      "status": "in part",
+      "proposal": {"row": "P1", "status": "shown", "as_filed": "public: native + token; private: native and token with real proofs on the sequencer, one transaction per claim once the private token holding exists"},
       "tests": [
         {"crate": "escapement-tests", "rust": "s1_private_claim_blinded_alias_single_tx_and_fresh_values_per_claim"},
         {"crate": "escapement-tests", "rust": "native_asset_lifecycle_fees_batch_private_claim_and_ceilings"},
@@ -531,13 +606,18 @@
       ],
       "records": [
         {"file": "docs/EVIDENCE.md", "anchor": "E-13"}
-      ]
+      ],
+      "code_says": "A claim into a private account that has no holding of the token yet takes two transactions: one private `InitializeHolding`, then the claim (E2E `private-token-holding` before `claim-private-token-*`); a claim without the holding is refused. Public claims, native private claims and token private claims into an existing holding take one transaction each.",
+      "remaining": "Folding the private holding's initialization into the claim, so a fresh private token account also claims in one transaction (M2)."
     },
     {
-      "id": "P2", "group": "P", "rfp_where": "Hard Requirements / Performance 2",
+      "id": "P2",
+      "group": "P",
+      "rfp_where": "Hard Requirements / Performance 2",
       "short": "Cost of each operation, measured on testnet 0.4",
       "text": "Document the compute unit (CU) cost of each operation: create schedule, claim, cancel, signal milestone, transfer beneficiary. Measurements are taken on LEZ testnet 0.4.",
-      "status": "waits on Logos", "proposal": {"row": "P2", "status": "waits on Logos"},
+      "status": "waits on Logos",
+      "proposal": {"row": "P2", "status": "waits on Logos"},
       "remaining": "The measurement on LEZ testnet 0.4, which has not launched (M4). Today's table is measured on LEZ v0.4.0-rc3 with the real guest.",
       "tests": [
         {"crate": "escapement-tests", "rust": "batch_create_concurrent_claims_and_exact_ceiling_benchmark"},
@@ -549,10 +629,13 @@
       ]
     },
     {
-      "id": "S1", "group": "S", "rfp_where": "Hard Requirements / Supportability 1",
+      "id": "S1",
+      "group": "S",
+      "rfp_where": "Hard Requirements / Supportability 1",
       "short": "Deployed and tested on testnet 0.4",
       "text": "The vesting LEZ program is delivered for LEZ testnet 0.4: it is deployed and tested on LEZ testnet 0.4.",
-      "status": "waits on Logos", "proposal": {"row": "S1", "status": "waits on Logos"},
+      "status": "waits on Logos",
+      "proposal": {"row": "S1", "status": "waits on Logos"},
       "remaining": "Deployment and tests on LEZ testnet 0.4, which has not launched (M4). The scripted immutable deployment and its header read-back run on a standalone v0.4.0-rc3 sequencer today.",
       "tests": [
         {"e2e": "deploy-immutable-and-init-admin"},
@@ -563,10 +646,13 @@
       ]
     },
     {
-      "id": "S2", "group": "S", "rfp_where": "Hard Requirements / Supportability 2",
+      "id": "S2",
+      "group": "S",
+      "rfp_where": "Hard Requirements / Supportability 2",
       "short": "E2E against a standalone sequencer, in CI, green on main",
       "text": "End-to-end integration tests run against a LEZ sequencer (standalone mode) and are included in CI. CI must be green on the default branch.",
-      "status": "shown", "proposal": {"row": "S2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "S2", "status": "shown"},
       "note": "CI job `e2e-standalone-sequencer` builds the unmodified v0.4.0-rc3 sequencer and runs the 75-check suite on every push; green on main at 2ddc57c.",
       "tests": [
         {"e2e": "deploy-immutable-and-init-admin"},
@@ -585,10 +671,13 @@
       ]
     },
     {
-      "id": "S3", "group": "S", "rfp_where": "Hard Requirements / Supportability 3",
+      "id": "S3",
+      "group": "S",
+      "rfp_where": "Hard Requirements / Supportability 3",
       "short": "A test for every hard F/U/R/P requirement",
       "text": "Every hard requirement in Functionality, Usability, Reliability, and Performance has at least one corresponding test.",
-      "status": "in part", "proposal": {"row": "S3", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "S3", "status": "in part"},
       "remaining": "The mini-app clauses (U2a, U2b, U2c) have no test until the mini-app exists (M3); the testnet halves of F6 and P2 get theirs in M4.",
       "note": "This map is the traceability matrix; CI computes S3 from it.",
       "tests": [
@@ -599,10 +688,13 @@
       ]
     },
     {
-      "id": "S4", "group": "S", "rfp_where": "Hard Requirements / Supportability 4",
+      "id": "S4",
+      "group": "S",
+      "rfp_where": "Hard Requirements / Supportability 4",
       "short": "README: deployment, addresses, CLI and mini-app usage",
       "text": "A README documents end-to-end usage: deployment steps, program addresses, and step-by-step instructions for creating a schedule, claiming, and cancelling via CLI and mini-app.",
-      "status": "in part", "proposal": {"row": "S4", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "S4", "status": "in part"},
       "remaining": "Mini-app instructions (M3) and LEZ testnet 0.4 program addresses (M4).",
       "note": "The README has the quickstart, the deployment and the CLI usage.",
       "records": [
@@ -610,10 +702,13 @@
       ]
     },
     {
-      "id": "Pr1", "group": "Pr", "rfp_where": "Hard Requirements / + Privacy 1",
+      "id": "Pr1",
+      "group": "Pr",
+      "rfp_where": "Hard Requirements / + Privacy 1",
       "short": "Mini-app and SDK: public and private claims",
       "text": "The mini-app and SDK must support claiming to both public and private accounts.",
-      "status": "in part", "proposal": {"row": "Pr1–Pr2", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "Pr1–Pr2", "status": "in part"},
       "remaining": "The mini-app (M3).",
       "note": "The SDK (and the CLI through it) claims to public accounts and into the beneficiary's own private account.",
       "tests": [
@@ -629,10 +724,13 @@
       ]
     },
     {
-      "id": "Pr2", "group": "Pr", "rfp_where": "Hard Requirements / + Privacy 2",
+      "id": "Pr2",
+      "group": "Pr",
+      "rfp_where": "Hard Requirements / + Privacy 2",
       "short": "Mini-app disclosure before each private claim",
       "text": "When using the private account path, the mini-app must display the pre-confirmation privacy disclosure described in the Usability section before each claim, identifying what is visible on-chain (claim amount, beneficiary address, vesting schedule address) and what remains private (the destination private account and subsequent movements of claimed tokens).",
-      "status": "in part", "proposal": {"row": "Pr1–Pr2", "status": "in part"},
+      "status": "in part",
+      "proposal": {"row": "Pr1–Pr2", "status": "in part"},
       "remaining": "The mini-app's disclosure screen (M3).",
       "note": "As U5: the SDK's disclosure names these items and is bound to a confirmation token; the CLI shows it and sends only with that token.",
       "tests": [
@@ -646,10 +744,13 @@
       ]
     },
     {
-      "id": "Pr3", "group": "Pr", "rfp_where": "Hard Requirements / + Privacy 3",
+      "id": "Pr3",
+      "group": "Pr",
+      "rfp_where": "Hard Requirements / + Privacy 3",
       "short": "SDK refuses a non-private target on the private path",
       "text": "When using the private account path, the SDK must validate that the claim target is a private (shielded) account before submitting the transaction, and reject with an explicit error if it is not.",
-      "status": "shown", "proposal": {"row": "Pr3", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "Pr3", "status": "shown"},
       "note": "The CLI runs the same check on its key file's account before building anything.",
       "tests": [
         {"crate": "escapement-sdk", "rust": "claim::tests::pr3_a_public_target_on_the_private_path_is_refused_before_anything_is_built"},
@@ -661,10 +762,13 @@
       ]
     },
     {
-      "id": "SR1", "group": "SR", "rfp_where": "Soft Requirements 1",
+      "id": "SR1",
+      "group": "SR",
+      "rfp_where": "Soft Requirements 1",
       "short": "Separate cancellation authority",
       "text": "The creator can nominate a separate cancellation authority distinct from the creator wallet (useful when vesting is managed by a multisig or DAO).",
-      "status": "shown", "proposal": {"row": "SR1–SR2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "SR1–SR2", "status": "shown"},
       "note": "The authority replaces the creator exclusively for cancel and make-non-cancelable; a multisig or DAO program acts as its own PDA (`AsPda`), and a program the user merely signs for cannot act in the user's name (code 35).",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -678,10 +782,13 @@
       ]
     },
     {
-      "id": "SR2", "group": "SR", "rfp_where": "Soft Requirements 2",
+      "id": "SR2",
+      "group": "SR",
+      "rfp_where": "Soft Requirements 2",
       "short": "Separate milestone authority that excludes the creator",
       "text": "The creator can nominate a separate milestone authority distinct from the creator wallet. Creator-controlled milestone authority is appropriate for team vesting, but creates a conflict of interest when vesting is used for buyer protection (e.g., creator collateral vesting from a token launch per RFP-015 or RFP-016): the creator could approve milestones and drain funds immediately. Delegating milestone authority to a governance body or multisig that excludes the creator prevents this.",
-      "status": "shown", "proposal": {"row": "SR1–SR2", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "SR1–SR2", "status": "shown"},
       "note": "With a milestone authority named, the creator's own signal is refused (code 13), in-process and on the sequencer.",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
@@ -695,10 +802,13 @@
       ]
     },
     {
-      "id": "FS1", "group": "FS", "rfp_where": "Design Rationale / Fee structure 1",
+      "id": "FS1",
+      "group": "FS",
+      "rfp_where": "Design Rationale / Fee structure 1",
       "short": "Who pays",
       "text": "Who pays: whether fees (if any) are charged to the schedule creator, the beneficiary at claim time, or both.",
-      "status": "shown", "proposal": {"row": "FS1–FS4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "FS1–FS4", "status": "shown"},
       "note": "The creator only; the beneficiary pays no protocol fee at claim.",
       "tests": [
         {"crate": "escapement-tests", "rust": "s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability"},
@@ -709,10 +819,13 @@
       ]
     },
     {
-      "id": "FS2", "group": "FS", "rfp_where": "Design Rationale / Fee structure 2",
+      "id": "FS2",
+      "group": "FS",
+      "rfp_where": "Design Rationale / Fee structure 2",
       "short": "When fees are collected",
       "text": "When fees are collected: at schedule creation, at each claim event, at cancellation, or a combination.",
-      "status": "shown", "proposal": {"row": "FS1–FS4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "FS1–FS4", "status": "shown"},
       "note": "At creation only (single and batch).",
       "tests": [
         {"crate": "escapement-tests", "rust": "s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability"},
@@ -723,10 +836,13 @@
       ]
     },
     {
-      "id": "FS3", "group": "FS", "rfp_where": "Design Rationale / Fee structure 3",
+      "id": "FS3",
+      "group": "FS",
+      "rfp_where": "Design Rationale / Fee structure 3",
       "short": "Fee rate and fee switch",
       "text": "Fee rate: the exact rate or range, including whether a governance-activatable fee switch is included for future adjustment.",
-      "status": "shown", "proposal": {"row": "FS1–FS4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "FS1–FS4", "status": "shown"},
       "note": "0 bps at launch, switchable by the admin authority (`lez-admin-authority` v0.2.0) up to an immutable 100 bps cap; an optional broker fee up to 500 bps.",
       "tests": [
         {"crate": "escapement-tests", "rust": "s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability"},
@@ -740,10 +856,13 @@
       ]
     },
     {
-      "id": "FS4", "group": "FS", "rfp_where": "Design Rationale / Fee structure 4",
+      "id": "FS4",
+      "group": "FS",
+      "rfp_where": "Design Rationale / Fee structure 4",
       "short": "Where fees are routed",
       "text": "Where fees are routed: the destination account or mechanism (protocol treasury, burn, staking reward pool, etc.).",
-      "status": "shown", "proposal": {"row": "FS1–FS4", "status": "shown"},
+      "status": "shown",
+      "proposal": {"row": "FS1–FS4", "status": "shown"},
       "note": "Into a fee vault per asset (a LEZ holding carries one token), withdrawn by the treasury; this keeps working after the admin renounces.",
       "tests": [
         {"crate": "escapement-tests", "rust": "s3_lez_admin_authority_fee_switch_multi_token_vaults_and_immutability"},
@@ -754,10 +873,13 @@
       ]
     },
     {
-      "id": "D1", "group": "DR", "rfp_where": "Design Rationale / Batch creation",
+      "id": "D1",
+      "group": "DR",
+      "rfp_where": "Design Rationale / Batch creation",
       "short": "Batch size bound documented",
       "text": "The batch size is bounded by the LEZ transaction size limit, which the implementation must document.",
-      "status": "shown", "proposal": {"row": "F5", "status": "shown", "as_filed": "testnet re-measure in M4"},
+      "status": "shown",
+      "proposal": {"row": "F5", "status": "shown", "as_filed": "testnet re-measure in M4"},
       "note": "The binding limit on LEZ v0.4.0-rc3 is gas, not bytes: docs/gas-and-batch.md gives N_max per shape and asset, and N_max + 1 is refused with OutOfGas.",
       "tests": [
         {"crate": "escapement-tests", "rust": "batch_create_concurrent_claims_and_exact_ceiling_benchmark"},
@@ -768,10 +890,13 @@
       ]
     },
     {
-      "id": "L1", "group": "OS", "rfp_where": "Open Source Requirement",
+      "id": "L1",
+      "group": "OS",
+      "rfp_where": "Open Source Requirement",
       "short": "MIT + Apache-2.0 dual licence",
       "text": "All code must be released under the MIT+Apache2.0 dual License.",
-      "status": "shown", "proposal": null,
+      "status": "shown",
+      "proposal": null,
       "note": "Not a row of the proposal's table; the proposal's program checkboxes accept the licence.",
       "tests": [
         {"check": "reqmap:license"}
