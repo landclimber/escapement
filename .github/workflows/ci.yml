@@ -129,11 +129,12 @@ jobs:
         run: cargo test --workspace --locked -- --nocapture
 
       - name: Requirement map against the test binaries just built (every named test is in them)
+        shell: bash
         env:
           RISC0_DEV_MODE: "1"
         run: |
           mkdir -p target/reqmap
-          cargo test --workspace --locked -- --list > target/reqmap/workspace-tests.txt 2>&1 || { cat target/reqmap/workspace-tests.txt; exit 1; }
+          cargo test --workspace --locked -- --list 2>&1 | tee target/reqmap/workspace-tests.txt
           python3 scripts/check-reqmap.py --cargo-job core-and-guest --cargo-list target/reqmap/workspace-tests.txt
 
   # S2: the end-to-end suite against an unmodified standalone LEZ v0.4.0-rc3 sequencer (mock
@@ -206,9 +207,10 @@ jobs:
         run: bash e2e/run_e2e.sh
 
       - name: Requirement map against this run (every named E2E check passed; every named CLI test is in its binary)
+        shell: bash
         run: |
           mkdir -p target/reqmap
-          (cd crates/escapement-cli && cargo test --release --locked -- --list) > target/reqmap/cli-tests.txt 2>&1 || { cat target/reqmap/cli-tests.txt; exit 1; }
+          cargo test --manifest-path crates/escapement-cli/Cargo.toml --release --locked -- --list 2>&1 | tee target/reqmap/cli-tests.txt
           python3 scripts/check-reqmap.py --cargo-job e2e-standalone-sequencer --cargo-list target/reqmap/cli-tests.txt --e2e-records e2e/.run/out/e2e.jsonl
 
       - name: Keep the suite's records
@@ -287,3 +289,12 @@ jobs:
         env:
           RISC0_DEV_MODE: "0"
         run: cargo test --locked -p escapement-tests --test escapement_e2e s1_real_proof_dev_mode_0 -- --ignored --nocapture
+
+      - name: Requirement map against the test binary just built (the named real-proof test is in it)
+        shell: bash
+        env:
+          RISC0_DEV_MODE: "0"
+        run: |
+          mkdir -p target/reqmap
+          cargo test --locked -p escapement-tests --test escapement_e2e -- --list 2>&1 | tee target/reqmap/real-proof-tests.txt
+          python3 scripts/check-reqmap.py --cargo-job real-stark-proof --cargo-list target/reqmap/real-proof-tests.txt

@@ -71,6 +71,9 @@ ENFORCED = [
     "under `set +e` or inside `( ... )` does not count;",
     "after the tests are built, a named Rust test, or its whole test binary, is missing from the "
     "compiled test binaries (`cargo test ... -- --list`) of the job that runs it;",
+    "a job that runs named Rust tests, or the E2E suite, has no gating step after them that runs this "
+    "check against its compiled-test listing (`--cargo-job JOB --cargo-list`) or the suite's records "
+    "(`--e2e-records`), so the two checks below cannot be dropped or made non-failing silently;",
     "a named end-to-end check is not one that `e2e/run_e2e.sh` records, or no CI job runs that "
     "suite; after the suite runs in CI, a named check was not recorded as passed in that run;",
     "a `shown` clause names no test, or none of its tests runs on every push to `main` (a manual "
@@ -182,7 +185,7 @@ def cfg_value(expr: str):
             key, val = m.groups()
             host = {"target_os": "linux", "target_family": "unix", "target_arch": "x86_64"}
             return (val == host[key]) if key in host else None
-        return {"test": True, "unix": True, "debug_assertions": True,
+        return {"test": True, "unix": True,
                 "kani": False, "miri": False, "windows": False}.get(t)
 
     return ev(re.sub(r"\s+", "", expr))
@@ -249,6 +252,9 @@ def _expand_cfg_attr(attrs: list[str]) -> list[str]:
     for a in attrs:
         if a.startswith("cfg_attr(") and a.endswith(")"):
             pred, *inner = _split_top(a[9:-1])
+            if pred != "test" and any(x == "ignore" or x.startswith(("ignore=", "should_panic")) for x in inner):
+                out.append("cfg_attr?")   # its build (--release, RUSTFLAGS --cfg ...) could switch it
+                continue
             v = cfg_value(pred)
             if v is True:
                 out += _expand_cfg_attr(inner)
@@ -607,6 +613,7 @@ class CargoRun:
     on_push: bool
     gating: bool = True  # a failure fails the job
     why: str = ""        # why it does not gate
+    step_no: int = 0
 
 
 @dataclass
@@ -617,10 +624,23 @@ class SuiteRun:
     on_push: bool
     gating: bool = True
     why: str = ""
+    step_no: int = 0
+    argv: list = field(default_factory=list)
 
 
 def _truthy(v) -> bool:
     return v not in (None, False, "false", "False", "")
+
+
+def _branch_included(patterns: list[str]) -> bool:
+    """GitHub's branch filter: patterns in order, a `!pattern` excluding what matched before."""
+    included = False
+    for b in patterns:
+        if b.startswith("!"):
+            included = included and not fnmatch.fnmatchcase(DEFAULT_BRANCH, b[1:])
+        else:
+            included = included or fnmatch.fnmatchcase(DEFAULT_BRANCH, b)
+    return included
 
 
 def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[SuiteRun]]:
@@ -639,7 +659,7 @@ def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[Su
         filters = [k for k in ("paths", "paths-ignore", "branches-ignore", "tags", "tags-ignore") if k in pf]
         if filters:
             not_push = f"push filtered by `{'`, `'.join(filters)}`"
-        elif pf.get("branches") and not any(fnmatch.fnmatchcase(DEFAULT_BRANCH, b) for b in pf["branches"]):
+        elif pf.get("branches") and not _branch_included(pf["branches"]):
             not_push = f"push branches do not include {DEFAULT_BRANCH}"
         else:
             every_push = True
@@ -675,7 +695,7 @@ def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[Su
         job_defaults = (job.get("defaults") or {}).get("run") or {}
         default_dir = job_defaults.get("working-directory", ".")
         job_why = "job has `continue-on-error`" if _truthy(job.get("continue-on-error")) else ""
-        for step in job.get("steps") or []:
+        for step_no, step in enumerate(job.get("steps") or []):
             run = step.get("run")
             if not run:
                 continue
@@ -688,14 +708,14 @@ def ci_runs(workflow_text: str) -> tuple[list[CargoRun], list[SuiteRun], list[Su
             cwd = os.path.normpath(step.get("working-directory", default_dir))
             for argv, at, cmd_why in _commands(run, cwd, shell):
                 why = step_why or cmd_why or ""
-                gate = dict(gating=not why, why=why)
+                gate = dict(gating=not why, why=why, step_no=step_no)
                 if argv[:2] == ["cargo", "test"]:
                     cargo_runs.append(CargoRun(job_id, step.get("name", ""), at, argv[2:], step_triggers, step_on_push, **gate))
                 elif (argv[0] in ("bash", "sh") and len(argv) > 1 and os.path.normpath(os.path.join(at, argv[1])) == str(E2E_SUITE)) \
                         or os.path.normpath(os.path.join(at, argv[0])) == str(E2E_SUITE):
-                    suite_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, **gate))
+                    suite_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, argv=argv, **gate))
                 elif any(os.path.normpath(os.path.join(at, x)) == "scripts/check-reqmap.py" for x in argv[:2]):
-                    reqmap_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, **gate))
+                    reqmap_runs.append(SuiteRun(job_id, step.get("name", ""), step_triggers, step_on_push, argv=argv, **gate))
     return cargo_runs, suite_runs, reqmap_runs
 
 
@@ -730,6 +750,9 @@ def _strip_shell_comments(script: str) -> str:
     return "".join(out)
 
 
+_CONTROL = {"if", "then", "elif", "else", "fi", "for", "while", "until", "do", "done", "case", "esac",
+            "select", "function", "trap", "exit", "return", "alias", "eval", "source", ".", "exec",
+            "shopt", "{", "}", "coproc", "unset", "unalias", "declare", "typeset", "local"}
 _REDIRECT = re.compile(r"^(>>?|<<?<?|>&|<&|&>>?)$")
 
 
@@ -787,8 +810,11 @@ def _commands(script: str, cwd: str, shell=None):
     cmd: list[str] = []
     subshells: list[str] = []
     skip_word = False
+    unread = False   # shell control flow this check does not follow has been seen
     for t in toks + [";"]:
         if t and set(t) <= set("();<>|&\n"):   # shlex groups adjacent punctuation: "\n(", ");"
+            if "()" in t or t.startswith("<<"):
+                unread = True                      # a function definition, a here-doc
             if _REDIRECT.match(t):
                 if cmd and cmd[-1].isdigit():
                     cmd.pop()                      # the fd of "2>&1" is not an argument
@@ -801,8 +827,10 @@ def _commands(script: str, cwd: str, shell=None):
                 cwd = os.path.normpath(os.path.join(cwd, cmd[1]))
             elif cmd and cmd[0] == "set":
                 errexit, pipefail = _set_flags(cmd[1:], errexit, pipefail)
+            elif cmd and cmd[0] in _CONTROL:
+                unread = True
             elif cmd:
-                cmds.append((cmd, cwd, errexit, pipefail, len(subshells), sep))
+                cmds.append((cmd, cwd, errexit, pipefail, len(subshells), sep, unread))
             cmd = []
             for ch in t:
                 if ch == "(":
@@ -813,9 +841,11 @@ def _commands(script: str, cwd: str, shell=None):
             skip_word = False
         else:
             cmd.append(t)
-    for n, (argv, at, ee, pf, depth, sep) in enumerate(cmds):
+    for n, (argv, at, ee, pf, depth, sep, after_unread) in enumerate(cmds):
         why = None
-        if depth:
+        if after_unread:
+            why = "after shell control flow this check does not read (if, loops, case, functions, exit, trap, eval, here-docs)"
+        elif depth:
             why = "inside `( ... )`"
         elif sep == "||":
             why = "followed by `||`"
@@ -893,14 +923,14 @@ def cargo_selects(run: CargoRun, pkgs: list[Package], test: RustTest) -> bool:
     named = set(opts.get("-p", []) + opts.get("--package", []))
     if probe in by_dir and by_dir[probe].workspace_root == probe:
         # A package that is its own workspace (the CLI): only it.
-        selected = {by_dir[probe].name} if not named or by_dir[probe].name in named else set()
+        selected = {by_dir[probe].name} if not named or any(fnmatch.fnmatchcase(by_dir[probe].name, n) for n in named) else set()
     elif probe == "." or (probe in by_dir and by_dir[probe].workspace_root == "."):
         members = {p.name for p in pkgs if p.workspace_root == "."}
         if named:
-            selected = named & members
+            selected = {m for m in members if any(fnmatch.fnmatchcase(m, n) for n in named)}
         elif {"--workspace", "--all"} & flags or probe == ".":
             # The root manifest is virtual: with no -p, cargo tests every member.
-            selected = members - set(opts.get("--exclude", []))
+            selected = {m for m in members if not any(fnmatch.fnmatchcase(m, x) for x in opts.get("--exclude", []))}
         else:
             selected = {by_dir[probe].name}
     else:
@@ -1182,6 +1212,8 @@ def validate(ctx: Context, rfp_text: str | None = None, cargo_list: list[str] | 
                 errs.append(f"{cid}: {r.error}")
         for rec in c.get("records") or []:
             errs += [f"{cid}: {e}" for e in check_record(rec)]
+        if st == "shown" and c.get("gap"):
+            errs.append(f"{cid}: shown with a gap: fix the evidence or lower the status")
         if st == "shown":
             if not tests:
                 errs.append(f"{cid}: `shown` but names no test")
@@ -1197,6 +1229,7 @@ def validate(ctx: Context, rfp_text: str | None = None, cargo_list: list[str] | 
     for name, (_, fn) in CHECKS.items():
         if any(t.get("check") == name for c in rmap["clauses"] for t in c.get("tests") or []):
             errs += fn(ctx)
+    errs += check_ci_time_steps(ctx, resolved)
     if rfp_text is not None:
         errs += check_rfp(rmap, rfp_text)
     if cargo_list is not None:
@@ -1204,6 +1237,36 @@ def validate(ctx: Context, rfp_text: str | None = None, cargo_list: list[str] | 
     if e2e_records is not None:
         errs += check_e2e_records(resolved, e2e_records)
     return errs, resolved
+
+
+def _opt(argv: list[str], name: str) -> str | None:
+    for i, a in enumerate(argv):
+        if a == name and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def check_ci_time_steps(ctx: Context, resolved: dict[str, Resolved]) -> list[str]:
+    """Each job that runs named Rust tests has a gating step after them that checks its compiled
+    listing (--cargo-job JOB --cargo-list); each job that runs the E2E suite has a gating step
+    after it that checks the suite's records (--e2e-records)."""
+    errs = []
+    for job in sorted({j for r in resolved.values() if r.ok and r.rust is not None for j in r.jobs}):
+        last = max((r.step_no for r in ctx.cargo_runs if r.job == job and r.gating and "--list" not in r.argv), default=-1)
+        if not any(r.job == job and r.gating and r.step_no > last and "--cargo-list" in r.argv
+                   and _opt(r.argv, "--cargo-job") == job for r in ctx.reqmap_runs):
+            errs.append(f"CI: job `{job}` runs named Rust tests, but no gating step after them runs "
+                        f"`scripts/check-reqmap.py --cargo-job {job} --cargo-list ...`")
+    if any(r.ok and "e2e" in r.ref for r in resolved.values()):
+        for job in sorted({s.job for s in ctx.suite_runs if s.gating}):
+            last = max(s.step_no for s in ctx.suite_runs if s.job == job and s.gating)
+            if not any(r.job == job and r.gating and r.step_no > last and "--e2e-records" in r.argv
+                       for r in ctx.reqmap_runs):
+                errs.append(f"CI: job `{job}` runs {E2E_SUITE}, but no gating step after it runs "
+                            f"`scripts/check-reqmap.py --e2e-records ...`")
+    return errs
 
 
 def check_record(rec: dict) -> list[str]:
@@ -1311,7 +1374,8 @@ def md_escape(s: str) -> str:
 
 def render_test(ref: dict, r: Resolved) -> str:
     if "rust" in ref:
-        return f"`{ref['rust']}` ({ref['crate']}, [{r.where}]({os.path.relpath(r.where, DOC.parent)}))"
+        loc = f", [{r.where}]({os.path.relpath(r.where, DOC.parent)})" if r.where else ""
+        return f"`{ref['rust']}` ({ref['crate']}{loc})"
     if "e2e" in ref:
         return f"E2E `{ref['e2e']}`"
     return f"check `{ref['check']}`: {CHECKS[ref['check']][0]}"
@@ -1356,6 +1420,11 @@ def render(ctx: Context, resolved: dict[str, Resolved]) -> str:
     w("`scripts/check-reqmap.py` runs in CI (`.github/workflows/ci.yml`) and fails the build when:")
     w("")
     for line in ENFORCED:
+        w(f"- {line}")
+    w("")
+    w("## What this check does not do")
+    w("")
+    for line in LIMITS:
         w(f"- {line}")
     w("")
     w("## Summary")
@@ -1442,6 +1511,20 @@ def render(ctx: Context, resolved: dict[str, Resolved]) -> str:
 # Self-test: each kind of error is caught
 # ---------------------------------------------------------------------------------------------
 
+LIMITS = [
+    "It reads the CI workflow, the shell of its `run:` steps, the Cargo manifests and the Rust test "
+    "sources syntactically. It is not a shell interpreter or a compiler. A `cargo test` after shell "
+    "control flow it does not follow (`if`, loops, `case`, functions, `exit`, `trap`, `eval`, "
+    "here-docs) counts as not run, and a `cfg` or `cfg_attr` it cannot evaluate (features, "
+    "`debug_assertions`) is an error rather than a guess; other shell or build tricks may still "
+    "get past it.",
+    "It does not read test bodies: a test that returns early, or asserts less than its name and "
+    "the map say, passes. That is for review.",
+    "The CI logs are the final word on what ran: the listing step checks the test binaries that job "
+    "built, and the records step checks the E2E checks that run recorded as passed.",
+]
+
+
 def stale_errors(doc: str) -> list[str]:
     path = ROOT / DOC
     if not path.exists() or path.read_text() != doc:
@@ -1485,7 +1568,13 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
                     if old is not None and old not in text:
                         return [f"(self-test setup: {old!r} not in {rel})"]
                     path.write_text(new + text if old is None else text.replace(old, new, 1))
-            return validate(load_context(m, workflow), **extra)[0]
+            c = load_context(m, workflow)
+            errs, res = validate(c, **extra)
+            try:
+                render(c, res)
+            except Exception as e:  # noqa: BLE001
+                failures.append(f"self-test `{label}`: the page could not be rendered: {e!r}")
+            return errs
         except MapError as e:
             return [str(e)]
         finally:
@@ -1614,6 +1703,28 @@ def self_test(ctx: Context, rfp_text: str | None = None) -> list[str]:
     expect_ok("complete E2E records", e2e_records=["\n".join(rec(n) for n in names)])
     expect("an E2E check not recorded", "was not recorded", e2e_records=["\n".join(rec(n) for n in names if n != named[0])])
     expect("an E2E check failed", "failed in this run", e2e_records=["\n".join(rec(n, n != named[0]) for n in names)])
+
+    # Round 2: the CI-time steps, shell control flow, globs, build-dependent ignores, branch filters.
+    list_line = "python3 scripts/check-reqmap.py --cargo-job core-and-guest --cargo-list target/reqmap/workspace-tests.txt"
+    rec_flag = " --e2e-records e2e/.run/out/e2e.jsonl"
+    if list_line not in wf or rec_flag not in wf:
+        failures.append("self-test: the workflow no longer has the CI-time check lines the injections edit")
+    else:
+        expect("listing check removed", "--cargo-list ...", workflow=wf.replace(list_line, "true"))
+        expect("listing check made non-failing", "--cargo-list ...", workflow=wf.replace(list_line, list_line + " || true"))
+        expect("records check removed", "--e2e-records ...", workflow=wf.replace(rec_flag, ""))
+    for label, before in [("uncalled function", "f() { true; }\n"), ("if false", "if false; then\n"),
+                          ("exit 0", "exit 0\n"), ("trap", "trap 'exit 0' EXIT\n"),
+                          ("cargo() shadowed", "cargo() { :; }\n"), ("here-doc", "cat <<'EOF'\n"),
+                          ("while false", "while false; do\n"), ("case", "case x in y)\n")]:
+        expect(f"`{label}` before the test command", "no `cargo test`",
+               workflow=wf.replace(test_step, f"        run: |\n          {before.replace(chr(10), chr(10) + '          ')}{test_cmd}\n"))
+    expect("--exclude glob", "no `cargo test`", workflow=wf.replace(test_cmd, "cargo test --workspace --exclude 'escapement-t*' --locked -- --nocapture"))
+    expect("push to every branch but main", "runs on every push", workflow=wf.replace(
+        "  push:\n    branches: [main]\n", "  push:\n    branches: ['**', '!main']\n"))
+    expect("cfg_attr(not(debug_assertions), ignore)", "cannot evaluate", files={idl_test: (idl_fn, "#[cfg_attr(not(debug_assertions), ignore)]\n" + idl_fn)})
+    expect("cfg_attr(kani, ignore)", "cannot evaluate", files={idl_test: (idl_fn, "#[cfg_attr(kani, ignore)]\n" + idl_fn)})
+    expect("shown with a gap", "shown with a gap", rmap_mut=lambda m: clause(m, "F4").update(gap="x"))
 
     # The RFP text.
     if rfp_text is not None:

@@ -16,6 +16,7 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 - a named Rust test does not exist: the script reads each crate's source, follows its modules and evaluates `#[cfg]`, so the name is the full libtest path in the named crate;
 - a named Rust test is not run by any `cargo test` in `.github/workflows/ci.yml` whose failure fails the job: the package, the target (`test = false`, `harness = false`, `required-features`, `autotests`), the filters, `#[ignore]` (also through `cfg_attr`; run only with `--ignored`) and `#[should_panic]` are all taken into account, and a step with `continue-on-error`, a command followed by `||`, `&&` or `&`, piped without `pipefail`, run under `set +e` or inside `( ... )` does not count;
 - after the tests are built, a named Rust test, or its whole test binary, is missing from the compiled test binaries (`cargo test ... -- --list`) of the job that runs it;
+- a job that runs named Rust tests, or the E2E suite, has no gating step after them that runs this check against its compiled-test listing (`--cargo-job JOB --cargo-list`) or the suite's records (`--e2e-records`), so the two checks below cannot be dropped or made non-failing silently;
 - a named end-to-end check is not one that `e2e/run_e2e.sh` records, or no CI job runs that suite; after the suite runs in CI, a named check was not recorded as passed in that run;
 - a `shown` clause names no test, or none of its tests runs on every push to `main` (a manual job, a job that `needs` one, or a push trigger filtered by `paths`, `tags` or `branches-ignore` does not count);
 - an `in part`, `not yet` or `waits on Logos` clause does not say what remains (`not yet` must name its milestone, `waits on Logos` must name LEZ testnet 0.4);
@@ -23,6 +24,12 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 - a record (file, or an anchor in it such as an EVIDENCE row) does not exist;
 - S3 is `shown` while a hard Functionality, Usability, Reliability or Performance clause names no test;
 - this page is not exactly what the script generates from the map (stale).
+
+## What this check does not do
+
+- It reads the CI workflow, the shell of its `run:` steps, the Cargo manifests and the Rust test sources syntactically. It is not a shell interpreter or a compiler. A `cargo test` after shell control flow it does not follow (`if`, loops, `case`, functions, `exit`, `trap`, `eval`, here-docs) counts as not run, and a `cfg` or `cfg_attr` it cannot evaluate (features, `debug_assertions`) is an error rather than a guess; other shell or build tricks may still get past it.
+- It does not read test bodies: a test that returns early, or asserts less than its name and the map say, passes. That is for review.
+- The CI logs are the final word on what ran: the listing step checks the test binaries that job built, and the records step checks the E2E checks that run recorded as passed.
 
 ## Summary
 
@@ -39,7 +46,7 @@ Every clause of RFP-017 (Privacy-Preserving Token Vesting), quoted verbatim from
 | [F3b](#f3b) | One-way conversion to non-cancelable | shown | 5 | 2 |
 | [F3c](#f3c) | Cancel returns the unvested balance to the creator | in part (code differs from the proposal) | 5 | 2 |
 | [F3d](#f3d) | Vested tokens stay claimable after cancel | shown | 7 | 2 |
-| [F4](#f4) | Transferability set at creation, immutable | shown | 5 | 2 |
+| [F4](#f4) | Transferability set at creation, immutable | shown | 6 | 2 |
 | [F5](#f5) | Batch creation; maximum per transaction documented | shown | 3 | 2 |
 | [F6](#f6) | An event per state transition; schema documented | in part | 6 | 2 |
 | [U1](#u1) | SDK for Logos modules: full lifecycle, public and private claims | in part | 8 | 1 |
@@ -340,12 +347,13 @@ Records:
 
 **Status: shown.** Proposal row `F4`: shown.
 
-**Note:** A transfer of a non-transferable schedule exits with code 21; no message changes the flag after creation.
+**Note:** A transfer of a non-transferable schedule exits with code 21. The stateful suite asserts after every random step (transfers, claims, cancels, make-non-cancelable, refused probes) that each schedule's `transferable` equals the value it was created with; the IDL test pins the program's complete message set, none of which sets the flag.
 
 Tests:
 
 - `full_lifecycle_all_schedule_types_authorities_and_refusals` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
 - `stateful_handler_conservation_invariant_suite` (escapement-tests, [crates/escapement-tests/tests/escapement_e2e.rs](../crates/escapement-tests/tests/escapement_e2e.rs)); CI: core-and-guest (every push and pull request)
+- `u6_idl_covers_all_messages_states_events_and_round_trips` (escapement-idl, [crates/escapement-idl/tests/idl.rs](../crates/escapement-idl/tests/idl.rs)); CI: core-and-guest (every push and pull request)
 - E2E `transfer-applied`; CI: e2e-standalone-sequencer (every push and pull request)
 - E2E `refusal-old-beneficiary-reverted-state-unchanged`; CI: e2e-standalone-sequencer (every push and pull request)
 - E2E `new-beneficiary-received`; CI: e2e-standalone-sequencer (every push and pull request)
@@ -816,7 +824,7 @@ Records:
 
 Tests:
 
-- check `reqmap:s3-coverage`: every hard Functionality, Usability, Reliability and Performance clause names a test, or S3 is not `shown`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), requirement-map (every push and pull request)
+- check `reqmap:s3-coverage`: every hard Functionality, Usability, Reliability and Performance clause names a test, or S3 is not `shown`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
 
 Records:
 
@@ -1070,7 +1078,7 @@ Records:
 
 Tests:
 
-- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the repository, the guest crates included, says `license = "MIT OR Apache-2.0"`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), requirement-map (every push and pull request)
+- check `reqmap:license`: LICENSE-MIT and LICENSE-APACHE exist and every package manifest in the repository, the guest crates included, says `license = "MIT OR Apache-2.0"`; CI: core-and-guest (every push and pull request), e2e-standalone-sequencer (every push and pull request), real-stark-proof (manual (workflow_dispatch)), requirement-map (every push and pull request)
 
 Records:
 
