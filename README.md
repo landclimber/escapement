@@ -28,7 +28,10 @@ Built and tested (numbers and commands: [docs/EVIDENCE.md](docs/EVIDENCE.md)):
 
 Not built yet: the Logos Core module and the Basecamp mini-app, deployment on LEZ testnet 0.4 (not
 launched yet), reading events back through an indexer, an external audit.
-Requirement by requirement: [docs/traceability.md](docs/traceability.md).
+Requirement by requirement: [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md), every RFP-017 clause quoted
+verbatim with its status and the tests that show it, generated from
+[docs/requirements-map.json](docs/requirements-map.json) and enforced in CI by `scripts/check-reqmap.py`
+(the one-page summary: [docs/traceability.md](docs/traceability.md)).
 
 ## Quickstart
 
@@ -102,7 +105,7 @@ transfer-beneficiary and withdraw-fees; unknown flags are refused. Program addre
 | `crates/escapement-tests` | in-process integration suites; `crates/escapement-test-methods`: a test-only relay guest |
 | `e2e/` | standalone sequencer harness and the end-to-end suite |
 | `scripts/` | reproducible guest build |
-| `docs/` | [EVIDENCE](docs/EVIDENCE.md), [traceability](docs/traceability.md), [DECISIONS](docs/DECISIONS.md), [events](docs/events.md), [gas-and-batch](docs/gas-and-batch.md), [SECURITY](docs/SECURITY.md), [CROPS](docs/CROPS.md) |
+| `docs/` | [EVIDENCE](docs/EVIDENCE.md), [REQUIREMENTS](docs/REQUIREMENTS.md) ([map](docs/requirements-map.json)), [traceability](docs/traceability.md), [DECISIONS](docs/DECISIONS.md), [events](docs/events.md), [gas-and-batch](docs/gas-and-batch.md), [SECURITY](docs/SECURITY.md), [CROPS](docs/CROPS.md) |
 
 ## Privacy, in short
 

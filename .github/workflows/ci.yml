@@ -16,6 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The requirement map (docs/requirements-map.json -> docs/REQUIREMENTS.md): every RFP-017 clause,
+  # quoted from the RFP at a pinned commit, with its status and the named tests and records that
+  # show it. Fails when a clause is not verbatim or an RFP item is not covered, a named test does
+  # not exist or no job below runs it, a "shown" clause names no test run on every push, or the
+  # page is stale. The jobs below check the same names again against what they build and run.
+  requirement-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Requirement map against the RFP text at its pinned commit, the source, the E2E suite and this workflow
+        run: |
+          mkdir -p target/reqmap
+          curl -fsSL --retry 3 -o target/reqmap/RFP-017.md "$(python3 scripts/check-reqmap.py --print-rfp-url)"
+          python3 scripts/check-reqmap.py --rfp target/reqmap/RFP-017.md
+
+      - name: The map check catches every kind of error it claims to (self-test)
+        run: python3 scripts/check-reqmap.py --self-test --rfp target/reqmap/RFP-017.md
+
   core-and-guest:
     runs-on: ubuntu-latest
     # fmt + clippy + a cold build of the LEZ dependency tree + the real-ELF test
@@ -108,6 +128,14 @@ jobs:
           RISC0_DEV_MODE: "1"
         run: cargo test --workspace --locked -- --nocapture
 
+      - name: Requirement map against the test binaries just built (every named test is in them)
+        env:
+          RISC0_DEV_MODE: "1"
+        run: |
+          mkdir -p target/reqmap
+          cargo test --workspace --locked -- --list > target/reqmap/workspace-tests.txt 2>&1 || { cat target/reqmap/workspace-tests.txt; exit 1; }
+          python3 scripts/check-reqmap.py --cargo-list target/reqmap/workspace-tests.txt
+
   # S2: the end-to-end suite against an unmodified standalone LEZ v0.4.0-rc3 sequencer (mock
   # Bedrock, loopback only), driven by the Escapement CLI: immutable deployment and header read-back,
   # admin init, native schedules of every kind, public and one-transaction private claims, cancel,
@@ -176,6 +204,12 @@ jobs:
         env:
           E2E_DEV_MODE: "1"
         run: bash e2e/run_e2e.sh
+
+      - name: Requirement map against this run (every named E2E check passed; every named CLI test is in its binary)
+        run: |
+          mkdir -p target/reqmap
+          (cd crates/escapement-cli && cargo test --release --locked -- --list) > target/reqmap/cli-tests.txt 2>&1 || { cat target/reqmap/cli-tests.txt; exit 1; }
+          python3 scripts/check-reqmap.py --cargo-list target/reqmap/cli-tests.txt --e2e-records e2e/.run/out/e2e.jsonl
 
       - name: Keep the suite's records
         if: always()

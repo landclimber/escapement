@@ -1,5 +1,9 @@
 # RFP-017 requirement traceability
 
+A one-page summary. The clause-by-clause map that CI enforces (every clause quoted verbatim, every
+named test checked to exist and to run in CI) is [REQUIREMENTS.md](REQUIREMENTS.md), generated from
+[requirements-map.json](requirements-map.json) by `scripts/check-reqmap.py`.
+
 Every requirement of RFP-017 (logos-co/rfp, `RFPs/RFP-017-token-vesting.md`, as published on
 24 Nov 2026), its status, and the test or artefact that shows it.
 
