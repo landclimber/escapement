@@ -50,21 +50,26 @@ signed it, and its arguments (`expect`). The accounts are in [`public-network/ac
 ### What `verify-public.sh` checks
 
 For each transaction: it is on chain at the recorded block and index (its hash recomputed from its encoding, the
-block's hash from the block's contents), and applied or reverted as recorded; its call decodes to the recorded program,
-message and arguments (for example, a claim's schedule, destination and amount; a creation's beneficiary, asset, total,
-kind, cliff or tranches and authorities), rooted at the recorded account and signed by the recorded one (from its
-witnesses); and the step's name agrees with the call. Rows whose transactions were swapped therefore fail; the `role`
+block's hash from the block's contents), and applied or reverted as recorded; its call decodes to the recorded program
+and message, with the arguments recorded in `expect` (for example, a claim's schedule, destination and amount; a
+creation's beneficiary, asset, total, kind, cliff amount or tranches, flags and authorities; a batch's recipients,
+totals and kinds), rooted at the recorded account and signed by the recorded one (from its witnesses); and the step's
+name agrees with the call. Rows whose transactions were swapped therefore fail; the `role`
 column itself is a description, not checked. The deployments' segments must chain to their headers, and fetched
 consecutive blocks must link by their parent hashes. For the private claim, the proof must be a real RISC Zero receipt
 (`InnerReceipt` Composite, Succinct or Groth16, not the Fake one dev mode makes) of the recorded variant and size, and
 its actors must include the schedule.
 
-For the accounts: both program headers (image id, immutable), the configuration, every schedule's full state (creator,
-beneficiary, asset, kind, total, claimed, flags, authorities, cancellation), and every native escrow's balance against
-what its schedules are still owed. The host's records below are cross-checked against the transactions they describe.
-101 checks in all; `--self-test` adds 13 wrong records (an amount, a destination, the root or signing account, the
-operation, a batch recipient's total, an authority, the fee, a refusal's outcome and gas, a dev-mode receipt, two rows'
-operations swapped), each of which must fail.
+For the accounts: both program headers (image id, immutable), the configuration (token program, fee, treasury, admin),
+each schedule's creator, beneficiary, asset, kind, total, claimed amount, flags, authorities and cancellation (vested
+and refunded), and every native escrow's balance against what its schedules are still owed. The host's records below are
+cross-checked against the transactions they describe. The evidence set must be complete: `network.json` pins how many
+transactions, accounts and native escrows it holds, the rows are numbered in order with no hash or account twice, and
+every account that signed a recorded transaction has an on-chain nonce equal to the number of recorded transactions it
+signed, so a deleted row fails. This checks the committed records, not every transaction the network carried. 103
+checks in all; `--self-test` adds 15 wrong or incomplete records (an amount, a destination, the root or signing
+account, the operation, a batch recipient's total, an authority, the fee, a refusal's outcome and gas, a dev-mode
+receipt, two rows' operations swapped, a deleted transaction row, a deleted account row), each of which must fail.
 
 ### Refusals read back
 
@@ -82,8 +87,8 @@ clock-dependent fields aside) and was identical: [`public-network/refusals.json`
 
 **Checked on chain by `verify-public.sh`:** the transaction, its call (`ClaimExact` of 50,000,000 from the schedule to
 the alias), that its receipt is a Succinct one of 237,142 bytes (a real proof, not dev mode), and the schedule and its
-escrow afterwards. **Reported by the operator, not checked by the script:** the proving time, CPU, memory, hardware,
-fee reserve, the private balance and the CLI's privacy checks, from the host's records in
+escrow afterwards. **Reported by the operator, not checked by the script:** the prover (`r0vm` 3.0.5), the proving
+time, CPU, memory, hardware, fee reserve, the private balance and the CLI's privacy checks, from the host's records in
 [`public-network/private-claim.json`](public-network/private-claim.json) (the CLI's output and systemd's accounting).
 
 | | |
@@ -104,9 +109,12 @@ On a 32-vCPU container the same kind of transaction took 205.6 s, about 14 times
 
 The CLI ran on the network's own host, against its sequencer on `127.0.0.1:3040` (it talks only to a sequencer on
 loopback), as a dedicated system user: built from `2ddc57c` for every step up to the token cancel (step 38) and the
-private claim, and from `351d235` (this branch's `batch` command added, nothing else changed) from the first batch
-(step 39) on. Every key (the deployer's, the program's header key, three public accounts, the private account) was
-generated there and never left it. The step names in `transactions.tsv` follow the commands of `e2e/run_e2e.sh`;
+private claim, and from the first batch (step 39) on with a first version of the `batch` command: linear batches only,
+the same `ID:TOTAL` recipients and the same `BatchCreate` encoding as now. The command was reworked after the run
+(per-recipient cliff amounts, exactly one shape flag, the 128-recipient ceiling, the terms shown in a dry run); the
+two batches sent are linear, and their decoded items match today's `ID:TOTAL` form. Every key (the deployer's, the program's header key, three public accounts, the private account) was
+generated there and never left it. The step names in `transactions.tsv` follow the naming style of
+`e2e/run_e2e.sh`'s steps (the suite's own batch steps were added later and are named differently);
 every command's output is in [`public-network/run-records.json`](public-network/run-records.json).
 
 ## What this does not show
@@ -127,6 +135,9 @@ every command's output is in [`public-network/run-records.json`](public-network/
 - A private **token** claim was not run on this network (on this host it needs three proven transactions: a private
   shield for its fee, the private token holding, and the claim); it ran with real proofs on a standalone sequencer
   (E-13 in [EVIDENCE](EVIDENCE.md)).
+- Not every field is compared: the script ignores salts and batch ids, the creator and refund holdings, the schedules'
+  times, per-item authorities in a batch, milestone unlock times and the cancellation time, and the schedules' version
+  and asset program.
 - Events were not read back through an indexer (on `v0.4.0-rc3`, `getEvents` is the indexer's RPC).
 - The proof time is from a 4-vCPU host shared with the running network, on two threads: not a benchmark.
 - What a private claim makes public is as designed: the schedule, its beneficiary, the amount and time; not the

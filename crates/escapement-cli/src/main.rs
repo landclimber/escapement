@@ -188,12 +188,15 @@ fn loopback_url(url: &str) -> Result<String> {
 struct Args {
     positional: Vec<String>,
     flags: BTreeMap<String, Option<String>>,
+    /// Flags given more than once (refused: the last one would silently win).
+    repeated: Vec<String>,
 }
 
 impl Args {
     fn parse(raw: &[String]) -> Self {
         let mut positional = Vec::new();
         let mut flags = BTreeMap::new();
+        let mut repeated = Vec::new();
         let mut i = 0;
         while i < raw.len() {
             if let Some(name) = raw[i].strip_prefix("--") {
@@ -201,13 +204,19 @@ impl Args {
                 if value.is_some() {
                     i += 1;
                 }
-                flags.insert(name.to_string(), value);
+                if flags.insert(name.to_string(), value).is_some() {
+                    repeated.push(name.to_string());
+                }
             } else {
                 positional.push(raw[i].clone());
             }
             i += 1;
         }
-        Self { positional, flags }
+        Self {
+            positional,
+            flags,
+            repeated,
+        }
     }
 
     fn has(&self, name: &str) -> bool {
@@ -217,6 +226,9 @@ impl Args {
     /// Refuses any flag the command does not take (a typo must never send a different
     /// transaction from the one meant).
     fn check(&self, allowed: &[&str]) -> Result<()> {
+        if let Some(name) = self.repeated.first() {
+            bail!("--{name} is given more than once");
+        }
         for name in self.flags.keys() {
             if !allowed.contains(&name.as_str()) {
                 bail!(
@@ -432,7 +444,7 @@ impl Ctx {
                 bail!("refused in simulation, nothing sent: {e}");
             }
             simulated = Some(cycles);
-            gas_limit = (cycles + cycles.div_ceil(4)).max(50_000);
+            gas_limit = (cycles + cycles.div_ceil(4)).max(50_000).min(MAX_GAS_EXEC);
         }
         let tx = self.build_public(call, signers, evidence, gas_limit, nonces, price);
         let included = self.send_and_wait(LeeTransaction::Public(tx)).await?;
@@ -960,14 +972,17 @@ async fn batch(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         "no-precheck",
         "allow-duplicates",
     ])?;
-    let (start_ts, cliff_ts, end_ts) = match (a.u64s("linear")?, a.u64s("cliff")?) {
-        (Some(v), None) => {
+    // Which flags were given decides the shape (a flag given without a value is an error, not absent).
+    let (start_ts, cliff_ts, end_ts) = match (a.has("linear"), a.has("cliff")) {
+        (true, false) => {
+            let v = a.u64s("linear")?.unwrap_or_default();
             let [s, e] = v[..] else {
                 bail!("--linear START,END (unix ms)")
             };
             (s, None, e)
         }
-        (None, Some(v)) => {
+        (false, true) => {
+            let v = a.u64s("cliff")?.unwrap_or_default();
             let [s, c, e] = v[..] else {
                 bail!("in a batch, --cliff START,CLIFF,END (unix ms); each recipient's cliff amount goes in --recipients ID:TOTAL:CLIFF")
             };
@@ -1054,7 +1069,8 @@ async fn batch(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         .zip(&schedules)
         .map(|(i, s)| {
             let mut v = json!({"schedule": s, "beneficiary": i.beneficiary.to_string(),
-                               "total": i.total_amount.to_string()});
+                               "total": i.total_amount.to_string(), "cancelable": i.cancelable,
+                               "transferable": i.transferable});
             match &i.kind {
                 ScheduleKind::Linear { start_ts, end_ts } => {
                     v["kind"] = json!("linear");
@@ -1080,8 +1096,11 @@ async fn batch(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         .collect();
     if a.has("dry-run") {
         return Ok(
-            json!({"dry_run": true, "batch_id": hex::encode(batch_id), "schedules": schedules,
-                   "items": terms, "call": print_call(&call)}),
+            json!({"dry_run": true, "batch_id": hex::encode(batch_id), "asset": format!("{asset:?}"),
+                   "funding_holding": params.creator_holding.to_string(),
+                   "refund_holding": params.refund_holding.to_string(),
+                   "escrow": escrow.to_string(), "schedules": schedules, "items": terms,
+                   "call": print_call(&call)}),
         );
     }
     let catalog = catalog_for(Some(d.program))?;
@@ -1098,7 +1117,9 @@ async fn batch(ctx: &Ctx, a: &Args) -> Result<serde_json::Value> {
         .await?;
     Ok(
         json!({"tx": included.json(), "simulated_cycles": cycles, "batch_id": hex::encode(batch_id),
-              "schedules": schedules, "items": terms, "escrow": escrow.to_string(),
+              "asset": format!("{asset:?}"), "funding_holding": params.creator_holding.to_string(),
+              "refund_holding": params.refund_holding.to_string(), "schedules": schedules, "items": terms,
+              "escrow": escrow.to_string(),
               "escrow_balance": asset_balance(ctx, asset, escrow).await?.to_string()}),
     )
 }

@@ -19,7 +19,10 @@ For each transaction:
   makes, fails) of the recorded variant and size. The proof's validity itself rests on the sequencer, which verified
   it before including the transaction; this script does not run a RISC Zero verifier;
 - a deployment: the segments written point to each other (tail first) and the header to the first one.
-Fetched blocks that are consecutive must link (each one's parent hash is the previous one's hash).
+Fetched blocks that are consecutive must link (each one's parent hash is the previous one's hash). The records must be
+complete: network.json pins the counts of transactions, accounts and native escrows, rows are numbered in order with no
+hash or account twice, and each account that signed a recorded transaction has an on-chain nonce equal to its recorded
+transactions. This checks the committed evidence set, not every transaction the network ever carried.
 
 For each account: program headers carry the recorded image id (Escapement's from image-ids.tsv) and are immutable;
 the configuration holds the recorded token program, fee and admin; each schedule's state (`VestingActorState::
@@ -29,7 +32,8 @@ cancellation, and each native escrow holds exactly what its schedules have not p
     scripts/verify-public.sh                 through the RPC in docs/public-network/network.json
     RPC=<url> scripts/verify-public.sh       through another endpoint serving the same chain
     scripts/verify-public.sh --self-test     also: wrong records (an amount, a recipient, an account, the operation,
-                                             a refusal, the receipt, swapped rows) must each fail
+                                             a refusal, the receipt, swapped rows, a deleted transaction or account
+                                             row) must each fail
 """
 import base64
 import hashlib
@@ -409,7 +413,29 @@ def rows(name):
     with open(os.path.join(DATA, name)) as f:
         lines = [x.rstrip("\n").split("\t") for x in f if x.strip() and not x.startswith("#")]
     head = lines[0]
+    for x in lines[1:]:
+        if len(x) != len(head):
+            raise ValueError(f"{name}: a row with {len(x)} columns, not {len(head)}")
     return [dict(zip(head, x)) for x in lines[1:]]
+
+
+def structure(tx_rows, acct_rows, escrows):
+    """Problems with the evidence set itself: the counts network.json pins, rows numbered 0..N-1, no hash, account or
+    name twice. (The script checks this committed set of records, not every transaction the network ever carried.)"""
+    want, problems = NETWORK["records"], []
+    if len(tx_rows) != want["transactions"]:
+        problems.append(f"{len(tx_rows)} transactions recorded, network.json pins {want['transactions']}")
+    if [t["n"] for t in tx_rows] != [str(i) for i in range(len(tx_rows))]:
+        problems.append("the transactions are not numbered 0, 1, 2, ... in order")
+    if len({t["hash"] for t in tx_rows}) != len(tx_rows):
+        problems.append("a transaction hash is recorded twice")
+    if len(acct_rows) != want["accounts"]:
+        problems.append(f"{len(acct_rows)} accounts recorded, network.json pins {want['accounts']}")
+    if len({a["account"] for a in acct_rows}) != len(acct_rows) or len({a["name"] for a in acct_rows}) != len(acct_rows):
+        problems.append("an account or a name is recorded twice")
+    if escrows is not None and escrows != want["native_escrows"]:
+        problems.append(f"{escrows} native escrows checked, network.json pins {want['native_escrows']}")
+    return problems
 
 
 def kv(s):
@@ -503,6 +529,30 @@ def mutated(rows_by_n):
     ]
 
 
+NONCES = {}
+
+
+def completeness(tx_rows, decoded):
+    """Problems if the records miss a transaction: every account that signed a recorded transaction (the faucet's,
+    which the network uses for everyone, aside) must have an on-chain nonce equal to the number of recorded
+    transactions it signed, counted from the transactions' own witnesses."""
+    faucet = {t["signed_by"] for t in tx_rows if t["step"].startswith("00-faucet")}
+    signed = {}
+    for t in tx_rows:
+        dec = decoded.get(t["n"])
+        for a in set(dec[0]["signers"]) if dec else ():
+            signed[a] = signed.get(a, 0) + 1
+    problems = []
+    for a, n in sorted(signed.items()):
+        if a in faucet:
+            continue
+        if a not in NONCES:
+            NONCES[a] = int((call("getAccount", [a]) or {}).get("nonce", -1))
+        if NONCES[a] != n:
+            problems.append(f"{a} has signed {NONCES[a]} transactions on chain, {n} recorded")
+    return problems, len([a for a in signed if a not in faucet])
+
+
 def main():
     print(f"RPC {RPC}\nexplorer {EXPLORER}")
     failed, blocks, decoded = 0, BLOCKS, {}
@@ -538,6 +588,10 @@ def main():
         n = sum(1 for g in group if g and g[1].startswith("loader."))
         report(not problems, f"    {step}: {n} loader transactions, the segments chained tail first, the header on the "
                f"first, immutable", problems)
+
+    problems, accounts = completeness(rows("transactions.tsv"), decoded)
+    report(not problems, f"    complete: each of the {accounts} accounts that signed has exactly its recorded transactions on chain "
+           f"(its nonce)", problems)
 
     linked = [n for n in blocks if n + 1 in blocks]
     problems = [f"block {n + 1}'s parent is not block {n}" for n in linked if blocks[n + 1]["parent"] != blocks[n]["hash"]]
@@ -587,6 +641,11 @@ def main():
             problems.append(f"{type(e).__name__}: {e}")
         report(not problems, f"{a['name']:<40} {a['account']}  {a['check'].split()[0]}  {EXPLORER}#/account/{a['account']}", problems)
 
+    problems = structure(rows("transactions.tsv"), rows("accounts.tsv"), len(escrows))
+    report(not problems, f"    the evidence set: {NETWORK['records']['transactions']} transactions numbered in order, "
+           f"{NETWORK['records']['accounts']} accounts and {NETWORK['records']['native_escrows']} native escrows, "
+           f"as network.json pins, none twice", problems)
+
     for escrow, owed in sorted(escrows.items()):
         problems = []
         try:
@@ -617,8 +676,16 @@ def main():
     try:
         ref = json.load(open(os.path.join(DATA, "refusals.json")))["refusals"]
         refused = {h for h, t in txs.items() if t["outcome"] == "refused"}
-        if {x["tx"]["hash"] for x in ref} != refused or not all(x["unchanged"] for x in ref):
-            problems.append("its transactions are not the refused rows, or a schedule changed")
+        if {x["tx"]["hash"] for x in ref} != refused:
+            problems.append("its transactions are not the refused rows")
+        clock = {"clock_ms", "claimable_now", "next_unlock_ms", "next_unlock_utc", "reason"}
+        for x in ref:
+            before, after = ({k: v for k, v in x[s].items() if k not in clock} for s in ("schedule_before", "schedule_after"))
+            if before != after:
+                problems.append(f"{x['step']}: the schedule changed")
+            row = txs.get(x["tx"]["hash"])
+            if not row or kv(row["expect"]).get("schedule") != x["schedule_before"].get("schedule"):
+                problems.append(f"{x['step']}: its schedule is not the one its transaction names")
     except Exception as e:  # noqa: BLE001
         problems.append(f"refusals.json: {type(e).__name__}: {e}")
     report(not problems, f"    refusals.json: the {len(ref) if not problems else '?'} refused transactions, each schedule unchanged", problems)
@@ -629,6 +696,13 @@ def main():
             problems = check_tx(t)[0]
             report(bool(problems), f"    self-test: a wrong record of {what} fails ({problems[0] if problems else 'it passed'})",
                    ["a wrong record passed"])
+        accts = rows("accounts.tsv")
+        problems = structure(rows("transactions.tsv"), [a for a in accts if a["name"] != "schedule: native transferable"], None)
+        report(bool(problems), f"    self-test: records missing a schedule's account fail ({problems[0] if problems else 'they passed'})",
+               ["records missing an account passed"])
+        problems = completeness([t for t in rows("transactions.tsv") if t["n"] != "30"], decoded)[0]
+        report(bool(problems), f"    self-test: records missing a transaction (row 30) fail ({problems[0] if problems else 'they passed'})",
+               ["records missing a transaction passed"])
 
     print("all checks passed" if not failed else f"{failed} FAILED")
     return 1 if failed else 0

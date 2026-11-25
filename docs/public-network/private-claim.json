@@ -56,5 +56,12 @@
   "cpu_weight": 10,
   "memory_max": "10 GiB",
   "oom_score_adjust": 1000
+ },
+ "prover": {
+  "r0vm": "3.0.5",
+  "r0vm_sha256": "36c016a5bb2ded5bd1f8f92cc487e6ffaeb1e95ec05850c983081a0f716b515b",
+  "escapement_cli_sha256": "1b7b7a06d193fafaed634ca5fb1b8bd2f8c1abd7ed223397e3af4787583a4106",
+  "escapement_cli_built_from": "2ddc57c",
+  "note": "operator-reported: the binaries installed on the host and checked there against these SHA-256s; r0vm --version printed risc0-r0vm 3.0.5"
  }
 }

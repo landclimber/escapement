@@ -12,14 +12,21 @@ const BATCH_ID: &str = "00000000000000000000000000000000000000000000000000000000
 
 /// (exit success, the printed result, stderr).
 fn run(args: &[&str]) -> (bool, serde_json::Value, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_escapement"))
-        .args(args)
+    run_with(None, args)
+}
+
+/// As `run`, with a token program configured when given.
+fn run_with(token_program: Option<&str>, args: &[&str]) -> (bool, serde_json::Value, String) {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_escapement"));
+    cmd.args(args)
         .env("LEZ_RPC", "http://127.0.0.1:1")
         .env("ESCAPEMENT_PROGRAM", PROGRAM)
         .env_remove("ESCAPEMENT_TOKEN_PROGRAM")
-        .env_remove("ESCAPEMENT_KEY")
-        .output()
-        .expect("run escapement");
+        .env_remove("ESCAPEMENT_KEY");
+    if let Some(t) = token_program {
+        cmd.env("ESCAPEMENT_TOKEN_PROGRAM", t);
+    }
+    let out = cmd.output().expect("run escapement");
     let stdout = String::from_utf8_lossy(&out.stdout);
     let v: serde_json::Value = stdout
         .lines()
@@ -144,6 +151,35 @@ fn ambiguous_or_malformed_batches_are_refused_before_anything_is_built() {
             vec!["--recipients", &[A, ":0"].concat(), "--linear", "1,9"],
             "zero total",
         ),
+        (
+            vec!["--recipients", &two, "--linear", "--cliff", "1,2,9"],
+            "exactly one of",
+        ),
+        (
+            vec!["--recipients", &[A, ":5"].concat(), "--linear"],
+            "--linear START,END",
+        ),
+        (
+            vec![
+                "--recipients",
+                &[A, ":5"].concat(),
+                "--cliff",
+                "--linear",
+                "1,9",
+            ],
+            "exactly one of",
+        ),
+        (
+            vec![
+                "--recipients",
+                &[A, ":5"].concat(),
+                "--linear",
+                "1,9",
+                "--linear",
+                "2,9",
+            ],
+            "more than once",
+        ),
     ] {
         let mut full = vec!["batch"];
         full.extend(args);
@@ -205,5 +241,77 @@ fn create_takes_exactly_one_shape_and_a_u128_cliff_amount() {
             end_ts: 9,
             cliff_amount: 1u128 << 65
         }
+    );
+}
+
+#[test]
+fn a_batch_above_the_ceiling_is_refused_and_a_dry_run_shows_the_irreversible_terms() {
+    let many = vec![[A, ":1"].concat(); 129].join(",");
+    let (ok, _, err) = run(&[
+        "batch",
+        "--recipients",
+        &many,
+        "--linear",
+        "1,9",
+        "--allow-duplicates",
+        "--dry-run",
+    ]);
+    assert!(!ok && err.contains("at most 128"), "{err}");
+    let r = [A, ":5"].concat();
+    let (ok, out, err) = run(&[
+        "batch",
+        "--recipients",
+        &r,
+        "--linear",
+        "1,9",
+        "--non-cancelable",
+        "--transferable",
+        "--dry-run",
+    ]);
+    assert!(ok, "{err}");
+    assert_eq!(out["items"][0]["cancelable"], false);
+    assert_eq!(out["items"][0]["transferable"], true);
+    assert_eq!(out["asset"], "Native");
+    assert!(out["escrow"].as_str().is_some_and(|e| !e.is_empty()));
+    let Message::BatchCreate(p) = message(&out) else {
+        panic!("not a BatchCreate")
+    };
+    assert!(!p.items[0].cancelable && p.items[0].transferable);
+}
+
+#[test]
+fn a_token_batch_dry_run_shows_its_asset_and_holdings() {
+    const TOKEN_PROGRAM: &str = "2RAjghNzt7QjRDRmuekUhRZmyj6ctwgEDoTrSjj7JJtq";
+    const DEFINITION: &str = "AQSzUKN1bMD2L3hhFgCphZSKZUPDZZNQBifw1bLn84BF";
+    let r = [A, ":5,", B, ":7"].concat();
+    let (ok, out, err) = run_with(
+        Some(TOKEN_PROGRAM),
+        &[
+            "batch",
+            "--token",
+            DEFINITION,
+            "--recipients",
+            &r,
+            "--linear",
+            "1,9",
+            "--refund-to",
+            B,
+            "--dry-run",
+        ],
+    );
+    assert!(ok, "{err}");
+    assert!(
+        out["asset"].as_str().unwrap().contains(DEFINITION),
+        "{}",
+        out["asset"]
+    );
+    assert_eq!(out["refund_holding"], B);
+    let Message::BatchCreate(p) = message(&out) else {
+        panic!("not a BatchCreate")
+    };
+    assert_eq!(p.refund_holding.to_string(), B);
+    assert_eq!(out["funding_holding"], p.creator_holding.to_string());
+    assert!(
+        matches!(p.asset, escapement_core::Asset::Token { definition } if definition.to_string() == DEFINITION)
     );
 }

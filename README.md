@@ -29,7 +29,7 @@ Built and tested (numbers and commands: [docs/EVIDENCE.md](docs/EVIDENCE.md)):
   immutably at `Be6eH1Ps2cr7zSmuV2XfwZDkF14naGcEG6h71ViszSXW` with the image id of `image-ids.tsv`, then
   66 transactions over every lifecycle, both assets, batches, nine refusals read back, and a
   native private claim with a real proof (a Succinct receipt), made on the network's host. Each
-  transaction's inclusion, position, outcome, call and signer, and each account's final state, are
+  transaction's inclusion, position, outcome, call and signer, and each account's recorded fields, are
   re-checked by `scripts/verify-public.sh`, reading the operator's RPC:
   [docs/PUBLIC-NETWORK.md](docs/PUBLIC-NETWORK.md).
 
