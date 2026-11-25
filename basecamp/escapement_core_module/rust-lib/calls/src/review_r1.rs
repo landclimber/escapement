@@ -56,6 +56,7 @@ pub(crate) fn fixture() -> Fixture {
         refund_holding: AccountId::new(me),
         total_amount: 90_000_000_000,
         claimed_amount: 0,
+        vested_high_water: 0,
         kind: ScheduleKind::Linear { start_ts: now - 600_000, end_ts: now + 600_000 },
         cancelable: true,
         transferable: false,

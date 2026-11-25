@@ -4,3 +4,5 @@ escapement_core_module/logos-rust-sdk-src
 # Nix result links.
 result
 result-*
+# Written by basecamp/scripts/ci-workspace.py from rust-lib/Cargo.lock; never committed.
+ci/Cargo.lock

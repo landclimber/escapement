@@ -137,6 +137,80 @@ jobs:
           cargo test --workspace --locked -- --list 2>&1 | tee target/reqmap/workspace-tests.txt
           python3 scripts/check-reqmap.py --cargo-job core-and-guest --cargo-list target/reqmap/workspace-tests.txt
 
+  # The Basecamp module and mini-app (basecamp/) without Nix: the module's calls crate
+  # (escapement-module-calls, through `call()` against a stand-in sequencer) in basecamp/ci/, a
+  # workspace of its own locked as the module is built (rust-lib/'s scaffold needs the Logos Rust SDK
+  # source that only `nix build` fetches); the view's amount and time helpers (Node); the view itself
+  # (Qt Quick Test, offscreen, with Ubuntu's Qt 6 and a stand-in for Logos Core).
+  basecamp:
+    runs-on: ubuntu-24.04 # its Qt 6.4 packages and /usr/lib/qt6/bin path; not ubuntu-latest, which moves
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Qt 6 from Ubuntu's packages (Qt Quick, Controls, Layouts, Quick Test, the offscreen platform)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            qt6-declarative-dev-tools qt6-qpa-plugins \
+            qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates \
+            qml6-module-qtquick-layouts qml6-module-qtquick-window \
+            qml6-module-qtqml-workerscript qml6-module-qttest
+          test -x /usr/lib/qt6/bin/qmltestrunner
+
+      - name: Install Rust 1.98.1
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: 1.98.1
+
+      - name: Stage escapement-core and escapement-sdk; lock basecamp/ci as rust-lib/Cargo.lock locks the module
+        # before the cache step: rust-cache reads basecamp/ci's metadata and lock for its key
+        run: python3 -I basecamp/scripts/ci-workspace.py
+
+      - name: Cache Cargo (the module's workspace)
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: basecamp/ci -> target
+          shared-key: escapement-basecamp
+
+      - name: The module's calls against a stand-in sequencer (escapement-module-calls)
+        run: cargo test --manifest-path basecamp/ci/Cargo.toml --locked -p escapement-module-calls
+
+      - name: Requirement map against the test binary just built (every named module test is in it)
+        shell: bash
+        run: |
+          mkdir -p target/reqmap
+          cargo test --manifest-path basecamp/ci/Cargo.toml --locked -p escapement-module-calls -- --list 2>&1 | tee target/reqmap/basecamp-tests.txt
+          python3 scripts/check-reqmap.py --cargo-job basecamp --cargo-list target/reqmap/basecamp-tests.txt
+
+      - name: The view's amount and time helpers (Node)
+        run: node basecamp/escapement_ui/tests/amount.test.mjs
+
+      - name: The view (Qt Quick Test, offscreen; every test function must run and pass)
+        shell: bash
+        run: |
+          mkdir -p target/basecamp
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input basecamp/escapement_ui/tests/qml 2>&1 | tee target/basecamp/qml.txt
+          grep -E '^Totals: [0-9]+ passed, 0 failed' target/basecamp/qml.txt
+          fns=$(grep -hoE 'function test_[A-Za-z0-9_]+' basecamp/escapement_ui/tests/qml/tst_*.qml | cut -d' ' -f2)
+          [ -n "$fns" ] || { echo "no Qt Quick test functions found"; exit 1; }
+          for t in $fns; do
+            grep -qE "^PASS +: .*::$t\(\)$" target/basecamp/qml.txt || { echo "did not pass: $t"; exit 1; }
+          done
+
+      - name: Keep the test output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: basecamp-tests
+          path: |
+            target/reqmap/basecamp-tests.txt
+            target/basecamp/qml.txt
+
   # S2: the end-to-end suite against an unmodified standalone LEZ v0.4.0-rc3 sequencer (mock
   # Bedrock, loopback only), driven by the Escapement CLI: immutable deployment and header read-back,
   # admin init, native schedules of every kind, public and one-transaction private claims, cancel,
