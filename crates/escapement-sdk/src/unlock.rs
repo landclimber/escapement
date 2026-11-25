@@ -142,6 +142,7 @@ mod tests {
             refund_holding: a,
             total_amount: 1_000,
             claimed_amount: claimed,
+            vested_high_water: claimed,
             kind,
             cancelable: true,
             transferable: false,

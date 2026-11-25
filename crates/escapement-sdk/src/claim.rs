@@ -253,6 +253,7 @@ mod tests {
             refund_holding: AccountId::new([9; 32]),
             total_amount: 1_000_000_000_000,
             claimed_amount: claimed,
+            vested_high_water: claimed,
             kind: ScheduleKind::Linear {
                 start_ts: 0,
                 end_ts: 100_000_000,

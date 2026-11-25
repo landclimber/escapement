@@ -68,6 +68,6 @@ tests, `SDK` = `crates/escapement-sdk`, `IDL` = `crates/escapement-idl/tests/idl
 | Property | Shown by |
 |---|---|
 | A program the user signs for cannot act in the user's name (code 35), by a sync or an asynchronous message | T `sec_relay_eoa_refused`, `sec_pda_*`, `sec_signer_authority_review_gaps` |
-| Cancel never refunds claimed tokens under clock lag | T `c1_*`; M `split_on_cancel_*`; Kani harness (see EVIDENCE) |
+| Cancel never refunds claimed or claim-proven vested tokens under clock lag | T `c1_*`, `audit_lagged_cancel_*`; M `split_on_cancel_*`; Kani harness (claimed tokens; see EVIDENCE) |
 | Reproducible guest (image id independent of build path) | `scripts/build-guest.sh --check`, `image-ids.tsv` |
 | Immutable deployment, header read back | E2E `deploy-immutable-and-init-admin`, `header-immutable-and-image-id` |

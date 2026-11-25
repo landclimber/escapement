@@ -268,10 +268,10 @@ pub fn next_unlock_after(schedule: &ScheduleAccount, timestamp_ms: u64) -> Optio
 
 /// Computes `(vested_at_cancel, unvested_refund)` at live chain timestamp `now_ms`.
 ///
-/// Clamps `vested_at_cancel >= schedule.claimed_amount` so neither LEZ v0.4's end-of-block
-/// `Clock::Tick` 1-block lag relative to `ClaimExact`'s `timestamp_window` nor sequencer
-/// wall-clock regression can ever under-count vested tokens or over-refund from a shared
-/// batch escrow.
+/// Clamps `vested_at_cancel` to at least the live vested curve, the amount already claimed, and
+/// the greatest amount proved vested by an earlier claim. Neither LEZ v0.4's end-of-block
+/// `Clock::Tick` lag relative to `ClaimExact`'s `timestamp_window` nor sequencer wall-clock
+/// regression can therefore claw back vested tokens or over-refund from a shared batch escrow.
 pub fn split_on_cancel(
     schedule: &ScheduleAccount,
     now_ms: u64,
@@ -283,7 +283,8 @@ pub fn split_on_cancel(
         return Err(VestingError::AlreadyCancelled);
     }
     let vested = vested_uncancelled(schedule.total_amount, &schedule.kind, now_ms)
-        .max(schedule.claimed_amount);
+        .max(schedule.claimed_amount)
+        .max(schedule.vested_high_water);
     let unvested = schedule
         .total_amount
         .checked_sub(vested)
@@ -317,6 +318,7 @@ mod tests {
             refund_holding: a,
             total_amount,
             claimed_amount,
+            vested_high_water: 0,
             kind,
             cancelable: true,
             transferable: false,
@@ -412,6 +414,30 @@ mod tests {
         let full = dummy_schedule(100_000, 100_000, kind);
         assert_eq!(
             split_on_cancel(&full, 4_999),
+            Err(VestingError::AlreadyFullyVested)
+        );
+    }
+
+    #[test]
+    fn split_on_cancel_preserves_vested_high_water_when_clock_regresses() {
+        let kind = ScheduleKind::CliffLinear {
+            start_ts: 1_000,
+            cliff_ts: 2_000,
+            end_ts: 5_000,
+            cliff_amount: 50_000,
+        };
+        // A private claim at the cliff withdrew only one unit, but proved 50,000 vested.
+        let mut s = dummy_schedule(100_000, 1, kind);
+        s.vested_high_water = 50_000;
+        assert_eq!(split_on_cancel(&s, 1_999), Ok((50_000, 50_000)));
+
+        // Claiming more cannot lower the floor; observing the whole schedule vested leaves no refund.
+        s.claimed_amount = 50_000;
+        assert_eq!(split_on_cancel(&s, 1_999), Ok((50_000, 50_000)));
+        s.claimed_amount = 1;
+        s.vested_high_water = 100_000;
+        assert_eq!(
+            split_on_cancel(&s, 0),
             Err(VestingError::AlreadyFullyVested)
         );
     }
@@ -681,6 +707,7 @@ mod tests {
             unlocked_count in 0u128..=4u128,
             now in any::<u64>(),
             claim_bias in any::<u128>(),
+            floor_bias in any::<u128>(),
         ) {
             let kind = match kind_tag {
                 0 => ScheduleKind::Linear {
@@ -725,16 +752,24 @@ mod tests {
             } else {
                 claim_bias % (total + 1)
             };
+            // `vested_high_water` (what an earlier claim proved vested) also spans 0..=total.
+            let floor = if total == u128::MAX {
+                floor_bias
+            } else {
+                floor_bias % (total + 1)
+            };
             let vested_now = vested_uncancelled(total, &kind, now);
-            let s = dummy_schedule(total, claimed, kind);
+            let mut s = dummy_schedule(total, claimed, kind);
+            s.vested_high_water = floor;
             let res = split_on_cancel(&s, now);
             if res == Err(VestingError::AlreadyFullyVested) {
-                prop_assert_eq!(vested_now.max(claimed), total);
+                prop_assert_eq!(vested_now.max(claimed).max(floor), total);
             } else {
                 let (vested, refund) = res.expect("only AlreadyFullyVested is reachable here");
                 prop_assert!(refund > 0, "Ok split must have a positive refund");
                 prop_assert_eq!(vested + refund, total, "vested + refund must conserve total");
                 prop_assert!(vested >= claimed, "vested_at_cancel must never drop below claimed");
+                prop_assert!(vested >= floor, "vested_at_cancel must never drop below the high-water mark");
                 prop_assert!(vested >= vested_now, "clamping must never under-count vested");
                 prop_assert_eq!(refund, total - vested);
             }

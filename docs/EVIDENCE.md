@@ -20,7 +20,7 @@ testnet milestone.
 
 | Item | Value |
 |---|---|
-| Program guest (`image-ids.tsv`) | image id `adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c`, SHA-256 `03d8e8d9737790902390024555f27609d1e153582b3108cc86769387b69386e3`, 495,452 bytes |
+| Program guest (`image-ids.tsv`) | image id `2f59485486434472e333dd2e508d53c63ecaf44124bda0548fafaeb0c83482f8`, SHA-256 `8d0da3ee38ce2b2e6707fca63a7bdf7dfeef162a5e9d066064886a2770c7be15`, 496,444 bytes (since the 25 Nov cancel-clamp fix; before it `adc8b81f…`, 495,452 bytes) |
 | Toolchains | host Rust 1.98.1; RISC Zero 3.0.5 (`r0vm`), guest Rust 1.91.1, C++ 2024.1.5 |
 | LEZ | `logos-execution-zone` tag `v0.4.0-rc3` (`bafd07be`) |
 | Token program | `lez-programs` `3f04cc37ec5f` (branch `refactor/lez-v0.4.x`) |
@@ -31,7 +31,7 @@ testnet milestone.
 
 | Row | What ran | Result | Where | Re-run |
 |---|---|---|---|---|
-| **E-01** | Vesting and fee math (`escapement-core`) | 13/13; 7 property suites × 4,096 cases (28,672): `mul_div` identity at full 256-bit width, linear and cliff curves monotone, bounded and exact at the end, exact next-unlock millisecond, fee ceiling against an independent reference, cancel split conserves and never refunds claimed tokens, claimable never above `total − claimed` | native | `cargo test -p escapement-core --locked` |
+| **E-01** | Vesting and fee math (`escapement-core`) | 14/14; 7 property suites × 4,096 cases (28,672): `mul_div` identity at full 256-bit width, linear and cliff curves monotone, bounded and exact at the end, exact next-unlock millisecond, fee ceiling against an independent reference, cancel split conserves and never refunds claimed tokens (and, by a unit test, never refunds what an earlier claim proved vested), claimable never above `total − claimed` | native | `cargo test -p escapement-core --locked` |
 | **E-02** | Kani bounded proofs (`crates/escapement-core/src/kani_proofs.rs`, Kani 0.68.0) | 3 harnesses **verified**: the fee is the exact ceiling of `amount × bps / 10,000` and any rate above its cap is refused, for every `u16` rate and cap (8-bit amounts, 12 s); cancelling a **linear** schedule conserves `vested + refund == total` and never refunds claimed tokens, whatever the clock (8-bit values, 7 s; cliff and milestone cancels are covered by E-01's property tests only); `mul_div_rem_u128` satisfies `q·d + r == a·b`, `r < d` (8-bit operands, 131 s). Not proven by Kani: curve monotonicity (harnesses timed out at 150 s; covered by E-01's property tests) and the full-width division path (E-01) | native (Kani) | `cd crates/escapement-core && cargo kani` |
 | **E-03** | Reproducible guest | identical image id, SHA-256 and size built at the tree's path and at a copy elsewhere, and in CI on GitHub's runner (its own path, `HOME` and toolchain install); the check builds the guest from source every time (a guest build directory restored from a cache is not the same input, see "CI" below) | native, CI | `scripts/build-guest.sh --check` |
 | **E-04** | Signer authority (`sec_relay_eoa_refused`, `sec_pda_cpi_succeeds_and_inherited_seed_relay_refused`, `sec_signer_authority_review_gaps`) | all nine user operations relayed by another program refused with code 35 at 12,115–16,650 cycles, state unchanged; a program acting as its own PDA (`AsPda`) creates, batch-creates, signals, claims (`ClaimPublic`, `ClaimExact`), transfers the beneficiary, cancels, makes non-cancelable and withdraws fees as the treasury; for each of the nine operations, `AsPda` from the PDA's own program without a grant on the delivery, through a grant inherited by another program, or with a seed that does not derive the PDA is refused (35), state unchanged; admin `Configure` and `Renounce` relayed by another program are refused even when the admin signs (lez-authority E120), state unchanged; forged `Internal`, `StateReply` and clock-reply messages sent to a schedule by another program are refused (32), state unchanged; a user operation or `AsPda` that arrives as an asynchronous message from another program (LEZ's mailbox path) is refused (35), state unchanged, even when the right account signs | in-process, dev mode | `RISC0_DEV_MODE=1 cargo test -p escapement-tests --test escapement_e2e sec_ -- --nocapture` |
@@ -110,3 +110,8 @@ s1_real_proof_dev_mode_0 -- --ignored --nocapture`, or CI's manual job.
   and after, a token private claim with an in-proof fee on the sequencer, the signer-authority test
   gaps (E-04), and test names and wording that say exactly what the privacy tests show. Nothing
   compiled into the guest changed.
+- **25 Nov:** an external AI audit (Kimi) found that the cancel clamp protected claimed tokens but
+  not the rest of what a partial private claim had proven vested: a cancel in the same block, reading
+  the lagging clock, took back the rest of a cliff. Fixed with `vested_high_water` (D-10) and tests;
+  the guest changed (new image id above), and the cycle figures in `gas-and-batch.md` were measured
+  on the previous guest.

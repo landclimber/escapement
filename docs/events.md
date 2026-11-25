@@ -38,7 +38,7 @@ Types: `AccountId` = 32 bytes; `Asset` = Borsh enum, tag `0` `Native`, tag `1` `
 `effective_ts` for a private claim).
 
 **`Cancelled`**: `schedule_id: AccountId`, `cancelled_by: AccountId`, `cancelled_at_ms: u64`,
-`vested_at_cancel: u128` (never below what was already claimed), `refunded_amount: u128`,
+`vested_at_cancel: u128` (never below what was already claimed, nor below what an earlier claim proved vested), `refunded_amount: u128`,
 `refund_holding: AccountId`.
 
 **`MilestoneSignaled`**: `schedule_id: AccountId`, `milestone_index: u8`, `amount_unlocked: u128`,
