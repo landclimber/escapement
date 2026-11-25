@@ -1,0 +1,43 @@
+{
+  "source": {
+    "trees": {
+      "basecamp/escapement_core_module": "84a127209827888cdb94d0735f9402bfe9344e25",
+      "basecamp/escapement_ui": "9eed77bce607a1a02c6796607b70703236404788",
+      "basecamp/scripts": "018a7318d38748b7cbe34fb7a1cc83bf01ccb5c2"
+    },
+    "staged_crates_commit": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "note": "the git trees the packages were built from: compare with git rev-parse <commit>:<path>"
+  },
+  "platform": "linux-amd64",
+  "lgx_package": "github:logos-co/logos-package/4bdd9041ebfbd06c2b22134afdcd27fce8a43f3c",
+  "nix": "nix (Nix) 2.28.3",
+  "signed": false,
+  "packages": [
+    {
+      "name": "escapement_core_module",
+      "version": "0.1.0",
+      "file": "linux-amd64/escapement_core_module-0.1.0.lgx",
+      "size": 8108228,
+      "sha256": "9893703adf32b90bad4be79c13144fc77ba472adf21248cd0050d4ea30ef4bdb",
+      "rootHash": "6e4c308f0841c735885eee71d9734a5aaaa2c716f499d8aad909a4050b43fc87",
+      "type": "core",
+      "variants": [
+        "linux-amd64"
+      ],
+      "nix_out": "/nix/store/mbriysgjvzbw1g9yjdwlxn7dy7ifri08-logos-escapement_core_module-module-lib-lgx-0.1.0",
+      "seconds": 109
+    },
+    {
+      "name": "escapement_ui",
+      "version": "0.1.0",
+      "file": "linux-amd64/escapement_ui-0.1.0.lgx",
+      "size": 26092,
+      "sha256": "dc21ed2499937bd5c2ac9c601bbcdbc9568a92623f5c46cd875e1094d6a0a823",
+      "rootHash": "1d668cec77e0201b994bf6291809d31e975697fd13dacc432112fc43deb80ef5",
+      "type": "ui_qml",
+      "variants": [],
+      "nix_out": "/nix/store/nvhdi8h5jrnc8q3p275p77v6n38ci7j2-logos-escapement_ui-module-lgx-0.1.0",
+      "seconds": 5
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+warning: unexpected `cfg` condition name: `kani`
+ --> staged/escapement-core/src/lib.rs:5:7
+  |
+5 | #[cfg(kani)]
+  |       ^^^^
+  |
+  = help: expected names are: `docsrs`, `feature`, and `test` and 32 more
+  = help: consider using a Cargo feature instead
+  = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+           [lints.rust]
+           unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+  = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(kani)");` to the top of the `build.rs`
+  = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+  = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: `escapement-core` (lib) generated 1 warning
+   Compiling escapement-module-calls v0.1.0 (<SPIKE>/escapement-wt-basecamp/basecamp/escapement_core_module/rust-lib/calls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.72s
+     Running unittests src/lib.rs (target/debug/deps/escapement_module_calls-d567c22e4e1cdfeb)
+
+running 25 tests
+test lez::tests::lez_rc3_pinned_message_layout ... ok
+test lez::tests::sequencer_addresses_are_read_strictly ... ok
+test lez::tests::keys_from_text_and_urls ... ok
+test lez::tests::bip340_vectors ... ok
+test tests::amounts_are_exact ... ok
+test tests::approvals_come_from_the_view_or_the_host ... ok
+test lez::tests::key_files_are_small_regular_files ... ok
+test review_r1::h1_only_the_preparer_among_the_view_and_the_host_approves ... ok
+test review_r1::l2_a_prepared_transaction_stays_on_its_network ... ok
+test review_r1::h1_status_does_not_reveal_the_pending_id ... ok
+test review_r1::m1_units_are_fixed_and_prompts_show_base_units ... ok
+test review_r1::m3_other_callers_reach_only_version ... ok
+test review_r1_kimi::kimi_l2_flags_must_be_booleans ... ok
+test review_r1_kimi::kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez ... ok
+test review_r1_kimi::kimi_m6_an_unreadable_outcome_is_not_a_refusal ... ok
+test review_r1_kimi::kimi_m6_a_lost_answer_after_the_send_is_unknown_not_refused ... ok
+test review_r1_kimi::kimi_reject_only_by_the_preparer ... ok
+test review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert ... ok
+test review_r2::r2_kimi_an_unsettled_transaction_can_be_dismissed ... ok
+test review_r2::r2_kimi_an_unsettled_transaction_survives_a_restart_and_is_settled_by_tx_status ... ok
+test review_r1_more::nit_the_nonce_is_checked_before_anything_is_signed ... ok
+test review_r2::r2_kimi_tx_status_uses_the_network_the_transaction_went_to ... ok
+test review_r2::r2_l1_a_refusal_by_the_sequencer_is_not_a_lost_answer ... ok
+test review_r2::r2_l3_tx_status_reports_an_unread_outcome ... ok
+test tests::nothing_is_sent_without_a_network_or_key ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+   Doc-tests escapement_module_calls
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

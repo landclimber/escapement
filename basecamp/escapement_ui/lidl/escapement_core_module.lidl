@@ -1,0 +1,17 @@
+module escapement_core_module {
+  version "0.1.0"
+  depends []
+
+  method version() -> tstr description "The module's version, what was staged (Escapement's commit, each crate's sources' SHA-256), the methods."
+  method configure(request: tstr) -> tstr description "`{rpc_url, program, read_only?, asset_label?, decimals?}`: the LEZ v0.4 sequencer and the Escapement program."
+  method status(request: tstr) -> tstr description "The network, the key's account (never the key), its balance, the pending transaction."
+  method key(request: tstr) -> tstr description "`{action: import|new|show|forget, path?}`: the signing key (from a key file, or made into the module's data\ndirectory); only the account id and public key are returned."
+  method schedules(request: tstr) -> tstr description "`{beneficiary?, creator?, ids?}`: the known schedules read live: positions (locked, claimable now, next\nunlock UTC) and the creator's schedules."
+  method track(request: tstr) -> tstr description "`{schedule}`: remember a schedule id on this network."
+  method prepare_claim(request: tstr) -> tstr description "`{schedule, amount?, to?}`: a public claim, checked and built, waiting for approval (nothing signed)."
+  method prepare_create(request: tstr) -> tstr description "`{beneficiary, total, kind, start_ms, end_ms, cliff_ms?, cliff_amount?, cancelable?}`: a new native schedule,\nchecked and built, waiting for approval (nothing signed)."
+  method prepare_cancel(request: tstr) -> tstr description "`{schedule}`: a cancellation, checked and built, waiting for approval (nothing signed)."
+  method approve(request: tstr) -> tstr description "`{pending_id}`: sign the prepared transaction (only now), send it, report its block and outcome."
+  method reject(request: tstr) -> tstr description "`{pending_id?}`: drop the prepared transaction."
+  method tx_status(request: tstr) -> tstr description "`{tx_hash}`: a sent transaction's block and outcome."
+}

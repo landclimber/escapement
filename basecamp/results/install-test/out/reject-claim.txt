@@ -1,0 +1,1 @@
+{"method":"reject","module":"escapement_core_module","result":"{\"ok\":true,\"rejected\":\"9915c8e4f8b578c89d8a0950\",\"signed\":false}","status":"ok"}

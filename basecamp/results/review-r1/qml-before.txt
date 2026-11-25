@@ -1,0 +1,32 @@
+QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '<SPIKE>/tmp/escapement-wt-basecamp/runtime-root'
+********* Start testing of qmltestrunner *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : qmltestrunner::EscapementViewR1::initTestCase()
+QDEBUG : qmltestrunner::EscapementViewR1::test_kimi_l1_a_reject_that_names_no_transaction_is_not_success() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_kimi_l1_a_reject_that_names_no_transaction_is_not_success() 'no success notice: Rejected: nothing was signed or sent.' returned FALSE. ()
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(106)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_kimi_m1_token_rows_cannot_be_claimed_here() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_kimi_m1_token_rows_cannot_be_claimed_here() a token schedule cannot be claimed from the view
+   Actual   (): true
+   Expected (): false
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(131)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_kimi_m6_an_unknown_outcome_is_shown_with_its_hash() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_kimi_m6_an_unknown_outcome_is_shown_with_its_hash() 'This view runs inside Logos Basecamp: escapement_core_module is not reachable here.' returned FALSE. ()
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(116)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_l3_a_failed_reject_keeps_the_prompt() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_l3_a_failed_reject_keeps_the_prompt() 'the prompt must stay when reject failed' returned FALSE. ()
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(82)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_m1_a_prompt_in_other_units_is_not_shown() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_m1_a_prompt_in_other_units_is_not_shown() 'This view runs inside Logos Basecamp: escapement_core_module is not reachable here.' returned FALSE. ()
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(96)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_m1_a_prompt_in_the_view_units_is_shown() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_m1_a_prompt_in_the_view_units_is_shown() 'the prompt is shown: This view runs inside Logos Basecamp: escapement_core_module is not reachable here.' returned FALSE. ()
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(141)]
+QDEBUG : qmltestrunner::EscapementViewR1::test_m4_text_is_plain_everywhere_including_the_prompt() qml: no backend seam in this view: Error: Cannot assign to non-existent property "backend"
+FAIL!  : qmltestrunner::EscapementViewR1::test_m4_text_is_plain_everywhere_including_the_prompt() Text items that may render markup: Escapement | token vesting on LEZ v0.4 · prototype, n |  | Network | Units | decimals | Account | No signing account yet. | <h1>error</h1> | <b>notice</b> | Your vesting positions | Choose your account (Account, above) to  | Schedule | TOKENSCHED | Claimable now | 500 LEZ | Next unlock | accruing | Locked (not vested yet) | 500 LEZ | Claimed | 0 of 1000 LEZ | Vesting | linear, a → b | Status | tokens are claimable now | Claim | Private claim: CLI only for now | Create a vesting schedule | Beneficiary | Total (LEZ) | Vesting | Start | End | Cliff at | Cliff amount (LEZ) | Asset: native LEZ (tokens: CLI) | Schedules you created | None yet from this account. | Not yet in this view: the private claim  | <b>Claim</b> | Check before signing. Nothing has been s | <i>Claim</i> | 1 LEZ<font color='white'> hidden</font> | • <img src='http://127.0.0.1:9/x.png'> | Expires in 5 min if not approved.
+   Actual   (): 46
+   Expected (): 0
+   Loc: [<SPIKE>/tmp/escapement-miniapp/before/ui/tests/qml/tst_view.qml(74)]
+PASS   : qmltestrunner::EscapementViewR1::cleanupTestCase()
+Totals: 2 passed, 7 failed, 0 skipped, 0 blacklisted, 134ms
+********* Finished testing of qmltestrunner *********

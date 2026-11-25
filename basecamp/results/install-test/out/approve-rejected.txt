@@ -1,0 +1,1 @@
+{"method":"approve","module":"escapement_core_module","result":"{\"error\":\"no transaction waits for approval under this id (sent, rejected, replaced or expired): prepare it again\",\"ok\":false}","status":"ok"}

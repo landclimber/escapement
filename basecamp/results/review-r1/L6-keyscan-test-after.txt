@@ -1,0 +1,3 @@
+PASS clean tree
+PASS dirty tree (both forms found, no secret printed)
+exit 0

@@ -1,0 +1,27 @@
+{
+  "name": "escapement_ui",
+  "display_name": "Escapement",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "category": "finance",
+  "description": "Escapement: token vesting on LEZ v0.4 (prototype, not audited). Recipient: your schedules, locked, claimable now, next unlock, public claim. Creator: create a schedule, list, cancel. Every transaction is shown and signed only after you approve it.",
+  "author": "Escapement",
+  "view": "qml/Main.qml",
+  "icon": "icons/escapement.png",
+  "dependencies": [],
+  "optional_dependencies": [
+    "escapement_core_module"
+  ],
+  "dependency_overrides": {
+    "escapement_core_module": {
+      "file": "lidl/escapement_core_module.lidl"
+    }
+  },
+  "provides": [],
+  "uses": [],
+  "nix": {
+    "packages": { "build": [], "runtime": ["qt6.qtdeclarative"] },
+    "external_libraries": [],
+    "cmake": { "find_packages": [], "extra_sources": [], "extra_include_dirs": [], "extra_link_libraries": [] }
+  }
+}

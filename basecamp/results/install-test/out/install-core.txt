@@ -1,0 +1,1 @@
+{"affected_loaded":[],"changes":[{"action":"install","file":"<RUN>/signed/linux-amd64/escapement_core_module-0.1.0.lgx","fromVersion":"","name":"escapement_core_module","signature":"signed","toVersion":"0.1.0"}],"installed":["escapement_core_module"],"op":"install","reloaded":[],"status":"ok","stopped_dependents":[]}

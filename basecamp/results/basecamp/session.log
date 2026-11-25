@@ -1,0 +1,11 @@
+started: pid 32185, head 1 after 3 s, RPC http://127.0.0.1:3040
+devnet: program 3wJDw5qJvmKmqcVB5zvFhMpXk7EtNYLsVnLcr1mgBc3y (image adc8b81f8b3f939f…)
+devnet: creator B6LUy53F3iAx2BwZRDGKHf8rDPfDagjTVf6Lsp2kiRRU, beneficiary 46sWTVBCRo8BwScisGDyzTdoR63eqFPFa1WCfMfdhk9J, other 7VCzgMVAJnb3d24xmu8fTXeD1rgoozzyJ9gYY2uD5cSS (100 LEZ each), clock 1795630614679
+/var/tmp/bc/rc.AppImage: OK
+start 2026-11-25T18:17:02Z home=/var/tmp/bc/home-bc5 display=:99
+basecamp pid 33123
+window up 18:17:06Z
+win 4194311: Logos Basecamp Window 4194311   Position: 161,117 (screen: 0)   Geometry: 1600x900 
+stopping 2026-11-25T18:20:33Z
+keyscan rc=0: keyscan: 27 files, 0 with key material (3 secrets)
+done 2026-11-25T18:20:37Z

@@ -1,0 +1,12 @@
+== escapement_core_module-0.1.0.lgx
+Package structure is valid: <RUN>/signed/linux-amd64/escapement_core_module-0.1.0.lgx
+Signature is valid
+Signer DID: did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Im5xcnpobGxiTDFHVlQtMzdyQlVyb0FFZFdlcG5BVGpybGstakVQeDVoVU0ifQ
+Signer name (self-asserted): Escapement test build (not a release)
+Signer is trusted: escapement-test
+== escapement_ui-0.1.0.lgx
+Package structure is valid: <RUN>/signed/linux-amd64/escapement_ui-0.1.0.lgx
+Signature is valid
+Signer DID: did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6Im5xcnpobGxiTDFHVlQtMzdyQlVyb0FFZFdlcG5BVGpybGstakVQeDVoVU0ifQ
+Signer name (self-asserted): Escapement test build (not a release)
+Signer is trusted: escapement-test

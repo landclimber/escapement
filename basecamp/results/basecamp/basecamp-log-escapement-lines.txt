@@ -1,0 +1,18 @@
+[2026-11-25 18:17:34.107] [info] [logos] [package_manager]   signer claims to be: Escapement test build (not a release) (self-asserted, not verified)
+Core module file installed: "/var/tmp/bc/home-bc5/.local/share/Logos/LogosBasecamp/modules/escapement_core_module/escapement_core_module_plugin.so"
+[2026-11-25 18:17:48.435] [info] [logos] [package_manager]   signer claims to be: Escapement test build (not a release) (self-asserted, not verified)
+UI plugin file installed: "/var/tmp/bc/home-bc5/.local/share/Logos/LogosBasecamp/plugins/escapement_ui"
+App launcher clicked: "escapement_ui"
+Loading UI module: "escapement_ui"
+Loading core dependencies for "escapement_ui" : QList()
+Loading optional dependency for "escapement_ui" : "escapement_core_module"
+[2026-11-25 18:17:57.883] [info] [logos] Module loaded: escapement_core_module
+RemoteTransportConnection: Connecting to registry: "local:logos_escapement_core_module_f8e8d11ec3d7" at "18:17:57.888"
+RemoteTransportConnection: Registry connect attempt started (no peer contact yet): "local:logos_escapement_core_module_f8e8d11ec3d7"
+logos.basecamp.sandbox: Sandbox configured for plugin=escapement_ui: install="/var/tmp/bc/home-bc5/.local/share/Logos/LogosBasecamp/plugins/escapement_ui" entry="/var/tmp/bc/home-bc5/.local/share/Logos/LogosBasecamp/plugins/escapement_ui/qml" appLibDir=/var/tmp/bc/rc/squashfs-root/usr/lib untrustedRoots=2
+logos.qmlbridge: DEPRECATED: escapement_ui calls logos core from QML (logos.callModuleAsync). Move the call into a backend module ("backend": "module" in metadata.json); QML access to logos core is removed in the next breaking release.
+RemoteTransportConnection: Connecting to registry: "local:logos_escapement_core_module_f8e8d11ec3d7" at "18:17:57.982"
+MainContainer: Added plugin dock to WorkspaceArea: "Escapement" (module: "escapement_ui" )
+Successfully loaded UI module: "escapement_ui"
+RemoteTransportConnection: Requesting object: "escapement_core_module" at "18:17:58.141"
+[LogosObject] RemoteTransportConnection: returning RemoteLogosObject for: "escapement_core_module"
