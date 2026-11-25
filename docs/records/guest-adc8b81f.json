@@ -2,6 +2,7 @@
  "schema": "escapement-record/1",
  "id": "guest-adc8b81f",
  "kind": "guest-image",
+ "tsv_at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
  "title": "The program guest: image-ids.tsv, and the image id read back from the header of every recorded deployment",
  "evidence_row": "docs/EVIDENCE.md Build identity, E-03",
  "rerun": "scripts/build-guest.sh --check",

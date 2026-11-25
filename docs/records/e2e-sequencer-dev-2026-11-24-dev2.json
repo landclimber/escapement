@@ -8,7 +8,7 @@
  "rerun": "e2e/sequencer.sh build && E2E_DEV_MODE=1 e2e/run_e2e.sh",
  "source_tree": {
   "commit": null,
-  "how_known": "not recorded: only this run's records file is kept (no log, time output or exit status). Its 75 steps are the same, in the same order, as the two runs above; the guest it deployed has the image id of image-ids.tsv (record guest-adc8b81f)."
+  "how_known": "not recorded: only this run's records file is kept (no log, time output or exit status). Its 75 steps are the same, in the same order, as the two runs above; the guest it deployed has the image id of image-ids.tsv (record guest-adc8b81f). Its date, and that it ran before the other two, come from the original file's modification time, which is not committed; the jsonl holds no timestamp."
  },
  "environment": {
   "text": "unmodified standalone LEZ v0.4.0-rc3 sequencer (sequencer_service --features standalone, mock Bedrock, commit bafd07be asserted by e2e/sequencer.sh), loopback only, driven by escapement-cli",

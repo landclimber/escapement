@@ -1,10 +1,17 @@
 {
  "schema": "escapement-claims/1",
  "about": "Every measured figure of the RFP-017 proposal (Escapement, filed 25 Nov 2026) that the repository can back, with its source. `record` sources are re-derived from raw run files by scripts/verify-records.py; `doc` sources are text in the docs at commit 2ddc57c with no raw log behind them in the repository.",
+ "records": [
+  "e2e-sequencer-dev-2026-11-24-dev2",
+  "e2e-sequencer-dev-2026-11-24-dev3",
+  "e2e-sequencer-real-proof-2026-11-24",
+  "guest-adc8b81f",
+  "suite-log-2026-11-24-r2"
+ ],
  "claims": [
   {
    "id": "G-1",
-   "says": "guest image id adc8b81f...df4c",
+   "says": "guest image id adc8b81f...df4c (image-ids.tsv at 2ddc57c)",
    "value": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
    "source": {
     "record": "guest-adc8b81f",
@@ -13,7 +20,7 @@
   },
   {
    "id": "G-2",
-   "says": "guest ELF SHA-256 03d8e8d9...86e3",
+   "says": "guest ELF SHA-256 03d8e8d9...86e3 (image-ids.tsv at 2ddc57c; not in the run files)",
    "value": "03d8e8d9737790902390024555f27609d1e153582b3108cc86769387b69386e3",
    "source": {
     "record": "guest-adc8b81f",
@@ -22,7 +29,7 @@
   },
   {
    "id": "G-3",
-   "says": "guest ELF 495,452 B",
+   "says": "guest ELF 495,452 B (image-ids.tsv at 2ddc57c; equal to elf_bytes in every run)",
    "value": 495452,
    "source": {
     "record": "guest-adc8b81f",
@@ -171,6 +178,15 @@
    }
   },
   {
+   "id": "R-4b",
+   "says": "the suite was run with E2E_DEV_MODE=0 (GNU time's command line; the sequencer's own dev mode is inferred from e2e/sequencer.sh, not logged)",
+   "value": 0,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.e2e_dev_mode_in_command"
+   }
+  },
+  {
    "id": "R-5",
    "says": "26 min wall",
    "value": 26,
@@ -193,7 +209,7 @@
   },
   {
    "id": "R-7",
-   "says": "~24-25 cores busy: (user + system) / wall = 24.8 (GNU time 2484%)",
+   "says": "cores busy on average, (user + system) / wall: 24.8",
    "value": 24.8,
    "source": {
     "record": "e2e-sequencer-real-proof-2026-11-24",
@@ -204,7 +220,7 @@
   },
   {
    "id": "R-8",
-   "says": "~24 cores busy: user / wall = 24.2",
+   "says": "cores busy on average, user / wall: 24.2",
    "value": 24.2,
    "source": {
     "record": "e2e-sequencer-real-proof-2026-11-24",
@@ -618,12 +634,32 @@
   },
   {
    "id": "S-1",
-   "says": "all 9 user operations relayed by another program refused",
+   "says": "9 user operations relayed by another program refused",
    "value": 9,
    "source": {
     "record": "suite-log-2026-11-24-r2",
     "path": "sec_relay",
     "reduce": "len"
+   }
+  },
+  {
+   "id": "S-1b",
+   "says": "the 9: BatchCreate, Cancel, ClaimExact, ClaimPublic, CreateSchedule, MakeNonCancelable, SignalMilestone, TransferBeneficiary, WithdrawFees",
+   "value": [
+    "BatchCreate",
+    "Cancel",
+    "ClaimExact",
+    "ClaimPublic",
+    "CreateSchedule",
+    "MakeNonCancelable",
+    "SignalMilestone",
+    "TransferBeneficiary",
+    "WithdrawFees"
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_relay[*].op",
+    "reduce": "set"
    }
   },
   {

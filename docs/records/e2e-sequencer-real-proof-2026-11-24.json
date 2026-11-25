@@ -68,9 +68,10 @@
   }
  },
  "notes": [
-  "start is the log's section timestamp; end is start + GNU time's elapsed (the log's ALL_DONE, printed after the records were summarised, is 2026-11-24T23:24:21+00:00).",
+  "start is the log's section timestamp (1 s resolution, printed just before GNU time started); end is start + GNU time's elapsed, so it is good to about 1 s (the log's ALL_DONE, printed after the records were summarised, is 2026-11-24T23:24:21+00:00).",
+  "\"Verified by the sequencer\" is inferred, not logged: the raw files hold the CLI's dev_mode false, ~238 KB proofs and the transactions included and not reverted; the sequencer's own RISC0_DEV_MODE is not in them. It follows from GNU time's command line (E2E_DEV_MODE=0, measured.time.e2e_dev_mode_in_command) and e2e/sequencer.sh, which starts the sequencer with RISC0_DEV_MODE unset unless E2E_DEV_MODE=1 (provenance check below).",
   "cpu_percent is GNU time's (user + system) / elapsed: 2484% = about 24.8 cores busy on average over the whole suite; user time alone / elapsed = 24.2.",
-  "max_rss_kib is GNU time's maximum resident set size of the largest single process in the tree, in KiB: 9,710,956 KiB = 9.94 GB = 9.26 GiB.",
+  "max_rss_kib is GNU time's maximum resident set size of the largest single process in the tree, in KiB: 9,710,956 KiB = 9.94 GB = 9.26 GiB, as reported by the gVisor sandbox's getrusage (several other rusage fields are 0 in this file); GNU time's version is not recorded.",
   "prove_s is escapement-cli's wall-clock time around lee::execute_and_prove for that transaction (crates/escapement-cli/src/main.rs), on the machine above.",
   "native_credit is derived, not logged: the private account's native balance after the transaction, less the balance after the previous one, plus the fee reserve it paid.",
   "private_account_id_in_tx_bytes and private_commitment_found are escapement-cli's own checks (the transaction's bytes searched for the private account id; getProofsAndRoot for the new commitment). The transaction bytes themselves were not saved.",
@@ -113,6 +114,12 @@
     "file": "docs/EVIDENCE.md",
     "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
     "text": "container requests 2 cores and bursts"
+   },
+   {
+    "type": "doc-contains",
+    "file": "e2e/sequencer.sh",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "local devenv=(env -u RISC0_DEV_MODE)"
    }
   ]
  },
@@ -1378,6 +1385,7 @@
    "elapsed": "25:59.61",
    "max_rss_kib": 9710956,
    "exit_status": 0,
+   "e2e_dev_mode_in_command": 0,
    "elapsed_s": 1559.61,
    "cpu_s": 38748.45,
    "stdout_pass_lines": 75,
@@ -1394,6 +1402,6 @@
    }
   },
   "start": "2026-11-24T22:58:22+00:00",
-  "end": "2026-11-24T23:24:21.610+00:00"
+  "end": "2026-11-24T23:24:21+00:00"
  }
 }

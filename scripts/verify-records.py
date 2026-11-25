@@ -11,9 +11,14 @@ two commits) and compares every figure in docs/records/claims.json with the reco
     python3 scripts/verify-records.py --require-history  # a git check that cannot run is a FAIL
     python3 scripts/verify-records.py --derive ID        # print what the parsers derive for record ID
 
+Comparisons are type-strict (True != 1, 41 != 41.0); a self-test that edited records and claims
+are caught runs first, every time. Every file under docs/records/raw/ must belong to a record and
+hold no local absolute path or key material.
+
 Exit status 1 if anything fails. Python 3 standard library only; reads files, runs `git` read-only.
 """
 import argparse
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -210,6 +215,8 @@ def derive_time(data):
         if key in TIME_FIELDS:
             name, conv = TIME_FIELDS[key]
             m[name] = conv(val)
+    mode = re.search(r"(?:^|\s)E2E_DEV_MODE=(\d)(?:\s|$)", m["command"])
+    m["e2e_dev_mode_in_command"] = int(mode.group(1)) if mode else None
     m["elapsed_s"] = elapsed_seconds(m["elapsed"])
     m["cpu_s"] = round(m["user_s"] + m["system_s"], 2)
     m["stdout_pass_lines"] = len(passes)
@@ -285,7 +292,10 @@ def derive_suite_log(data):
 # ---------------------------------------------------------------- image-ids.tsv + deploy read-backs
 
 def derive_guest(rec):
-    tsv = (ROOT / "image-ids.tsv").read_text()
+    # image-ids.tsv as of the commit the record names, so a later guest change does not touch it
+    at = rec["tsv_at"]
+    shown = git("show", f"{at}:image-ids.tsv") if have_commit(at) else None
+    tsv = shown.stdout if shown is not None and shown.returncode == 0 else (ROOT / "image-ids.tsv").read_text()
     row = next(l.split("\t") for l in tsv.splitlines() if l.startswith("escapement\t"))
     m = {"tsv": {"image_id": row[1], "sha256": row[2], "bytes": int(row[3])}}
     reads = []
@@ -318,7 +328,7 @@ def derive(rec):
             start = dt.datetime.fromisoformat(m["log"]["header_time"])
             end = start + dt.timedelta(seconds=m["time"]["elapsed_s"])
             m["start"] = start.isoformat()
-            m["end"] = end.isoformat(timespec="milliseconds")
+            m["end"] = end.isoformat(timespec="seconds")
         return m
     if kind == "suite-log":
         return derive_suite_log(read_artifact(arts["log"]))
@@ -411,75 +421,168 @@ def claim_value(claim, records):
     return v
 
 
+def strict_eq(a, b):
+    """Equality that also requires equal JSON types: True != 1, False != 0, 41 != 41.0."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(strict_eq(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(strict_eq(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+LOCAL_PATH = re.compile(
+    rb"(?:^|[\s\"'=:(])/(?:home|Users|root|tmp|mnt|var|opt|srv|workspace|data|scratch)/|\b[A-Za-z]:\\", re.M)
+KEY_MATERIAL = re.compile(rb"\"(?:secret|secret_key|nsk|vsk|private_key|seed)\"\s*:|BEGIN [A-Z ]*PRIVATE KEY")
+
+
+def check_raw_dir(records):
+    """Every file under docs/records/raw/ belongs to a record and holds no local path or key."""
+    used = {art["path"] for rec in records.values() for art in rec["artifacts"].values()}
+    problems = []
+    for f in sorted((RECORDS / "raw").rglob("*")):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(ROOT).as_posix()
+        data = f.read_bytes()
+        if rel not in used:
+            problems.append(f"{rel}: not an artifact of any record")
+        if LOCAL_PATH.search(data):
+            problems.append(f"{rel}: holds a local absolute path (replace it by <workdir>)")
+        if KEY_MATERIAL.search(data):
+            problems.append(f"{rel}: holds what looks like key material")
+    return problems
+
+
+def check_record(rec, require_history):
+    problems, notes = [], []
+    for name, art in rec["artifacts"].items():
+        path = ROOT / art["path"]
+        if not path.is_file():
+            problems.append(f"{name}: {art['path']} missing")
+            continue
+        data = path.read_bytes()
+        if sha256(data) != art["sha256"] or len(data) != art["bytes"]:
+            problems.append(f"{name}: {art['path']} hash/size differ")
+    if not problems:
+        try:
+            got = derive(rec)
+        except Exception as e:  # a raw file the parser cannot read is a failure, not a crash
+            got, problems = None, [f"derivation failed: {e!r}"]
+        want = rec["measured"]
+        if got is not None and not strict_eq(got, want):
+            keys = sorted(k for k in set(got) | set(want) if not strict_eq(got.get(k), want.get(k)))
+            problems.append("measured differs from the raw files (value or type) in: " + ", ".join(keys))
+    for chk in rec.get("provenance", {}).get("checks", []):
+        ok, note = run_check(chk, require_history)
+        if ok is False:
+            problems.append("provenance: " + note)
+        elif ok is None:
+            notes.append("skipped: " + note)
+    return problems, notes
+
+
+def check_claim(c, records, require_history):
+    src = c["source"]
+    try:
+        if "record" in src:
+            got = claim_value(c, records)
+            ok = strict_eq(got, c["value"])
+            detail = f"record {src['record']} {src['path']} -> {got!r}, claim says {c['value']!r}"
+        else:
+            ok, detail = run_check({"type": "doc-contains", **src}, require_history)
+    except Exception as e:
+        ok, detail = False, f"error: {e!r}"
+    return ("FAIL" if not ok else ("PASS" if "record" in src else "DOC")), detail
+
+
+def set_path(obj, dotted, value):
+    *head, last = dotted.split(".")
+    for k in head:
+        obj = obj[k]
+    obj[last] = value
+
+
+def self_test(records, claims):
+    """Type swaps in records and claims must fail. Returns a list of problems (empty = pass)."""
+    problems = []
+    for a, b, want in ((True, 1, False), (False, 0, False), (41, 41.0, False), (0, None, False),
+                       ("1", 1, False), (1.5, 1.5, True), ({"a": [1]}, {"a": [1]}, True),
+                       ({"a": [1]}, {"a": [True]}, False), ([False], [0], False)):
+        if strict_eq(a, b) is not want:
+            problems.append(f"strict_eq({a!r}, {b!r}) is not {want}")
+    rid = "e2e-sequencer-real-proof-2026-11-24"
+    for path, bad in (("time.exit_status", False), ("checks.failed", False), ("transactions_total", 41.0),
+                      ("time.user_s", 37763), ("probe.base_fee_exec", 8.0)):
+        rec = copy.deepcopy(records[rid])
+        set_path(rec["measured"], path, bad)
+        if not check_record(rec, False)[0]:
+            problems.append(f"record {rid}: measured.{path} = {bad!r} was not caught")
+    by_id = {c["id"]: c for c in claims}
+    for cid, bad in (("R-4", False), ("R-11", 5.0), ("G-4", 1), ("R-12", 206), ("E-5", 1)):
+        c = copy.deepcopy(by_id[cid])
+        c["value"] = bad
+        if check_claim(c, records, False)[0] != "FAIL":
+            problems.append(f"claim {cid}: value {bad!r} was not caught")
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--require-history", action="store_true")
     ap.add_argument("--derive", metavar="RECORD_ID")
     args = ap.parse_args()
 
-    files = sorted(p for p in RECORDS.glob("*.json") if p.name != "claims.json")
+    failed = 0
     records = {}
-    for p in files:
+    for p in sorted(p for p in RECORDS.glob("*.json") if p.name != "claims.json"):
         rec = json.loads(p.read_text())
-        records[rec["id"]] = rec
+        if rec["id"] in records:
+            print(f"FAIL  duplicate record id {rec['id']} ({p.name}, {records[rec['id']]['_file']})")
+            failed += 1
+            continue
         rec["_file"] = p.name
+        records[rec["id"]] = rec
 
     if args.derive:
         print(json.dumps(derive(records[args.derive]), indent=2))
         return 0
 
-    failed = 0
+    claims_doc = json.loads((RECORDS / "claims.json").read_text())
+    claims = claims_doc["claims"]
+    expected = set(claims_doc["records"])
+    for rid in sorted(expected ^ set(records)):
+        print(f"FAIL  record {rid}: " + ("missing" if rid in expected else "not listed in claims.json `records`"))
+        failed += 1
+
+    st = self_test(records, claims)
+    print(f"self-test (type swaps in records and claims are caught): {'FAIL' if st else 'PASS'}")
+    for p in st:
+        print(f"        - {p}")
+    failed += bool(st)
+
+    raw = check_raw_dir(records)
+    print(f"raw files (all belong to a record; no local path or key material): {'FAIL' if raw else 'PASS'}")
+    for p in raw:
+        print(f"        - {p}")
+    failed += bool(raw)
+
     print(f"records ({len(records)}):")
     for rid, rec in records.items():
-        problems, notes = [], []
-        for name, art in rec["artifacts"].items():
-            path = ROOT / art["path"]
-            if not path.is_file():
-                problems.append(f"{name}: {art['path']} missing")
-                continue
-            data = path.read_bytes()
-            if sha256(data) != art["sha256"] or len(data) != art["bytes"]:
-                problems.append(f"{name}: {art['path']} hash/size differ")
-            if re.search(rb"/(?:home|Users|root)/", data):
-                problems.append(f"{name}: {art['path']} holds a local absolute path (replace it by <workdir>)")
-        if not problems:
-            try:
-                got = derive(rec)
-            except Exception as e:  # a raw file the parser cannot read is a failure, not a crash
-                got, problems = None, [f"derivation failed: {e!r}"]
-            if got is not None and got != rec["measured"]:
-                keys = sorted(k for k in set(got) | set(rec["measured"]) if got.get(k) != rec["measured"].get(k))
-                problems.append("measured differs from the raw files in: " + ", ".join(keys))
-        for chk in rec.get("provenance", {}).get("checks", []):
-            ok, note = run_check(chk, args.require_history)
-            if ok is False:
-                problems.append("provenance: " + note)
-            elif ok is None:
-                notes.append("skipped: " + note)
-        status = "FAIL" if problems else "PASS"
+        problems, notes = check_record(rec, args.require_history)
         failed += bool(problems)
-        print(f"  {status}  {rid}  ({rec['_file']})")
+        print(f"  {'FAIL' if problems else 'PASS'}  {rid}  ({rec['_file']})")
         for p in problems:
             print(f"        - {p}")
         for n in notes:
             print(f"        . {n}")
 
-    claims = json.loads((RECORDS / "claims.json").read_text())["claims"]
     print(f"claims ({len(claims)}; PASS = re-derived from a record's raw files, "
           "DOC = only stated in the docs, no raw log in the repository):")
     counts = {"PASS": 0, "DOC": 0, "FAIL": 0}
     for c in claims:
-        src = c["source"]
-        try:
-            if "record" in src:
-                got = claim_value(c, records)
-                ok = got == c["value"]
-                detail = f"record {src['record']} {src['path']} -> {got!r}, claim says {c['value']!r}"
-            else:
-                ok, detail = run_check({"type": "doc-contains", **src}, args.require_history)
-        except Exception as e:
-            ok, detail = False, f"error: {e!r}"
-        status = "FAIL" if not ok else ("PASS" if "record" in src else "DOC")
+        status, detail = check_claim(c, records, args.require_history)
         counts[status] += 1
         failed += status == "FAIL"
         print(f"  {status:<4}  {c['id']}  {c['says']}")

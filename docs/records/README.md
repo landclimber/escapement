@@ -24,28 +24,36 @@ The raw files in `raw/2026-11-24-r2/` are the original files the runs wrote unde
 `e2e/.run/` on the machine that ran them, with only one change: every local absolute path is
 replaced by a placeholder (`<workdir>` for the checkout's root, `<risc0-home>` for the RISC Zero
 toolchain home). Nothing else differs. Each record gives the original's relative path, SHA-256 and
-size beside those of the committed copy, and the verifier fails if a raw file holds an absolute
-home path. The devnet key files the suite writes are not included.
+size beside those of the committed copy. The verifier fails if any file under `raw/` holds a local
+absolute path or what looks like key material, or belongs to no record. The devnet key files the suite writes are not included.
 
 ## A record
 
 - `artifacts`: each raw file with its SHA-256 and size.
 - `measured`: everything the verifier's parser for the record's `kind` reads from those files:
-  check counts; every transaction id with its block, size and outcome; each check's answer (the
-  CLI's JSON answer per line, hashed); the deployed image id; the proven transactions' proving
-  times, proof and transaction sizes, public cycles, fee reserves and balances; GNU `time -v`
+  check counts; every transaction id with its block, size and outcome; each check's answer line
+  as committed (the CLI's JSON answer, paths replaced), hashed; the deployed image id; the proven
+  transactions' proving times, proof and transaction sizes, public cycles, fee reserves and balances; GNU `time -v`
   wall, user and system time, peak RSS and exit status; the log's exit markers and timestamps.
-  The verifier re-derives it and requires it to be equal.
+  The verifier re-derives it and requires it to be equal, types included (`true` is not `1`,
+  `41` is not `41.0`); a self-test that such edits to records and claims fail runs every time.
 - `source_tree`, `environment`, `hardware`, `notes`: what the raw files do not say (which commit,
   which machine), with how it is known. Each factual one has a `provenance` check: the quoted text
   is in the doc at that commit, or the run's paths are unchanged between the commits named.
 
 ## Limits
 
+- The verifier proves the records agree with the committed raw files. That those files are what
+  the runs wrote rests on git history and the commit date: `original_sha256` lets whoever holds
+  the original files re-check the path replacement, and nobody else.
+- CI's `records` job (`--require-history`) needs commits 0e8a142, 9d35262, 7a593e1 and 2ddc57c to
+  stay reachable: publish this history as it is, not rewritten or squashed.
 - The runs used a loopback sequencer that no longer exists, so their transactions cannot be
   re-queried; the records bind the figures to the files the runs wrote, and git history binds the
   files from the commit that added them on.
-- The suite logs each CLI command's answer, not the JSON-RPC requests it sent.
+- The suite logs each CLI command's answer, not the JSON-RPC requests it sent, and not the
+  sequencer's own dev mode: "verified by the sequencer" for the real-proof run is inferred from the
+  run's command line (`E2E_DEV_MODE=0`) and `e2e/sequencer.sh` (see the record's notes).
 - The machine is described in `docs/EVIDENCE.md`; the runs' own files do not record it.
 - `claims.json` entries marked `DOC` by the verifier (Kani times, the in-process cost table and
   batch ceilings, the in-process real-proof run) are stated in the docs with no raw log behind

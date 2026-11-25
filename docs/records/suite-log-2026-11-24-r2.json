@@ -24,7 +24,7 @@
    "original_sha256": "af58b8fd3ee58c759c40e8531bbcd2c72c95257da883344d2d65b2b769004266",
    "original_bytes": 13854,
    "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
-   "what": "the round's driver log (stdout and stderr)"
+   "what": "the round's driver output, each step filtered by the driver (e.g. grep): only the lines it kept are here (test result lines, not every test line); the commands and filters are not logged"
   }
  },
  "notes": [

@@ -69,7 +69,7 @@ less the fee reserve, exactly.
 
 The run's own files (the suite's records, GNU `time -v` of the whole suite, the round's log) are in
 `docs/records/raw/2026-11-24-r2/`. The record `docs/records/e2e-sequencer-real-proof-2026-11-24.json`
-lists every transaction id with its block and outcome, the figures in the table above, and the
+lists every transaction id with its block and outcome, the figures in the table below, and the
 suite's wall time (25 min 59.6 s), CPU time (37,763.5 s user + 984.9 s system), peak RSS (9,710,956
 KiB, 9.94 GB) and exit status (0); `python3 scripts/verify-records.py` re-derives all of it from
 those files, in CI too ([docs/records/README.md](records/README.md)).
