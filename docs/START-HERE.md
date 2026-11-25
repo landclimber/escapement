@@ -4,7 +4,7 @@ Escapement is a privacy-preserving vesting program for the Logos Execution Zone 
 It keeps schedule terms and claim amounts public while allowing a beneficiary to claim to a private account under a one-time alias; the repository also contains its RISC Zero guest, Rust SDK, CLI, SPEL IDL, and a first Basecamp mini-app.
 This checkout has in-process and standalone-sequencer evidence plus 66 recorded transactions (57 applied, 9 deliberately refused) on a public LEZ v0.4.0-rc3 network, but it is not an audited or completed LEZ testnet 0.4 delivery.
 
-Review commit: the head of `main` (its CI run in step 5). The outputs below were checked at the merge that added this page and CI's `basecamp` job, on top of `eef9b55` ([CI run 45680840213](https://github.com/landclimber/escapement/actions/runs/45680840213), green). Clone with full history (`git clone https://github.com/landclimber/escapement && cd escapement`; not --depth 1, not a ZIP) and run commands from the repository root. The first three need Python 3.11+ and git (step 2 re-reads older commits); none sends a transaction or needs a key.
+Review commit: the head of `main` (its CI run in step 5). The outputs below were checked at `c891b54` (this page and CI's `basecamp` job merged onto `eef9b55`, whose [CI run 45680840213](https://github.com/landclimber/escapement/actions/runs/45680840213) is green); the next commit changes only this sentence. Clone with full history (`git clone https://github.com/landclimber/escapement && cd escapement`; not --depth 1, not a ZIP) and run commands from the repository root. The first three need Python 3.11+ and git (step 2 re-reads older commits); none sends a transaction or needs a key.
 
 ## The 10-minute verification path
 
