@@ -11,7 +11,12 @@
 #         export RISC0_HOME="$PWD/.risc0-guest" && rzup install rust 1.91.1 && rzup install cpp 2024.1.5
 #     and r0vm 3.0.5 on PATH, which computes the image id;
 #   - scripts/guest-rustc (cargo's rustc wrapper, .cargo/config.toml), which remaps every build path to a fixed
-#     name and replaces cargo's path-dependent -C metadata for the zkVM units (see guest-rustc.py).
+#     name and replaces cargo's path-dependent -C metadata for the zkVM units (see guest-rustc.py);
+#   - a build from source every time: the guest's build directory is removed first. A guest build directory
+#     restored from a cache is not the same input: Swatinem/rust-cache (CI) deletes the wrapper's
+#     .escapement-meta-* records and the workspace crates' artifacts but keeps the dependencies, so the crates
+#     cargo then recompiles get cargo's own -C metadata and the guest a different image id of the same size
+#     (CI run 45513681545: 6ef37ac3... instead of adc8b81f...).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 R0="${RISC0_HOME:-$HOME/.risc0}"
@@ -24,6 +29,8 @@ command -v r0vm >/dev/null || { echo "r0vm 3.0.5 is not on PATH" >&2; exit 1; }
 export RUSTC_WRAPPER="$ROOT/scripts/guest-rustc" RISC0_BUILD_LOCKED=1 CARGO_TERM_COLOR=never
 unset CARGO_TARGET_DIR RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RISC0_SKIP_BUILD
 cd "$ROOT"
+rm -rf "$ROOT/target/riscv-guest/escapement-methods"
+cargo clean -p escapement-methods >&2   # so that cargo runs the build script, which builds the guest, again
 cargo build -p escapement-methods --locked >&2
 bin="$ROOT/target/riscv-guest/escapement-methods/escapement-guest/riscv32im-risc0-zkvm-elf/release/escapement.bin"
 line="$(printf 'escapement\t%s\t%s\t%s' "$(r0vm --elf "$bin" --id 2>&1 | tail -n 1)" "$(sha256sum "$bin" | cut -c1-64)" "$(wc -c < "$bin" | tr -d ' ')")"

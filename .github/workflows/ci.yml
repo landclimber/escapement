@@ -246,6 +246,9 @@ jobs:
         with:
           shared-key: escapement-v04-real-proof
 
+      - name: Reproducible guest (the binary the proof runs; built from source, not from the cache)
+        run: scripts/build-guest.sh --check
+
       - name: Prove the blinded-alias private claim with real STARK receipts (E-02)
         env:
           RISC0_DEV_MODE: "0"
