@@ -387,7 +387,7 @@
       "text": "Creator view: create a new schedule (all parameters), list active schedules, cancel a schedule, signal a milestone.",
       "status": "in part",
       "proposal": {"row": "U2", "status": "not yet"},
-      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job prepares and approves a create transaction, which the stand-in records and reports in a block while read-back fails and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).",
+      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job prepares and approves a create transaction, which the stand-in records and reports in a block while read-back fails, and has the module refuse to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).",
       "code_says": "The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).",
       "tests": [
         {"crate": "escapement-module-calls", "rust": "review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert"},
@@ -711,7 +711,7 @@
       "text": "Every hard requirement in Functionality, Usability, Reliability, and Performance has at least one corresponding test.",
       "status": "in part",
       "proposal": {"row": "S3", "status": "in part"},
-      "remaining": "U2a, U2b and U2c have tests (the view's Qt Quick tests, the module's Rust tests) that CI does not run yet (they need Qt and Nix); the testnet halves of F6 and P2 get theirs in M4.",
+      "remaining": "The testnet halves of F6 and P2 get theirs in M4 (U2a, U2b and U2c's module and view tests run in CI's `basecamp` job).",
       "note": "This map is the traceability matrix; CI computes S3 from it.",
       "tests": [
         {"check": "reqmap:s3-coverage"}

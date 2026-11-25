@@ -493,7 +493,7 @@ Records:
 
 **The code says otherwise:** The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).
 
-**Remaining:** Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job prepares and approves a create transaction, which the stand-in records and reports in a block while read-back fails and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).
+**Remaining:** Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job prepares and approves a create transaction, which the stand-in records and reports in a block while read-back fails, and has the module refuse to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).
 
 Tests:
 
@@ -858,7 +858,7 @@ Records:
 
 **Status: in part.** Proposal row `S3`: in part.
 
-**Remaining:** U2a, U2b and U2c have tests (the view's Qt Quick tests, the module's Rust tests) that CI does not run yet (they need Qt and Nix); the testnet halves of F6 and P2 get theirs in M4.
+**Remaining:** The testnet halves of F6 and P2 get theirs in M4 (U2a, U2b and U2c's module and view tests run in CI's `basecamp` job).
 
 **Note:** This map is the traceability matrix; CI computes S3 from it.
 

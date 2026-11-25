@@ -104,7 +104,7 @@ Then read [basecamp/RESULTS.md](../basecamp/RESULTS.md): it records 25/25 module
 | `escapement_core_module-0.1.0.lgx` | `6ed37848d8c36a3f5be209c346569459aafb26bd4bffb522d5e816fbcdd20194` |
 | `escapement_ui-0.1.0.lgx` | `71861615e01c0dd602a733bd4c2973e104e3f33387c2b90dd9a3c62ae62d4029` |
 
-Those are recorded hashes, not hashes you can recompute without the uncommitted package files. Packages were signed with an explicitly named **test key**. CI's `basecamp` job runs the module's 25 calls tests (against a stand-in sequencer, without Nix), the view's amount helpers and its Qt Quick tests; building the packages and the headless Logos Core and Basecamp steps are not in CI.
+Those are recorded hashes, not hashes you can recompute without the uncommitted package files. Packages were signed with an explicitly named **test key**. CI's `basecamp` job runs the module's 25 calls tests (against a stand-in sequencer, without Nix), the view's amount helpers and its Qt Quick tests; building the packages and the headless Logos Core and Basecamp steps are not in CI. CI's calls tests build against escapement-core and escapement-sdk as at the checked-out commit (with the H-01 fix), not the `2ddc57c` copy the packages embed.
 The packages embed crates staged from 2ddc57c and were exercised against the earlier adc8b81f guest, not the H-01-fixed one.
 
 ## Where every RFP-017 requirement is shown
@@ -131,7 +131,7 @@ In particular, do not read `shown` as “all requirements complete”: 16 clause
 
 - **LEZ testnet 0.4:** no deployment or CU measurements there; testnet 0.4 has not launched. The public evidence is from the separate, single-sequencer Ferrata network on v0.4.0-rc3 (P2, S1).
 - **Mini-app releases:** no downloadable release `.lgx` assets or installation from a git repository, no macOS build, and no demonstrated byte-reproducible packages. Only local linux-amd64 packages signed by a test key were exercised.
-- **Mini-app lifecycle:** no private claim or privacy disclosure screen, no milestone signal, and no beneficiary transfer. Creation is limited to native-LEZ linear/cliff schedules and lacks transferability, delegated authorities, tokens, and milestone terms; the module and view tests are outside CI (U1, U2a–U2c, U4b, U5, Pr1, Pr2).
+- **Mini-app lifecycle:** no private claim or privacy disclosure screen, no milestone signal, and no beneficiary transfer. Creation is limited to native-LEZ linear/cliff schedules and lacks transferability, delegated authorities, tokens, and milestone terms; the module's calls tests and the view's tests run in CI's `basecamp` job (without Nix, against a stand-in sequencer), but building the packages and running them in Logos Core or Basecamp is outside CI (U1, U2a–U2c, U4b, U5, Pr1, Pr2).
 - **One-transaction private token claim:** a fresh private token account needs holding initialization before its claim; on the public host a full token-private path would also need a native-fee shield. Public Ferrata ran a native private claim, not a token private claim (P1).
 - **Event consumption:** events are emitted and their schemas tested, but they have not been read back through an indexer; on v0.4.0-rc3 getEvents is the indexer's RPC, so this waits on testnet 0.4 (F6).
 - **Remote-wallet UX:** the CLI currently targets a local sequencer with file-held keys; testnet remote endpoints and wallet-held keys remain future work (U3).

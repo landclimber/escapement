@@ -196,7 +196,7 @@ jobs:
           mkdir -p target/basecamp
           QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input basecamp/escapement_ui/tests/qml 2>&1 | tee target/basecamp/qml.txt
           grep -E '^Totals: [0-9]+ passed, 0 failed' target/basecamp/qml.txt
-          fns=$(grep -hoE 'function test_[A-Za-z0-9_]+' basecamp/escapement_ui/tests/qml/tst_*.qml | cut -d' ' -f2)
+          fns=$(grep -hoE 'function test_[A-Za-z0-9_]+' basecamp/escapement_ui/tests/qml/tst_*.qml | cut -d' ' -f2) || true
           [ -n "$fns" ] || { echo "no Qt Quick test functions found"; exit 1; }
           for t in $fns; do
             grep -qE "^PASS +: .*::$t\(\)$" target/basecamp/qml.txt || { echo "did not pass: $t"; exit 1; }

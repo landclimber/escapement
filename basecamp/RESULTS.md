@@ -53,7 +53,8 @@ copy has no test.
   Check with `git rev-parse d731205:basecamp/escapement_core_module` and the like. The staged crates are from
   `2ddc57c`. Since then only test code changed in these trees: `git diff --stat d731205 HEAD -- basecamp/escapement_core_module
   basecamp/escapement_ui basecamp/scripts` shows one fixture line in each of two test files (`vested_high_water`, after
-  the H-01 fix) and `basecamp/scripts/ci-workspace.py`, which CI's `basecamp` job uses.
+  the H-01 fix) and `basecamp/scripts/ci-workspace.py`, which CI's `basecamp` job uses. CI's calls tests build against escapement-core and escapement-sdk as at the
+  checked-out commit (with the H-01 fix), not the `2ddc57c` copy the packages embed.
   The packages themselves are not committed; their hashes are.
 - **Build.** `scripts/build-lgx.sh` (logos-module-builder `5f74cdb`, lgx `4bdd904`) built the core module in 109 s and
   the view in 5 s ([`build.json`](results/build/build.json)).
