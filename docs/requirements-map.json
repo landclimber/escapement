@@ -387,7 +387,7 @@
       "text": "Creator view: create a new schedule (all parameters), list active schedules, cancel a schedule, signal a milestone.",
       "status": "in part",
       "proposal": {"row": "U2", "status": "not yet"},
-      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job creates a schedule through the module (prepared, approved, in a block) and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).",
+      "remaining": "Signalling a milestone (no method yet), and the creation parameters beyond linear or cliff, cancelable or not, in LEZ (milestone schedules, transferability, delegated authorities, tokens); a test that CI runs of listing the creator's schedules and of an applied cancel: CI's `basecamp` job prepares and approves a create transaction, which the stand-in records and reports in a block while read-back fails and refuses to cancel a token schedule, but no test lists the creator's schedules or cancels one (the Basecamp run does, shots 04-06, 12-14).",
       "code_says": "The creator view exists: it creates a schedule, lists the creator's schedules and cancels one, shown in Basecamp 0.4.0-rc.2 on a local sequencer (basecamp/RESULTS.md shots 04-06, 12-14).",
       "tests": [
         {"crate": "escapement-module-calls", "rust": "review_r2::r2_kimi_a_failed_create_read_back_is_not_a_revert"},

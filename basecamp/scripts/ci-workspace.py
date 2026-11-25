@@ -7,9 +7,11 @@ escapement-core and escapement-sdk, locked exactly as the module is built.
 1. stage.py stages escapement-core and escapement-sdk into rust-lib/staged/ (basecamp/ci/staged links there).
 2. rust-lib/Cargo.lock is copied to basecamp/ci/Cargo.lock and cargo drops the entries of the module's scaffold
    (`escapement_core_module`, `logos-rust-sdk`), which this workspace does not have.
-3. Every package left in that lock must be in rust-lib/Cargo.lock with the same version, source and checksum:
+3. Every package left in that lock must be in rust-lib/Cargo.lock with the same version, source, checksum and
+   dependency links (less the dropped packages):
    the tests then build what the module is built from, and `cargo test --locked` refuses any other resolution.
 """
+import argparse
 import shutil
 import subprocess
 import sys
@@ -29,6 +31,7 @@ def packages(lock: Path) -> dict[tuple, tuple]:
 
 
 def main() -> int:
+    argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     subprocess.run([sys.executable, "-I", str(HERE / "stage.py")], check=True)
     shutil.copyfile(MODULE_LOCK, CI / "Cargo.lock")
     # Resolve against the copied lock: cargo keeps every locked version and drops what no member uses.
@@ -36,11 +39,14 @@ def main() -> int:
                    check=True, stdout=subprocess.DEVNULL)
     module, ours = packages(MODULE_LOCK), packages(CI / "Cargo.lock")
     bad = []
-    for key, (checksum, _deps) in sorted(ours.items(), key=str):
+    gone = {k[0] for k in module} - {k[0] for k in ours}
+    for key, (checksum, deps) in sorted(ours.items(), key=str):
         if key not in module:
             bad.append(f"{key[0]} {key[1]} ({key[2] or 'path'}) is not in rust-lib/Cargo.lock")
         elif module[key][0] != checksum:
             bad.append(f"{key[0]} {key[1]}: checksum differs from rust-lib/Cargo.lock")
+        elif tuple(d for d in module[key][1] if d.split()[0] not in gone) != deps:
+            bad.append(f"{key[0]} {key[1]}: dependencies differ from rust-lib/Cargo.lock")
     for name in ("escapement-module-calls", "escapement-core", "escapement-sdk"):
         if not any(k[0] == name for k in ours):
             bad.append(f"{name} is not in the workspace's lock")
@@ -50,7 +56,7 @@ def main() -> int:
         return 1
     dropped = sorted({k[0] for k in module} - {k[0] for k in ours})
     print(f"ci-workspace.py: basecamp/ci/Cargo.lock = rust-lib/Cargo.lock less {', '.join(dropped) or 'nothing'}"
-          f" ({len(ours)} of {len(module)} packages, every one with its locked version, source and checksum)")
+          f" ({len(ours)} of {len(module)} packages, every one with its locked version, source, checksum and dependencies)")
     return 0
 
 
