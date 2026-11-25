@@ -4,7 +4,7 @@ Escapement is a privacy-preserving vesting program for the Logos Execution Zone 
 It keeps schedule terms and claim amounts public while allowing a beneficiary to claim to a private account under a one-time alias; the repository also contains its RISC Zero guest, Rust SDK, CLI, SPEL IDL, and a first Basecamp mini-app.
 This checkout has in-process and standalone-sequencer evidence plus 66 recorded transactions (57 applied, 9 deliberately refused) on a public LEZ v0.4.0-rc3 network, but it is not an audited or completed LEZ testnet 0.4 delivery.
 
-Review commit: `eef9b55` (CI run [45680840213](https://github.com/landclimber/escapement/actions/runs/45680840213), green; outputs below are for eef9b55; the commit adding this page changes only docs). Clone with full history (`git clone https://github.com/landclimber/escapement && cd escapement`; not --depth 1, not a ZIP) and run commands from the repository root. The first three need Python 3.11+ and git (step 2 re-reads older commits); none sends a transaction or needs a key.
+Review commit: the head of `main` (its CI run in step 5). The outputs below were checked at the merge that added this page and CI's `basecamp` job, on top of `eef9b55` ([CI run 45680840213](https://github.com/landclimber/escapement/actions/runs/45680840213), green). Clone with full history (`git clone https://github.com/landclimber/escapement && cd escapement`; not --depth 1, not a ZIP) and run commands from the repository root. The first three need Python 3.11+ and git (step 2 re-reads older commits); none sends a transaction or needs a key.
 
 ## The 10-minute verification path
 
@@ -52,7 +52,7 @@ python3 scripts/check-reqmap.py
 Expect exactly:
 
 ```text
-check-reqmap: 45 clauses (27 shown, 16 in part, 0 not yet, 2 waits on Logos); 92 distinct named tests; OK
+check-reqmap: 45 clauses (27 shown, 16 in part, 0 not yet, 2 waits on Logos); 96 distinct named tests; OK
 ```
 
 This checks the map's structure, source test names, records, and generated page. CI additionally downloads the pinned RFP text, compares compiled test listings and E2E records, and self-tests the checker; this short local command does not replace those CI steps or inspect what test bodies assert.
@@ -74,13 +74,13 @@ The immutable public deployment has the **older** image ID `adc8b81f…df4c`: it
 
 ### 5. Inspect the CI and Basecamp evidence (remaining minutes)
 
-Open [CI run 45680840213](https://github.com/landclimber/escapement/actions/runs/45680840213). It should show `completed / success` at `eef9b55`, with `core-and-guest`, `e2e-standalone-sequencer`, `requirement-map` and `records` all `success`, and `real-stark-proof: skipped` (that job repeats the in-process real-proof test and runs only on manual dispatch; it has not been dispatched on this repository, and its in-process result is a DOC claim in [EVIDENCE.md](EVIDENCE.md). The recorded real-proof evidence is the standalone-sequencer run [e2e-sequencer-real-proof-2026-11-24.json](records/e2e-sequencer-real-proof-2026-11-24.json), re-checked in step 2).
+Open [the CI runs on `main`](https://github.com/landclimber/escapement/actions/workflows/ci.yml?query=branch%3Amain) and pick the run for the commit you checked out. It should show `completed / success`, with `core-and-guest`, `e2e-standalone-sequencer`, `requirement-map`, `records` and `basecamp` all `success`, and `real-stark-proof: skipped` (that job repeats the in-process real-proof test and runs only on manual dispatch; it has not been dispatched on this repository, and its in-process result is a DOC claim in [EVIDENCE.md](EVIDENCE.md). The recorded real-proof evidence is the standalone-sequencer run [e2e-sequencer-real-proof-2026-11-24.json](records/e2e-sequencer-real-proof-2026-11-24.json), re-checked in step 2).
 
-The Basecamp binaries and release assets are not committed. You can still check that the package source trees named in the results are exactly the trees at this commit:
+The Basecamp binaries and release assets are not committed. You can still check that the package source trees named in the results are the trees at `d731205`, the commit they were built from:
 
 ```sh
-git rev-parse HEAD:basecamp/escapement_core_module \
-  HEAD:basecamp/escapement_ui HEAD:basecamp/scripts
+git rev-parse d731205:basecamp/escapement_core_module \
+  d731205:basecamp/escapement_ui d731205:basecamp/scripts
 ```
 
 Expect:
@@ -91,6 +91,12 @@ Expect:
 018a7318d38748b7cbe34fb7a1cc83bf01ccb5c2
 ```
 
+and that since then only test code changed in them (one `vested_high_water` fixture line in each of two module test files, and CI's `basecamp/scripts/ci-workspace.py`):
+
+```sh
+git diff --stat d731205 HEAD -- basecamp/escapement_core_module basecamp/escapement_ui basecamp/scripts
+```
+
 Then read [basecamp/RESULTS.md](../basecamp/RESULTS.md): it records 25/25 module tests, 10/10 view tests, 31/31 headless Logos Core steps, signed local package verification, and a screenshot-by-screenshot Basecamp create/claim/cancel session. Its [package table](../basecamp/RESULTS.md#packages-linux-amd64) gives these signed linux-amd64 SHA-256 values:
 
 | Package | Signed SHA-256 |
@@ -98,7 +104,7 @@ Then read [basecamp/RESULTS.md](../basecamp/RESULTS.md): it records 25/25 module
 | `escapement_core_module-0.1.0.lgx` | `6ed37848d8c36a3f5be209c346569459aafb26bd4bffb522d5e816fbcdd20194` |
 | `escapement_ui-0.1.0.lgx` | `71861615e01c0dd602a733bd4c2973e104e3f33387c2b90dd9a3c62ae62d4029` |
 
-Those are recorded hashes, not hashes you can recompute without the uncommitted package files. Packages were signed with an explicitly named **test key**, and Basecamp/module tests are not in CI.
+Those are recorded hashes, not hashes you can recompute without the uncommitted package files. Packages were signed with an explicitly named **test key**. CI's `basecamp` job runs the module's 25 calls tests (against a stand-in sequencer, without Nix), the view's amount helpers and its Qt Quick tests; building the packages and the headless Logos Core and Basecamp steps are not in CI.
 The packages embed crates staged from 2ddc57c and were exercised against the earlier adc8b81f guest, not the H-01-fixed one.
 
 ## Where every RFP-017 requirement is shown

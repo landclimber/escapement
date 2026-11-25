@@ -45,12 +45,15 @@ copy has no test.
 | `escapement_core_module-0.1.0.lgx` | `9893703adf32b90bad4be79c13144fc77ba472adf21248cd0050d4ea30ef4bdb` | `6ed37848d8c36a3f5be209c346569459aafb26bd4bffb522d5e816fbcdd20194` | 8.1 MB |
 | `escapement_ui-0.1.0.lgx` | `dc21ed2499937bd5c2ac9c601bbcdbc9568a92623f5c46cd875e1094d6a0a823` | `71861615e01c0dd602a733bd4c2973e104e3f33387c2b90dd9a3c62ae62d4029` | 26 kB |
 
-- **Source.** They were built from the trees this commit holds (git hashes):
+- **Source.** They were built from the trees commit `d731205` holds (git hashes):
   - `basecamp/escapement_core_module` = `84a127209827888cdb94d0735f9402bfe9344e25`
   - `basecamp/escapement_ui` = `9eed77bce607a1a02c6796607b70703236404788`
   - `basecamp/scripts` = `018a7318d38748b7cbe34fb7a1cc83bf01ccb5c2`
 
-  Check with `git rev-parse HEAD:basecamp/escapement_core_module` and the like. The staged crates are from `2ddc57c`.
+  Check with `git rev-parse d731205:basecamp/escapement_core_module` and the like. The staged crates are from
+  `2ddc57c`. Since then only test code changed in these trees: `git diff --stat d731205 HEAD -- basecamp/escapement_core_module
+  basecamp/escapement_ui basecamp/scripts` shows one fixture line in each of two test files (`vested_high_water`, after
+  the H-01 fix) and `basecamp/scripts/ci-workspace.py`, which CI's `basecamp` job uses.
   The packages themselves are not committed; their hashes are.
 - **Build.** `scripts/build-lgx.sh` (logos-module-builder `5f74cdb`, lgx `4bdd904`) built the core module in 109 s and
   the view in 5 s ([`build.json`](results/build/build.json)).
