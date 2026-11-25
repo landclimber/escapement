@@ -260,10 +260,11 @@
       "text": "The schedule creator can configure whether the vesting position (beneficiary rights) is transferable to a new beneficiary. Transferability must be set at schedule creation and cannot be changed afterwards.",
       "status": "shown",
       "proposal": {"row": "F4", "status": "shown"},
-      "note": "A transfer of a non-transferable schedule exits with code 21; no message changes the flag after creation.",
+      "note": "A transfer of a non-transferable schedule exits with code 21. The stateful suite asserts after every random step (transfers, claims, cancels, make-non-cancelable, refused probes) that each schedule's `transferable` equals the value it was created with; the IDL test pins the program's complete message set, none of which sets the flag.",
       "tests": [
         {"crate": "escapement-tests", "rust": "full_lifecycle_all_schedule_types_authorities_and_refusals"},
         {"crate": "escapement-tests", "rust": "stateful_handler_conservation_invariant_suite"},
+        {"crate": "escapement-idl", "rust": "u6_idl_covers_all_messages_states_events_and_round_trips"},
         {"e2e": "transfer-applied"},
         {"e2e": "refusal-old-beneficiary-reverted-state-unchanged"},
         {"e2e": "new-beneficiary-received"}

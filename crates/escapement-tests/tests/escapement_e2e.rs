@@ -4288,6 +4288,8 @@ fn stateful_handler_conservation_invariant_suite() {
         priv_wallet: PrivateWallet,
         last_claimed: u128,
         was_non_cancelable: bool,
+        /// F4: the transferability the schedule was created with; it must never change.
+        transferable_at_creation: bool,
         was_cancelled: bool,
     }
     let mut tracked: Vec<Tracked> = Vec::new();
@@ -4399,6 +4401,7 @@ fn stateful_handler_conservation_invariant_suite() {
             priv_wallet: pw,
             last_claimed: 0,
             was_non_cancelable: !cancelable,
+            transferable_at_creation: transferable,
             was_cancelled: false,
         });
     }
@@ -4456,6 +4459,7 @@ fn stateful_handler_conservation_invariant_suite() {
             priv_wallet: pw,
             last_claimed: 0,
             was_non_cancelable: false,
+            transferable_at_creation: true,
             was_cancelled: false,
         });
     }
@@ -4813,6 +4817,10 @@ fn stateful_handler_conservation_invariant_suite() {
             if t.was_non_cancelable {
                 assert!(!s.cancelable, "non-cancelable reversed!");
             }
+            assert_eq!(
+                s.transferable, t.transferable_at_creation,
+                "F4: transferability never changes after creation"
+            );
             if !s.cancelable {
                 t.was_non_cancelable = true;
             }
