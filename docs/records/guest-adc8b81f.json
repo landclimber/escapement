@@ -1,0 +1,92 @@
+{
+ "schema": "escapement-record/1",
+ "id": "guest-adc8b81f",
+ "kind": "guest-image",
+ "title": "The program guest: image-ids.tsv, and the image id read back from the header of every recorded deployment",
+ "evidence_row": "docs/EVIDENCE.md Build identity, E-03",
+ "rerun": "scripts/build-guest.sh --check",
+ "artifacts": {
+  "dev2": {
+   "path": "docs/records/raw/2026-11-24-r2/out-r2-dev2/e2e.jsonl",
+   "sha256": "62935d068c1a7eeae31f7e313a42d421974a6c5f489688f9012752f6dd7e6686",
+   "bytes": 31207,
+   "original_path": "e2e/.run/out-r2-dev2/e2e.jsonl",
+   "original_sha256": "aeba7260914613c6462cebf0e805d2c8246e6f523426320302fa00e6a40f077e",
+   "original_bytes": 31415,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "suite records (deploy read-back)"
+  },
+  "dev3": {
+   "path": "docs/records/raw/2026-11-24-r2/out-r2-dev3/e2e.jsonl",
+   "sha256": "6916a99f0ffcdd2836898a8428ea8c2accff6690f93cc5452ad306f39fdaa844",
+   "bytes": 31207,
+   "original_path": "e2e/.run/out-r2-dev3/e2e.jsonl",
+   "original_sha256": "4cb1778296b831e4e5ea4a05de5e4bf674b47ad469b84a4c2aa3c1ba8d221b59",
+   "original_bytes": 31415,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "suite records (deploy read-back)"
+  },
+  "real": {
+   "path": "docs/records/raw/2026-11-24-r2/out-r2-real/e2e.jsonl",
+   "sha256": "98f9a37e9e697cf4f99fd41ffd2260b4505b958b12663a7d3b2303bbb4917e05",
+   "bytes": 31328,
+   "original_path": "e2e/.run/out-r2-real/e2e.jsonl",
+   "original_sha256": "c6124ab39b2446a160c541b8443349157baa3aa3ce2d8806ec1ef9d6c27853ba",
+   "original_bytes": 31536,
+   "paths_replaced": "the original file with only its local absolute paths replaced: the checkout's root by <workdir>, the RISC Zero home by <risc0-home>",
+   "what": "suite records (deploy read-back)"
+  }
+ },
+ "notes": [
+  "image-ids.tsv is what scripts/build-guest.sh --check must reproduce (CI runs it on every push).",
+  "The suite's own check header-immutable-and-image-id asserts immutable == true and a 64-character image id; the equality with image-ids.tsv is checked here, on the recorded read-backs.",
+  "deploy_transactions counts the deploy's transactions: 5 segments + 1 header."
+ ],
+ "provenance": {
+  "checks": [
+   {
+    "type": "git-unchanged",
+    "from": "9d352621b421174b3ac5fbe780e1896f24eac973",
+    "to": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "paths": [
+     "image-ids.tsv"
+    ],
+    "expect": []
+   }
+  ]
+ },
+ "measured": {
+  "tsv": {
+   "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+   "sha256": "03d8e8d9737790902390024555f27609d1e153582b3108cc86769387b69386e3",
+   "bytes": 495452
+  },
+  "read_backs": [
+   {
+    "artifact": "dev2",
+    "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+    "elf_bytes": 495452,
+    "segments": 5,
+    "immutable": true,
+    "deploy_transactions": 6
+   },
+   {
+    "artifact": "dev3",
+    "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+    "elf_bytes": 495452,
+    "segments": 5,
+    "immutable": true,
+    "deploy_transactions": 6
+   },
+   {
+    "artifact": "real",
+    "image_id": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+    "elf_bytes": 495452,
+    "segments": 5,
+    "immutable": true,
+    "deploy_transactions": 6
+   }
+  ],
+  "all_read_backs_match_tsv": true
+ }
+}

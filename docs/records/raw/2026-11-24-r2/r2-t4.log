@@ -1,0 +1,95 @@
+start 2026-11-24T22:53:22+00:00
+FMT_OK
+the image id matches image-ids.tsv
+error: failed to run custom build command for `escapement-test-methods v0.1.0 (<workdir>/crates/escapement-test-methods)`
+
+Caused by:
+  process didn't exit successfully: `<workdir>/target/debug/build/escapement-test-methods-2e4c5762731a9485/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-env-changed=RISC0_BUILD_DEBUG
+  Building guest package: escapement-test-methods.relay
+  cargo:rerun-if-env-changed=RISC0_SKIP_BUILD
+  Using Rust toolchain version 1.91.1
+  Using rustc: <risc0-home>/toolchains/v1.91.1-rust-x86_64-unknown-linux-gnu/bin/rustc
+  cargo:rerun-if-env-changed=RISC0_BUILD_LOCKED
+  cargo:rerun-if-env-changed=RISC0_RUST_SRC
+  cargo:rerun-if-env-changed=CC_riscv32im_risc0_zkvm_elf
+--
+warning: build failed, waiting for other jobs to finish...
+error: failed to run custom build command for `escapement-methods v0.1.0 (<workdir>/crates/escapement-methods)`
+
+Caused by:
+  process didn't exit successfully: `<workdir>/target/debug/build/escapement-methods-e4dee4b722b9b523/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-env-changed=RISC0_BUILD_DEBUG
+  Building guest package: escapement-methods.escapement-guest
+  cargo:rerun-if-env-changed=RISC0_SKIP_BUILD
+  Using Rust toolchain version 1.91.1
+  Using rustc: <risc0-home>/toolchains/v1.91.1-rust-x86_64-unknown-linux-gnu/bin/rustc
+  cargo:rerun-if-env-changed=RISC0_BUILD_LOCKED
+  cargo:rerun-if-env-changed=RISC0_RUST_SRC
+  cargo:rerun-if-env-changed=CC_riscv32im_risc0_zkvm_elf
+CLIPPY_DONE
+[SEC_PDA_NEG] ClaimPublic: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_PDA_NEG] ClaimExact: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_RELAY] ClaimPublic relayed by another program -> exit 35 (12715 cycles)
+[SEC_RELAY] ClaimExact relayed by another program -> exit 35 (13110 cycles)
+[SEC_RELAY] TransferBeneficiary relayed by another program -> exit 35 (12643 cycles)
+[SEC_PDA_NEG] TransferBeneficiary: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_RELAY] Cancel relayed by another program -> exit 35 (12115 cycles)
+[SEC_RELAY] MakeNonCancelable relayed by another program -> exit 35 (12115 cycles)
+[SEC_RELAY] SignalMilestone relayed by another program -> exit 35 (12191 cycles)
+[SEC_RELAY] CreateSchedule relayed by another program -> exit 35 (16650 cycles)
+[SEC_PDA_NEG] Cancel: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_RELAY] BatchCreate relayed by another program -> exit 35 (16640 cycles)
+[SEC_RELAY] WithdrawFees relayed by another program -> exit 35 (12989 cycles)
+[SEC_PDA_NEG] MakeNonCancelable: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_PDA] AsPda create/signal/claim/cancel/make-non-cancelable succeed; inherited grant, plain relay and wrong seed refused with 35
+test sec_pda_cpi_succeeds_and_inherited_seed_relay_refused ... ok
+test sec_relay_eoa_refused ... ok
+[SEC_PDA_NEG] SignalMilestone: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_PDA_NEG] CreateSchedule: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_PDA_NEG] BatchCreate: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_PDA_NEG] WithdrawFees: no grant, inherited grant, wrong seed -> 35, unchanged
+[SEC_ADMIN_RELAY] Configure relayed by another program -> refused: Err(ProgramExecutionFailed("Guest panicked: lez-authority/admin E120: the admin acts at top level, or through the program that made it the admin"))
+[SEC_ADMIN_RELAY] Renounce relayed by another program -> refused: Err(ProgramExecutionFailed("Guest panicked: lez-authority/admin E120: the admin acts at top level, or through the program that made it the admin"))
+[SEC_FORGED] Internal::ClaimPublic from another program -> refused: Err(ProgramExitedWithCode { code: 32, cycles: 15686 })
+[SEC_FORGED] StateReply from another program -> refused: Err(ProgramExitedWithCode { code: 32, cycles: 15663 })
+[SEC_FORGED] clock Reply::Timestamp from another program -> refused: Err(ProgramExitedWithCode { code: 32, cycles: 15350 })
+[SEC_ASYNC] ClaimPublic, the beneficiary signing, as an async message from another program -> 35, unchanged
+[SEC_ASYNC] CreateSchedule, the creator signing, as an async message from another program -> 35, unchanged
+[SEC_ASYNC] AsPda Cancel from the PDA's own program, as an async message from another program -> 35, unchanged
+test sec_signer_authority_review_gaps ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 17.20s
+SEC_EXIT=0
+== SDK
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+SDK_EXIT=0
+== token program guest from a cold target (as CI's e2e job builds it)
+TOKEN_COLD_BUILD_OK same=yes
+== dev E2E with the final script
+built: <workdir>/e2e/.run/bin/escapement
+e2e: 75 passed, 0 failed (dev mode: 1); records in <workdir>/e2e/.run/out-r2-dev3/e2e.jsonl
+DEV_E2E_EXIT=0 136s
+== real-proof suite 2026-11-24T22:58:22+00:00
+REAL_EXIT=0
+e2e: 75 passed, 0 failed (dev mode: 0); records in <workdir>/e2e/.run/out-r2-real/e2e.jsonl
+	User time (seconds): 37763.51
+	System time (seconds): 984.94
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 25:59.61
+	Maximum resident set size (kbytes): 9710956
+== real records
+probe true;deploy-immutable-and-init-admin true;header-immutable-and-image-id true;fund-beneficiary true;fund-second true;unknown-flag-refused true;dry-run-create true;dry-run-created-nothing true;create-linear true;escrow-holds-total true;claim-public-partial true;claim-public-applied true;refusal-overclaim-sent-on-chain true;refusal-overclaim-reverted-state-unchanged true;private-account-new true;key-file-written-0600 true;claim-private-new-account-prepare true;claim-private-new-account-disclosure-shown-and-nothing-sent true;claim-private-new-account-confirm true;claim-private-new-account-applied true;claim-private-prepare-again true;claim-private-wrong-token-refused true;claim-private-wrong-token-changed-nothing true;claim-private-same-account-confirm true;claim-private-same-account-applied true;private-account-show true;private-account-state-on-chain true;cancel-by-creator true;cancel-applied true;cancel-froze-vesting true;claim-vested-after-cancel true;vested-remainder-claimed true;escrow-empty-after-cancel-and-claim true;create-milestone true;refusal-creator-signal-sent-on-chain true;refusal-creator-signal-reverted-state-unchanged true;signal-by-authority true;signal-applied true;refusal-double-signal-sent-on-chain true;refusal-double-signal-reverted-state-unchanged true;claim-milestone-tranche true;milestone-tranche-received true;create-transferable true;transfer-beneficiary true;transfer-applied true;refusal-old-beneficiary-sent-on-chain true;refusal-old-beneficiary-reverted-state-unchanged true;claim-by-new-beneficiary true;new-beneficiary-received true;create-for-noncancelable true;make-non-cancelable true;non-cancelable-applied true;refusal-cancel-after-noncancelable-sent-on-chain true;refusal-cancel-after-noncancelable-reverted-state-unchanged true;refusal-beneficiary-cancels-sent-on-chain true;refusal-beneficiary-cancels-reverted-state-unchanged true;deploy-token-program true;configure-token-program true;token-program-configured true;token-definition true;token-supply-at-creator true;beneficiary-public-token-holding true;create-token-linear true;token-escrow-holds-total true;claim-token-public true;claim-token-public-applied true;shield-native-for-fees true;shield-applied true;private-token-holding true;private-token-holding-applied true;claim-private-token-prepare true;claim-private-token-disclosure-shown-and-nothing-sent true;claim-private-token-confirm true;claim-private-token-applied true;getEvents-is-not-a-sequencer-rpc-on-rc3 true;
+== proofs
+{"step":"claim-private-new-account-confirm","r":{"account_native_balance_after":"44542888","account_state_saved":true,"alias":"AAbbFVeeMuz7xmxC35w6mVaGxfYsN4mro6y2ABD1B4bb","amount":"50000000","claimed_total":"150000000","dev_mode":false,"escrow_debited":"50000000","fee_reserve":"5457112","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":237142,"prove_s":205.64648904,"public_cycles_simulated":48312,"tx":{"block":127,"bytes":251302,"hash":"0c5beabd3ff101460437883394a4536aeb13cbe4336ece12d0abd02348206d97","index":0,"reverted":false,"wait_s":1.015230638}}}
+{"step":"claim-private-new-account-applied","r":{"account_native_balance_after":"44542888","account_state_saved":true,"alias":"AAbbFVeeMuz7xmxC35w6mVaGxfYsN4mro6y2ABD1B4bb","amount":"50000000","claimed_total":"150000000","dev_mode":false,"escrow_debited":"50000000","fee_reserve":"5457112","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":237142,"prove_s":205.64648904,"public_cycles_simulated":48312,"tx":{"block":127,"bytes":251302,"hash":"0c5beabd3ff101460437883394a4536aeb13cbe4336ece12d0abd02348206d97","index":0,"reverted":false,"wait_s":1.015230638}}}
+{"step":"claim-private-same-account-confirm","r":{"account_native_balance_after":"49085072","account_state_saved":true,"alias":"JqJ7NgtEBjjbvEN5FtnC44J4Vs5RVg877EemB3HD7w3","amount":"10000000","claimed_total":"160000000","dev_mode":false,"escrow_debited":"10000000","fee_reserve":"5457816","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":239010,"prove_s":290.512531476,"public_cycles_simulated":48400,"tx":{"block":274,"bytes":255038,"hash":"636147ea0af6ef420ebf8649e0bfeea9d27e856ac735362b883f1701ad2fbbc3","index":0,"reverted":false,"wait_s":2.372120651}}}
+{"step":"claim-private-same-account-applied","r":{"account_native_balance_after":"49085072","account_state_saved":true,"alias":"JqJ7NgtEBjjbvEN5FtnC44J4Vs5RVg877EemB3HD7w3","amount":"10000000","claimed_total":"160000000","dev_mode":false,"escrow_debited":"10000000","fee_reserve":"5457816","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":239010,"prove_s":290.512531476,"public_cycles_simulated":48400,"tx":{"block":274,"bytes":255038,"hash":"636147ea0af6ef420ebf8649e0bfeea9d27e856ac735362b883f1701ad2fbbc3","index":0,"reverted":false,"wait_s":2.372120651}}}
+{"step":"shield-native-for-fees","r":{"account_native_balance_after":"74014456","account_state_saved":true,"alias":"H38rzPQnsKRUiLokFqaQ2ge9wER5AhqQgsA1XUtMWV6M","dev_mode":false,"fee_reserve":"5070616","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":238842,"prove_s":285.200613677,"public_cycles_simulated":0,"tx":{"block":458,"bytes":254702,"hash":"fbca967ad7e07269fd277ae669ee6931ea1c11c85fa80d4bb0a8bea1d2f0de65","index":0,"reverted":false,"wait_s":2.022870118}}}
+{"step":"shield-applied","r":{"account_native_balance_after":"74014456","account_state_saved":true,"alias":"H38rzPQnsKRUiLokFqaQ2ge9wER5AhqQgsA1XUtMWV6M","dev_mode":false,"fee_reserve":"5070616","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":238842,"prove_s":285.200613677,"public_cycles_simulated":0,"tx":{"block":458,"bytes":254702,"hash":"fbca967ad7e07269fd277ae669ee6931ea1c11c85fa80d4bb0a8bea1d2f0de65","index":0,"reverted":false,"wait_s":2.022870118}}}
+{"step":"private-token-holding","r":{"account_native_balance_after":"68850536","account_state_saved":true,"dev_mode":false,"fee_reserve":"5163920","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":238926,"prove_s":330.093621547,"public_cycles_simulated":11663,"tx":{"block":624,"bytes":254726,"hash":"b49cd6631189a74353f2da985b8dd0f5120b7e5b8002627951eee2be6b2a2f9e","index":0,"reverted":false,"wait_s":1.429959306}}}
+{"step":"private-token-holding-applied","r":{"account_native_balance_after":"68850536","account_state_saved":true,"dev_mode":false,"fee_reserve":"5163920","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":238926,"prove_s":330.093621547,"public_cycles_simulated":11663,"tx":{"block":624,"bytes":254726,"hash":"b49cd6631189a74353f2da985b8dd0f5120b7e5b8002627951eee2be6b2a2f9e","index":0,"reverted":false,"wait_s":1.429959306}}}
+{"step":"claim-private-token-confirm","r":{"account_native_balance_after":"63286696","account_state_saved":true,"alias":"9vPKxQrKVYZWrDjrouZYmS7rp95HAk95gz3LyXGtoGFQ","amount":"60000000","claimed_total":"100000000","dev_mode":false,"escrow_debited":"60000000","fee_reserve":"5563840","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":239107,"prove_s":307.655973651,"public_cycles_simulated":61653,"tx":{"block":779,"bytes":255232,"hash":"f2fd1bb969b8bc6ff0a3ad83eff806245a88cf985b3bae10d7e4b7f50f8af2a9","index":0,"reverted":false,"wait_s":1.5298937929999998}}}
+{"step":"claim-private-token-applied","r":{"account_native_balance_after":"63286696","account_state_saved":true,"alias":"9vPKxQrKVYZWrDjrouZYmS7rp95HAk95gz3LyXGtoGFQ","amount":"60000000","claimed_total":"100000000","dev_mode":false,"escrow_debited":"60000000","fee_reserve":"5563840","private_account_id_in_tx_bytes":false,"private_commitment_found":true,"proof_bytes":239107,"prove_s":307.655973651,"public_cycles_simulated":61653,"tx":{"block":779,"bytes":255232,"hash":"f2fd1bb969b8bc6ff0a3ad83eff806245a88cf985b3bae10d7e4b7f50f8af2a9","index":0,"reverted":false,"wait_s":1.5298937929999998}}}
+ALL_DONE 2026-11-24T23:24:21+00:00

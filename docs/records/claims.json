@@ -1,0 +1,991 @@
+{
+ "schema": "escapement-claims/1",
+ "about": "Every measured figure of the RFP-017 proposal (Escapement, filed 25 Nov 2026) that the repository can back, with its source. `record` sources are re-derived from raw run files by scripts/verify-records.py; `doc` sources are text in the docs at commit 2ddc57c with no raw log behind them in the repository.",
+ "claims": [
+  {
+   "id": "G-1",
+   "says": "guest image id adc8b81f...df4c",
+   "value": "adc8b81f8b3f939f36cea61e23516acd1916e3b4e1b5e30a5ff91931d934df4c",
+   "source": {
+    "record": "guest-adc8b81f",
+    "path": "tsv.image_id"
+   }
+  },
+  {
+   "id": "G-2",
+   "says": "guest ELF SHA-256 03d8e8d9...86e3",
+   "value": "03d8e8d9737790902390024555f27609d1e153582b3108cc86769387b69386e3",
+   "source": {
+    "record": "guest-adc8b81f",
+    "path": "tsv.sha256"
+   }
+  },
+  {
+   "id": "G-3",
+   "says": "guest ELF 495,452 B",
+   "value": 495452,
+   "source": {
+    "record": "guest-adc8b81f",
+    "path": "tsv.bytes"
+   }
+  },
+  {
+   "id": "G-4",
+   "says": "header image id read back matches image-ids.tsv (every recorded deployment)",
+   "value": true,
+   "source": {
+    "record": "guest-adc8b81f",
+    "path": "all_read_backs_match_tsv"
+   }
+  },
+  {
+   "id": "G-5",
+   "says": "immutable deployment: 5 segments + header",
+   "value": 5,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "deploy.segments"
+   }
+  },
+  {
+   "id": "G-6",
+   "says": "immutable deployment: 6 transactions (5 segments + header)",
+   "value": 6,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "deploy.transactions",
+    "reduce": "len"
+   }
+  },
+  {
+   "id": "G-7",
+   "says": "deployed with immutable = true",
+   "value": true,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "deploy.immutable"
+   }
+  },
+  {
+   "id": "E-1",
+   "says": "75/75 checks PASS, dev mode",
+   "value": 75,
+   "source": {
+    "record": "e2e-sequencer-dev-2026-11-24-dev3",
+    "path": "checks.passed"
+   }
+  },
+  {
+   "id": "E-2",
+   "says": "75 checks in the dev-mode suite",
+   "value": 75,
+   "source": {
+    "record": "e2e-sequencer-dev-2026-11-24-dev3",
+    "path": "checks.total"
+   }
+  },
+  {
+   "id": "E-3",
+   "says": "dev-mode suite exit status 0",
+   "value": 0,
+   "source": {
+    "record": "e2e-sequencer-dev-2026-11-24-dev3",
+    "path": "log.DEV_E2E_EXIT"
+   }
+  },
+  {
+   "id": "E-4",
+   "says": "6 refusals sent straight to the sequencer",
+   "value": 6,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "refusals",
+    "reduce": "len"
+   }
+  },
+  {
+   "id": "E-5",
+   "says": "each refusal included in a block as reverted",
+   "value": true,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "refusals[*].reverted",
+    "reduce": "all"
+   }
+  },
+  {
+   "id": "E-6",
+   "says": "each refusal: the schedule's on-chain state compared before and after, unchanged",
+   "value": true,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "refusals[*].state_unchanged_check_ok",
+    "reduce": "all"
+   }
+  },
+  {
+   "id": "E-7",
+   "says": "getEvents answered -32601 (Method not found) by the sequencer",
+   "value": -32601,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "get_events_answer.code"
+   }
+  },
+  {
+   "id": "R-1",
+   "says": "75/75 checks PASS with the sequencer and the CLI out of dev mode",
+   "value": 75,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "checks.passed"
+   }
+  },
+  {
+   "id": "R-2",
+   "says": "real-proof suite: every proven transaction reports dev_mode false",
+   "value": [
+    false
+   ],
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "dev_mode_reported"
+   }
+  },
+  {
+   "id": "R-3",
+   "says": "real-proof suite: summary line says dev mode 0",
+   "value": 0,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "log.summary.dev_mode"
+   }
+  },
+  {
+   "id": "R-4",
+   "says": "real-proof suite exit status 0",
+   "value": 0,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.exit_status"
+   }
+  },
+  {
+   "id": "R-5",
+   "says": "26 min wall",
+   "value": 26,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.elapsed_s",
+    "scale": 0.016666666666666666,
+    "round": 0
+   }
+  },
+  {
+   "id": "R-6",
+   "says": "37,764 s user CPU",
+   "value": 37764,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.user_s",
+    "round": 0
+   }
+  },
+  {
+   "id": "R-7",
+   "says": "~24-25 cores busy: (user + system) / wall = 24.8 (GNU time 2484%)",
+   "value": 24.8,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.cpu_percent",
+    "scale": 0.01,
+    "round": 1
+   }
+  },
+  {
+   "id": "R-8",
+   "says": "~24 cores busy: user / wall = 24.2",
+   "value": 24.2,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.user_s",
+    "divide_by": "time.elapsed_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-9",
+   "says": "peak RSS (GNU time max RSS, KiB) 9,710,956",
+   "value": 9710956,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.max_rss_kib"
+   }
+  },
+  {
+   "id": "R-10",
+   "says": "peak RSS in GB: 9.94 (the proposal's '9.7 GB' reads KiB as kB)",
+   "value": 9.94,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "time.max_rss_kib",
+    "scale": 1.024e-06,
+    "round": 2
+   }
+  },
+  {
+   "id": "R-11",
+   "says": "exactly five transactions carry real proofs",
+   "value": 5,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions",
+    "reduce": "len"
+   }
+  },
+  {
+   "id": "R-12",
+   "says": "native claim into a new private account proven in 205.6 s",
+   "value": 205.6,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].prove_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-13",
+   "says": "second native claim, same account, 290.5 s",
+   "value": 290.5,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].prove_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-14",
+   "says": "shield of native LEZ, 285.2 s",
+   "value": 285.2,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=shield-native-for-fees].prove_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-15",
+   "says": "private token holding, 330.1 s",
+   "value": 330.1,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=private-token-holding].prove_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-16",
+   "says": "token private claim with in-proof fee, 307.7 s",
+   "value": 307.7,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].prove_s",
+    "round": 1
+   }
+  },
+  {
+   "id": "R-17",
+   "says": "proof sizes from 237,142 B",
+   "value": 237142,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[*].proof_bytes",
+    "reduce": "min"
+   }
+  },
+  {
+   "id": "R-18",
+   "says": "proof sizes to 239,107 B",
+   "value": 239107,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[*].proof_bytes",
+    "reduce": "max"
+   }
+  },
+  {
+   "id": "R-19a",
+   "says": "new-account claim: proof 237,142 B",
+   "value": 237142,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].proof_bytes"
+   }
+  },
+  {
+   "id": "R-19b",
+   "says": "new-account claim: transaction 251,302 B",
+   "value": 251302,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].tx_bytes"
+   }
+  },
+  {
+   "id": "R-20a",
+   "says": "same-account claim: proof 239,010 B",
+   "value": 239010,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].proof_bytes"
+   }
+  },
+  {
+   "id": "R-20b",
+   "says": "same-account claim: transaction 255,038 B",
+   "value": 255038,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].tx_bytes"
+   }
+  },
+  {
+   "id": "R-21a",
+   "says": "shield: proof 238,842 B",
+   "value": 238842,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=shield-native-for-fees].proof_bytes"
+   }
+  },
+  {
+   "id": "R-21b",
+   "says": "shield: transaction 254,702 B",
+   "value": 254702,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=shield-native-for-fees].tx_bytes"
+   }
+  },
+  {
+   "id": "R-22a",
+   "says": "token holding: proof 238,926 B",
+   "value": 238926,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=private-token-holding].proof_bytes"
+   }
+  },
+  {
+   "id": "R-22b",
+   "says": "token holding: transaction 254,726 B",
+   "value": 254726,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=private-token-holding].tx_bytes"
+   }
+  },
+  {
+   "id": "R-23a",
+   "says": "token claim: proof 239,107 B",
+   "value": 239107,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].proof_bytes"
+   }
+  },
+  {
+   "id": "R-23b",
+   "says": "token claim: transaction 255,232 B",
+   "value": 255232,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].tx_bytes"
+   }
+  },
+  {
+   "id": "R-24",
+   "says": "new-account claim: public part 48,312 cycles",
+   "value": 48312,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].public_cycles"
+   }
+  },
+  {
+   "id": "R-25",
+   "says": "same-account claim: public part 48,400 cycles",
+   "value": 48400,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].public_cycles"
+   }
+  },
+  {
+   "id": "R-26",
+   "says": "token holding: public part 11,663 cycles",
+   "value": 11663,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=private-token-holding].public_cycles"
+   }
+  },
+  {
+   "id": "R-27",
+   "says": "token claim: public part 61,653 cycles",
+   "value": 61653,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].public_cycles"
+   }
+  },
+  {
+   "id": "R-28",
+   "says": "new-account claim: fee reserve 5,457,112",
+   "value": 5457112,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].fee_reserve"
+   }
+  },
+  {
+   "id": "R-29",
+   "says": "same-account claim: fee reserve 5,457,816",
+   "value": 5457816,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].fee_reserve"
+   }
+  },
+  {
+   "id": "R-30",
+   "says": "shield: fee reserve 5,070,616",
+   "value": 5070616,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=shield-native-for-fees].fee_reserve"
+   }
+  },
+  {
+   "id": "R-31",
+   "says": "token holding: fee reserve 5,163,920",
+   "value": 5163920,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=private-token-holding].fee_reserve"
+   }
+  },
+  {
+   "id": "R-32",
+   "says": "token claim: fee reserve 5,563,840",
+   "value": 5563840,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].fee_reserve"
+   }
+  },
+  {
+   "id": "R-33",
+   "says": "native claim of 50,000,000",
+   "value": 50000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].amount"
+   }
+  },
+  {
+   "id": "R-34",
+   "says": "second native claim of 10,000,000",
+   "value": 10000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].amount"
+   }
+  },
+  {
+   "id": "R-35",
+   "says": "shield of 30,000,000 (derived: balance after - balance before + fee reserve)",
+   "value": 30000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=shield-native-for-fees].native_credit"
+   }
+  },
+  {
+   "id": "R-36",
+   "says": "token claim of 60,000,000",
+   "value": 60000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].amount"
+   }
+  },
+  {
+   "id": "R-37",
+   "says": "token claim: the account then holds 60,000,000 tokens",
+   "value": "60000000",
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].token_holdings_after[0].balance"
+   }
+  },
+  {
+   "id": "R-38",
+   "says": "new-account claim: the account's balance = claim - fee reserve, exactly",
+   "value": 50000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].native_credit"
+   }
+  },
+  {
+   "id": "R-39",
+   "says": "same-account claim: balance gained = claim - fee reserve, exactly",
+   "value": 10000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-same-account-confirm].native_credit"
+   }
+  },
+  {
+   "id": "R-40",
+   "says": "token claim: fee paid from the account's native balance (no native credit)",
+   "value": 0,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].native_credit"
+   }
+  },
+  {
+   "id": "R-41",
+   "says": "base fees 8 / 8",
+   "value": 8,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "probe.base_fee_exec"
+   }
+  },
+  {
+   "id": "R-42",
+   "says": "base fees 8 / 8 (storage)",
+   "value": 8,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "probe.base_fee_stor"
+   }
+  },
+  {
+   "id": "R-43",
+   "says": "private account id absent from every proven transaction's bytes (CLI check)",
+   "value": [
+    false
+   ],
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[*].private_account_id_in_tx_bytes",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "R-44",
+   "says": "every new commitment found on the sequencer (CLI check, getProofsAndRoot)",
+   "value": [
+    true
+   ],
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[*].private_commitment_found",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "R-45",
+   "says": "the escrow debited exactly the claimed amount (new-account claim)",
+   "value": 50000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-new-account-confirm].escrow_debited"
+   }
+  },
+  {
+   "id": "R-46",
+   "says": "the escrow debited exactly the claimed amount (token claim)",
+   "value": 60000000,
+   "source": {
+    "record": "e2e-sequencer-real-proof-2026-11-24",
+    "path": "private_transactions[step=claim-private-token-confirm].escrow_debited"
+   }
+  },
+  {
+   "id": "S-1",
+   "says": "all 9 user operations relayed by another program refused",
+   "value": 9,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_relay",
+    "reduce": "len"
+   }
+  },
+  {
+   "id": "S-2",
+   "says": "relayed operations refused with code 35",
+   "value": [
+    35
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_relay[*].code",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "S-3",
+   "says": "relay refusals from 12,115 cycles",
+   "value": 12115,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_relay[*].cycles",
+    "reduce": "min"
+   }
+  },
+  {
+   "id": "S-4",
+   "says": "relay refusals to 16,650 cycles",
+   "value": 16650,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_relay[*].cycles",
+    "reduce": "max"
+   }
+  },
+  {
+   "id": "S-5",
+   "says": "AsPda without a grant / inherited grant / wrong seed refused for each of the 9 operations",
+   "value": 9,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_pda_neg",
+    "reduce": "len"
+   }
+  },
+  {
+   "id": "S-6",
+   "says": "... with code 35",
+   "value": [
+    35
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_pda_neg[*].code",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "S-7",
+   "says": "admin operations relayed by another program refused (Configure, Renounce)",
+   "value": [
+    "Configure",
+    "Renounce"
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_admin_relay[*].op",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "S-8",
+   "says": "forged replies refused with code 32",
+   "value": [
+    32
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_forged[*].code",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "S-9",
+   "says": "user operations arriving as asynchronous messages refused with code 35",
+   "value": [
+    35
+   ],
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "sec_async[*].code",
+    "reduce": "set"
+   }
+  },
+  {
+   "id": "S-10",
+   "says": "signer-authority tests: 3 passed, 0 failed",
+   "value": 3,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "test_results[section=start].passed"
+   }
+  },
+  {
+   "id": "S-11",
+   "says": "escapement-sdk 20/20 unit tests",
+   "value": 20,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "test_results[section=SDK].passed"
+   }
+  },
+  {
+   "id": "S-12",
+   "says": "escapement-sdk: 0 failed",
+   "value": 0,
+   "source": {
+    "record": "suite-log-2026-11-24-r2",
+    "path": "test_results[section=SDK].failed"
+   }
+  },
+  {
+   "id": "D-1",
+   "says": "core: 13/13 tests, 7 property suites x 4,096 = 28,672 cases",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "13/13; 7 property suites × 4,096 cases (28,672)"
+   }
+  },
+  {
+   "id": "D-2",
+   "says": "Kani: fee ceiling & cap in 12 s",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "(8-bit amounts, 12 s)"
+   }
+  },
+  {
+   "id": "D-3",
+   "says": "Kani: cancel conservation (linear) in 7 s",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "(8-bit values, 7 s;"
+   }
+  },
+  {
+   "id": "D-4",
+   "says": "Kani: mul_div identity in 131 s",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "(8-bit operands, 131 s)"
+   }
+  },
+  {
+   "id": "D-5",
+   "says": "reproducible guest rebuilt at two paths and on GitHub's runner",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "built at the tree's path and at a copy elsewhere, and in CI on GitHub's runner"
+   }
+  },
+  {
+   "id": "D-6",
+   "says": "34 of 35 exit codes reached by a test",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "34 of 35 exit codes reached by a test"
+   }
+  },
+  {
+   "id": "D-7",
+   "says": "20/20 private claims with pairwise-distinct values",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "20/20 pairwise-distinct aliases, nullifiers, commitments and ephemeral keys"
+   }
+  },
+  {
+   "id": "D-8",
+   "says": "7 padded actions, 512 B ciphertexts",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "7 padded private actions, 512-byte ciphertexts"
+   }
+  },
+  {
+   "id": "D-9",
+   "says": "earlier native new-account claims: 227.9 s and 199.3 s",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "227.9 s and 199.3 s"
+   }
+  },
+  {
+   "id": "D-10",
+   "says": "in-process holding init 180.2 s",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "initialization proven in 180.2 s"
+   }
+  },
+  {
+   "id": "D-11",
+   "says": "in-process token claim 159.8 s, 61,464 public cycles",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "then the claim in 159.8 s, 61,464 public cycles"
+   }
+  },
+  {
+   "id": "D-12",
+   "says": "CLI 3/3 unit tests",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| 3/3: a key file is written with mode 0600"
+   }
+  },
+  {
+   "id": "D-13",
+   "says": "IDL 2 tests",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "IDL 2, SDK 20"
+   }
+  },
+  {
+   "id": "D-14",
+   "says": "in-process cost table: `CreateSchedule` / 264,775 / 141,318",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `CreateSchedule` | 264,775 | 141,318 |"
+   }
+  },
+  {
+   "id": "D-15",
+   "says": "in-process cost table: `ClaimPublic` / 107,625 / 79,367",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `ClaimPublic` | 107,625 | 79,367 |"
+   }
+  },
+  {
+   "id": "D-16",
+   "says": "in-process cost table: 61,579 / 48,175",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| 61,579 | 48,175 |"
+   }
+  },
+  {
+   "id": "D-17",
+   "says": "in-process cost table: `Cancel` / 105,644 / 77,347",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `Cancel` | 105,644 | 77,347 |"
+   }
+  },
+  {
+   "id": "D-18",
+   "says": "in-process cost table: `MakeNonCancelable` / 44,056",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `MakeNonCancelable` | 44,056 |"
+   }
+  },
+  {
+   "id": "D-19",
+   "says": "in-process cost table: `SignalMilestone` / 76,279",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `SignalMilestone` | 76,279 |"
+   }
+  },
+  {
+   "id": "D-20",
+   "says": "in-process cost table: `TransferBeneficiary` / 45,818",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `TransferBeneficiary` | 45,818 |"
+   }
+  },
+  {
+   "id": "D-21",
+   "says": "in-process cost table: `BatchCreate(1)`, linear / 296,096",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `BatchCreate(1)`, linear | 296,096 |"
+   }
+  },
+  {
+   "id": "D-22",
+   "says": "in-process cost table: `BatchCreate(8)`, linear / 614,978",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| `BatchCreate(8)`, linear | 614,978 |"
+   }
+  },
+  {
+   "id": "D-23",
+   "says": "in-process cost table: (exit code 26) / 16,150",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "(exit code 26) | 16,150 |"
+   }
+  },
+  {
+   "id": "D-24",
+   "says": "in-process cost table: Linear / 206 / 226",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| Linear | 206 | 226 |"
+   }
+  },
+  {
+   "id": "D-25",
+   "says": "in-process cost table: Cliff + linear, with a cancel authority / 178 / 194",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| Cliff + linear, with a cancel authority | 178 | 194 |"
+   }
+  },
+  {
+   "id": "D-26",
+   "says": "in-process cost table: 4-tranche milestone, with both authorities / 148 / 166",
+   "source": {
+    "file": "docs/gas-and-batch.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "| 4-tranche milestone, with both authorities | 148 | 166 |"
+   }
+  },
+  {
+   "id": "D-27",
+   "says": "machine: 32 vCPUs visible, 64 GiB RAM, 2-core request",
+   "source": {
+    "file": "docs/EVIDENCE.md",
+    "at": "2ddc57c46d9da677cf27cd190aecfd30a61d5f80",
+    "text": "32 vCPUs visible, 64 GiB RAM"
+   }
+  }
+ ]
+}
