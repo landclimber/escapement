@@ -711,7 +711,7 @@
       "text": "Every hard requirement in Functionality, Usability, Reliability, and Performance has at least one corresponding test.",
       "status": "in part",
       "proposal": {"row": "S3", "status": "in part"},
-      "remaining": "The testnet halves of F6 and P2 get theirs in M4 (U2a, U2b and U2c's module and view tests run in CI's `basecamp` job).",
+      "remaining": "U2a names no test: nothing tests building the packages, downloading release assets or loading the mini-app from the git repository (CI's `basecamp` job runs U2b's and U2c's module and view tests, not the build). The testnet halves of F6 and P2 get theirs in M4.",
       "note": "This map is the traceability matrix; CI computes S3 from it.",
       "tests": [
         {"check": "reqmap:s3-coverage"}

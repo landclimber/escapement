@@ -858,7 +858,7 @@ Records:
 
 **Status: in part.** Proposal row `S3`: in part.
 
-**Remaining:** The testnet halves of F6 and P2 get theirs in M4 (U2a, U2b and U2c's module and view tests run in CI's `basecamp` job).
+**Remaining:** U2a names no test: nothing tests building the packages, downloading release assets or loading the mini-app from the git repository (CI's `basecamp` job runs U2b's and U2c's module and view tests, not the build). The testnet halves of F6 and P2 get theirs in M4.
 
 **Note:** This map is the traceability matrix; CI computes S3 from it.
 
