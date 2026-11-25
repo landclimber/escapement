@@ -31,6 +31,7 @@ fn kimi_m1_token_schedules_are_not_claimed_or_cancelled_as_lez() {
         refund_holding: me,
         total_amount: 1_000,
         claimed_amount: 0,
+        vested_high_water: 0,
         kind: ScheduleKind::Linear { start_ts: 1_795_599_000_000, end_ts: 1_795_601_000_000 },
         cancelable: true,
         transferable: false,
