@@ -327,6 +327,37 @@ mod tests {
     }
 
     #[test]
+    fn f1a_cliff_lump_sum_then_linear_tail_at_concrete_points() {
+        // 100,000 from t = 1,000,000; 25,000 at the cliff (t = 2,000,000), the other 75,000
+        // linearly to t = 5,000,000. Values computed by hand, independently of `vested_at`.
+        let kind = ScheduleKind::CliffLinear {
+            start_ts: 1_000_000,
+            cliff_ts: 2_000_000,
+            end_ts: 5_000_000,
+            cliff_amount: 25_000,
+        };
+        let s = dummy_schedule(100_000, 0, kind);
+        for (t, want) in [
+            (1_000_000, 0),
+            (1_999_999, 0),
+            (2_000_000, 25_000),
+            (2_000_001, 25_000), // 75,000 / 3,000,000 per ms, floored
+            (2_000_040, 25_001),
+            (2_750_000, 43_750),
+            (3_000_000, 50_000),
+            (3_500_000, 62_500),
+            (4_999_999, 99_999),
+            (5_000_000, 100_000),
+            (9_000_000, 100_000),
+        ] {
+            assert_eq!(vested_at(&s, t), want, "vested at t = {t}");
+        }
+        // Linear means equal steps: every 1,000,000 ms after the cliff releases 25,000.
+        assert_eq!(vested_at(&s, 4_000_000) - vested_at(&s, 3_000_000), 25_000);
+        assert_eq!(vested_at(&s, 3_000_000) - vested_at(&s, 2_000_000), 25_000);
+    }
+
+    #[test]
     fn mul_div_extremes_never_overflow() {
         assert_eq!(mul_div_floor_u128(u128::MAX, 1, 1), Some(u128::MAX));
         assert_eq!(
