@@ -1583,6 +1583,97 @@ fn c1_same_block_clock_lag_cancel_protects_shared_batch_escrow() {
 }
 
 // ============================================================================
+// AUDIT REGRESSION: partial private cliff claim followed by a lagged cancellation
+// ============================================================================
+
+#[test]
+fn audit_lagged_cancel_preserves_previously_vested_unclaimed_tokens() {
+    let mut chain = TestChain::new(1_000_000);
+    let def_k = key(28);
+    let creator_k = key(29);
+    let benef_k = key(30);
+    let def = account(&def_k);
+    let creator = account(&creator_k);
+    let benef = account(&benef_k);
+    chain.create_token(&def_k, &creator_k, 1_000_000);
+
+    let params = CreateScheduleParams {
+        salt: [0xC2; 32],
+        asset: Asset::Token { definition: def },
+        creator_holding: creator,
+        refund_holding: creator,
+        beneficiary: benef,
+        total_amount: 100_000,
+        kind: ScheduleKind::CliffLinear {
+            start_ts: 1_000_000,
+            cliff_ts: 2_000_000,
+            end_ts: 5_000_000,
+            cliff_amount: 50_000,
+        },
+        cancelable: true,
+        transferable: false,
+        cancel_authority: None,
+        milestone_authority: None,
+        broker: None,
+    };
+    let actors = chain.create_schedule_actors(creator, &params, &[]);
+    let sched = schedule_pda(chain.vesting, &creator, &params.salt);
+    let escrow = single_escrow_pda(chain.vesting, &sched);
+    chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &actors,
+            &[&creator_k],
+            &Wire::Program(VestingMessage::CreateSchedule(Box::new(params))),
+        )
+        .expect("schedule created");
+
+    let mut private_dest = PrivateWallet::new(76);
+    chain.init_private_holding(&mut private_dest, def);
+    chain.tick(1_990_000);
+    chain.advance_block_header_only(2_000_000);
+
+    // The cliff validates 50,000 as vested, but the beneficiary withdraws only one unit.
+    chain
+        .claim_private_blinded(
+            &PrivateClaimArgs {
+                beneficiary_key: &benef_k,
+                schedule_id: sched,
+                blinding_factor: [0xE3; 32],
+                random_seed: [0xE3; 32],
+                amount: 1,
+                effective_ts: 2_000_000,
+                promote_credit: true,
+            },
+            &mut private_dest,
+        )
+        .expect("partial cliff claim succeeds");
+
+    // In the same block the clock still reads 1,990,000. Cancellation must retain all
+    // 50,000 that vested at the cliff, not just the single unit already claimed.
+    let creator_before = chain.token_balance(creator);
+    let events = chain
+        .submit_public(
+            Actor::new(creator, chain.vesting),
+            &[
+                Actor::new(creator, chain.vesting),
+                Actor::new(sched, chain.vesting),
+                clock_actor(),
+                Actor::new(escrow, chain.token),
+                Actor::new(creator, chain.token),
+            ],
+            &[&creator_k],
+            &Wire::Program(VestingMessage::Cancel { schedule_id: sched }),
+        )
+        .expect("cancel succeeds");
+    let cancelled = &events_of::<Cancelled>(&events)[0];
+    assert_eq!(cancelled.vested_at_cancel, 50_000);
+    assert_eq!(cancelled.refunded_amount, 50_000);
+    assert_eq!(chain.token_balance(creator), creator_before + 50_000);
+    assert_eq!(chain.token_balance(escrow), 49_999);
+}
+
+// ============================================================================
 // SPIKE S-3 & [H-1]: `lez-admin-authority` v0.2.0, multi-token fee vaults & WithdrawFees
 // ============================================================================
 

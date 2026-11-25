@@ -590,6 +590,8 @@ fn handle_internal(input: &ReceiveInput, from: Actor, internal: Internal) -> Res
             if amount == 0 {
                 VestingError::ZeroAmount.abort();
             }
+            let vested = escapement_core::math::vested_at(&schedule, effective_ts);
+            schedule.vested_high_water = schedule.vested_high_water.max(vested);
             let claimable = claimable_at(&schedule, effective_ts);
             if claimable == 0 {
                 abort_nothing_claimable(&schedule, effective_ts);
@@ -919,6 +921,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                 refund_holding: params.refund_holding,
                 total_amount: params.total_amount,
                 claimed_amount: 0,
+                vested_high_water: 0,
                 kind: params.kind,
                 cancelable: params.cancelable,
                 transferable: params.transferable,
@@ -1128,6 +1131,7 @@ fn handle_state_reply(input: &ReceiveInput, pending: PendingOp) -> Response {
                     refund_holding: params.refund_holding,
                     total_amount: item.total_amount,
                     claimed_amount: 0,
+                    vested_high_water: 0,
                     kind: item.kind,
                     cancelable: item.cancelable,
                     transferable: item.transferable,
@@ -1271,6 +1275,9 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
             destination,
             requested_amount,
         } => {
+            schedule.vested_high_water = schedule
+                .vested_high_water
+                .max(escapement_core::math::vested_at(&schedule, now_ms));
             let claimable = claimable_at(&schedule, now_ms);
             if claimable == 0 {
                 abort_nothing_claimable(&schedule, now_ms);
@@ -1323,6 +1330,7 @@ fn handle_clock_reply(input: &ReceiveInput, pending: PendingOp, reply: ClockRepl
         } => {
             let (vested_at_cancel, unvested_refund) =
                 split_on_cancel(&schedule, now_ms).unwrap_or_else(|e| e.abort());
+            schedule.vested_high_water = vested_at_cancel;
             schedule.cancelled = Some(CancellationRecord {
                 cancelled_at_ms: now_ms,
                 vested_at_cancel,

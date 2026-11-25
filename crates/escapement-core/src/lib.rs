@@ -138,6 +138,9 @@ pub struct ScheduleAccount {
     pub refund_holding: AccountId,
     pub total_amount: u128,
     pub claimed_amount: u128,
+    /// Greatest cumulative amount proved vested by any completed claim. Cancellation uses this
+    /// floor so a lagging or regressed clock cannot claw back vested-but-unclaimed tokens.
+    pub vested_high_water: u128,
     pub kind: ScheduleKind,
     pub cancelable: bool,
     pub transferable: bool,

@@ -1138,6 +1138,11 @@
           "type": "u128"
         },
         {
+          "name": "vested_high_water",
+          "type": "u128",
+          "docs": "Greatest cumulative amount proved vested by any completed claim. Cancellation uses this\nfloor so a lagging or regressed clock cannot claw back vested-but-unclaimed tokens."
+        },
+        {
           "name": "kind",
           "type": {
             "defined": "ScheduleKind"

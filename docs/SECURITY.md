@@ -8,7 +8,7 @@ RFP-017 moves escrowed user funds and builds claim transactions inside Logos Bas
 - **Immutable deployment:** `program_loader` `CreateHeader { immutable: true }`, header read back and compared with the reproducible image id (`e2e/run_e2e.sh`). No upgrade key, pause, freeze, blacklist or sweep exists.
 - **Reproducible guest:** `scripts/build-guest.sh --check` rebuilds the guest anywhere and compares image id, SHA-256 and size with `image-ids.tsv`; CI runs it.
 - **Metered refusals:** all 35 deterministic vesting refusals are exit codes (1..=35) charged by cycles used. Some refusals still panic and are charged the transaction's whole gas limit: `lez-authority`'s admin refusals (by that library's design, D-11), messages that do not decode, and assertions on internal continuations that only a misbehaving runtime or token program could reach.
-- **Funds invariants:** exact funding delta at creation; the cancel clamp `vested_at_cancel >= claimed`; per-asset fee vaults; write-once token program id; conservation checked after every step of a randomized multi-actor suite.
+- **Funds invariants:** exact funding delta at creation; the cancel clamp `vested_at_cancel >= max(claimed, vested_high_water)`; per-asset fee vaults; write-once token program id; conservation checked after every step of a randomized multi-actor suite.
 - **Platform risk declared:** RISC Zero advisory GHSA-g6qg-9j8p-7j87 (critical) affects `risc0-zkvm < 3.1.0`, which LEZ `v0.4.0-rc3` uses; Escapement follows the LEZ release that bumps it (D-15).
 
 ## Catalog, signing, and releases (Baseline)

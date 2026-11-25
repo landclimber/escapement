@@ -13,6 +13,9 @@ through `lee::simulate_public_transaction` / `simulate_privacy_preserving_transa
 - `lez-programs` token program at `3f04cc37ec5f`, LEZ clock at `v0.4.0-rc3`;
 - `fee_bps = 0`, no broker.
 
+Not re-measured after the 25 Nov cancel-clamp fix (D-10), which adds one `vested_at` evaluation to
+`ClaimPublic` and `ClaimExact` and changes the guest's image id (`image-ids.tsv`).
+
 Re-run: `RISC0_DEV_MODE=1 cargo test --workspace --locked -- --nocapture` (the tables are printed
 to stderr). The testnet 0.4 measurement is part of the testnet milestone (P2 asks for it).
 

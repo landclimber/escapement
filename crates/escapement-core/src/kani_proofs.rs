@@ -26,6 +26,7 @@ fn schedule(total_amount: u128, claimed_amount: u128, kind: ScheduleKind) -> Sch
         refund_holding: a,
         total_amount,
         claimed_amount,
+        vested_high_water: 0,
         kind,
         cancelable: true,
         transferable: false,
