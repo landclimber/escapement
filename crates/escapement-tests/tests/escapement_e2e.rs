@@ -1565,6 +1565,10 @@ fn c1_same_block_clock_lag_cancel_protects_shared_batch_escrow() {
     assert_eq!(bob_priv.balance(chain.token), 100_000);
     assert_eq!(chain.token_balance(escrow), 0);
 
+    // R2: this cancel fails after its first step. `Cancel` has already set the schedule to wait
+    // for the clock reply when the continuation refuses (fully claimed, code 20); the whole
+    // transaction must be undone, leaving every account as it was.
+    let before_cancel = chain.state.clone();
     let cancel_bob = chain.submit_public(
         Actor::new(creator, chain.vesting),
         &[
@@ -1580,6 +1584,14 @@ fn c1_same_block_clock_lag_cancel_protects_shared_batch_escrow() {
         }),
     );
     assert_exit_code(&cancel_bob, 20);
+    assert!(
+        chain.state == before_cancel,
+        "R2: a cancel refused after its clock read leaves every account as it was"
+    );
+    assert!(
+        chain.schedule(bob_sched).cancelled.is_none(),
+        "R2: the schedule is back in its prior, uncancelled state"
+    );
 }
 
 // ============================================================================
@@ -3658,6 +3670,31 @@ fn negative_guards_authority_zero_address_and_overclaim_suite() {
     } else {
         panic!("milestone schedule lost its kind");
     }
+
+    // F1c: the creator's own signal unlocked exactly tranche 0; the beneficiary claims exactly it.
+    let ms_escrow = single_escrow_pda(chain.vesting, &ms_id);
+    let benef_before = chain.token_balance(benef);
+    chain
+        .submit_public(
+            Actor::new(benef, chain.vesting),
+            &[
+                Actor::new(benef, chain.vesting),
+                Actor::new(ms_id, chain.vesting),
+                clock_actor(),
+                Actor::new(ms_escrow, chain.token),
+                Actor::new(benef, chain.token),
+            ],
+            &[&benef_k],
+            &Wire::Program(VestingMessage::ClaimPublic {
+                schedule_id: ms_id,
+                destination: benef,
+                amount: None,
+            }),
+        )
+        .expect("F1c: the beneficiary claims the tranche the creator signalled");
+    assert_eq!(chain.token_balance(benef) - benef_before, 3_000);
+    assert_eq!(chain.token_balance(ms_escrow), 7_000);
+    assert_eq!(chain.schedule(ms_id).claimed_amount, 3_000);
 }
 
 // ============================================================================
