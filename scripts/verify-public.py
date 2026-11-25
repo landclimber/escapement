@@ -24,7 +24,7 @@ complete: network.json pins the counts of transactions, accounts and native escr
 hash or account twice, and each account that signed a recorded transaction has an on-chain nonce equal to its recorded
 transactions. This checks the committed evidence set, not every transaction the network ever carried.
 
-For each account: program headers carry the recorded image id (Escapement's from image-ids.tsv) and are immutable;
+For each account: program headers carry the recorded image id (Escapement's is the deployed build's, adc8b81f…, recorded in accounts.tsv) and are immutable;
 the configuration holds the recorded token program, fee and admin; each schedule's state (`VestingActorState::
 Schedule`, borsh) shows the recorded creator, beneficiary, asset, kind, total, claimed amount, flags, authorities and
 cancellation, and each native escrow holds exactly what its schedules have not paid out. Exit status 1 on any mismatch.
